@@ -51,3 +51,23 @@ How the spec text was read (each is pinned by a test in `packages/circuit/test/p
 - **Tiers 10 and 11 check only `tL`**, tiers 00 and 01 only `tS`, exactly as the table says. ReleaseGate sets `tL` only after 24 h, which is after `tS` anyway.
 - **UNFREEZE = at least 2 approvals**, independent of every other bit. ReleaseGate only acts on it while frozen.
 - Design: approvals needed = "at least k" with k = 1 + r1 + r0; timelock = `r1 ? tL : tS`; fast lane = `!r0 & e & 3of3`; then `PUBLISH = !f & ((T & Q) | FAST)`. UNFREEZE is computed twice (1 extra gate) because TAP-02 outputs must be the last signals.
+
+## 2026-11-16: Core contracts (ReleaseGate, SignetRegistry)
+
+**Checked first (fork):** a **contract** holding a circuit NFT can write to SiteRegistry (`test/spike/ContractHolder.fork.t.sol`): after transferring circuit #5 to a contract, `canEdit` is true for it and false for the old EOA, the container stays opened, and `putFile` + read-back + SHA-256 work. So the spec fallback (manifest in our own contract) is not needed.
+
+**How the spec was read where it was silent or ambiguous** (each has a test in `test/ReleaseGate.t.sol` / `test/SignetRegistry.t.sol`):
+- **Losing or replacing an approver.** The spec says "replace them with a tier-11 change by the other approvers", but tier 11 is 3 of 3, so two approvers can't pass it. Built as: tier 11 for normal changes; for a lost key or a rogue approver, the **recovery address** proposes a new approver set that executes after **7 days**, even while frozen. **Any 2 current approvers can cancel it** (protects against a stolen recovery key; one rogue approver can't block it). The cancel rule is not in the spec. *Needs your confirmation.*
+- **Approvals belong to an approver-set version.** Any approver change (tier 11 or recovery) makes approvals on open proposals stop counting (`StaleApprovers`). Otherwise a removed key's approvals would survive its removal.
+- **Stale proposals.** A release proposal stores the release it was compared against; if another release is published first, it can't be published (`StaleBase`). Otherwise a proposal made against an old allowlist could later pass as "code only".
+- **Who proposes.** Releases: the proposer key or any approver; the proposer sets `e`. Admin (tier 11): approvers only, never the CI key, never `e`. The proposer can't approve, freeze or unfreeze, and can't be one of the approvers.
+- **Tier 11 also covers** the proposer key, recovery address, guardian, grace window and switching back to observe mode (the spec lists approver set, domain binding, timelocks and circuit swap).
+- **Timelocks** must satisfy short ≤ long ≤ 30 days, so `tL` always implies `tS`.
+- **First release** compares against empty hashes, so it is tier 10 (2 approvals + 24 h, or 3 of 3 + e).
+- **Unfreeze approvals** count only for the current freeze; a new freeze resets them. `unfreeze()` gives the circuit only the approval bits and f = 1.
+- **Observe mode.** Starts at deploy. After 7 days any approver may switch to enforce (stricter only); going back to observe is tier 11.
+- **Domains.** The first claim happens in the gate's constructor (spec: DNS TXT proof at first claim, checked off-chain by Guard and the watchtower; the first-claim race is a known limit). Adding, transferring, unbinding or changing a domain's container is tier 11. A domain's container is either Signet's shared container (free) or the team's own (Pro/Enterprise).
+- **Shared container scope (v1).** SignetRegistry writes only `projects/<domain>/manifest.json`, at most one 24,000-byte chunk, and only bytes whose SHA-256 equals the bound gate's current published manifest hash. Anyone may relay the bytes. There is no owner, no upgrade path, and no function that moves the NFT out. Failover copies (full builds) stay in a team's own container.
+- **Beacon pin.** Every `eval` (publish and unfreeze) first checks `beacon.implementation()` is the address given and checked at deploy; otherwise `BeaconChanged`. Freezing needs no circuit, so it still works if the beacon ever changes.
+
+**Not done yet:** contracts are not deployed; circuit #5 is still held by the dev wallet on mainnet. The 3 fork tests transfer it only on a local fork.
