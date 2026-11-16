@@ -102,9 +102,78 @@ From `forge script script/spike/SpikeA.s.sol` (simulation against live state, no
 
 The gas price was 0.02 gwei base. The OP-stack `GasPriceOracle.getL1Fee` returned **0** for all 4 transactions.
 
-## 6. Open items
+### Spike A on mainnet: done 2026-11-16
 
-- **Immutability.** The circuit beacon owner is `0x0`, so processor code (`eval`, `tapeout`) can't be upgraded through the beacon. The factory is **not** sealed and its owner can still upgrade it; that affects new processors and fees, not stored circuits. Before claiming "immutable" in the README, confirm that a beacon proxy has no other way to change its beacon (needs source, which isn't verified).
+| Item | Value |
+|---|---|
+| Sender (dev wallet) | `0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE` |
+| Processor | #101, `0x73153e5fd2Acac604D49d6ca9fea27b750718F22` |
+| Circuit ID | **5** (2-input AND, `nIn` 2, `nOut` 1, `nState` 0, `gateCount` 2; `netlist(5)` = `0x0000000200000300000004000004`; `ownerOf(5)` = dev wallet) |
+| Probe contract | `0xD12717Fd5604798f66a62554d5AcBB535677DB7E` (`cpu()` = #101, `circuitId()` = 5) |
+
+| # | Tx | Block | Gas used | L2 gas fee (wei) | Value (wei) |
+|---|---|---|---|---|---|
+| 1 | `mint(0, 2)`: [`0x941443a1…52e9`](https://www.oklink.com/xlayer/tx/0x941443a174f38effc4a4a4c532dd3807d04528fc683d409594c2be139a0752e9) | 76,057,582 | 86,399 | 1,727,980,086,399 | 662,000,000,000,000 |
+| 2 | `tapeout(AND, 2, 1)`: [`0xd0a696bf…51a9`](https://www.oklink.com/xlayer/tx/0xd0a696bfd9a79191d542c899d363bb69e85a1972137e300189a743d804d951a9) | 76,057,584 | 224,682 | 4,493,640,224,682 | 1,300,000,000,000,000 |
+| 3 | deploy `CircuitProbe`: [`0x4b8367bb…9a82`](https://www.oklink.com/xlayer/tx/0x4b8367bb737a27d9d7be195bb297c50c38623cf2d5c5b1b7539f5e5942e79a82) | 76,057,586 | 541,209 | 10,824,180,541,209 | 0 |
+| 4 | `probe.record(true, true)`: [`0xaa5aae2f…93ad`](https://www.oklink.com/xlayer/tx/0xaa5aae2f2b6f7bf8a6661867a5281fd089dd14406a39b0950f0110cf60c493ad) | 76,057,587 | 80,679 | 1,613,580,080,679 | 0 |
+| | **Total** | | **932,969** | **18,659,380,932,969** (0.0000187 OKB) | **1,962,000,000,000,000** (0.001962 OKB) |
+
+- Effective gas price was 20,000,001 wei (0.02 gwei); the receipts' `l1Fee` was 0 on all four.
+- **Total spent: 0.001980659380932969 OKB**, equal to the dev wallet's balance drop between blocks 76,057,581 and 76,057,587 (0.031629232644504788 → 0.029648573263571819).
+- **Read-back on mainnet:** `probe.lastOut()` = `true`, so AND(1,1) returned 1 inside transaction 4. Its `Evaluated` event logged `(a=1, b=1, out=1, gasUsed=56,091)` for the contract → `eval` call. `probe.evaluate(...)` returns 0 for (1,0), (0,1) and (0,0).
+
+## 6. Can a factory upgrade change an existing circuit's `eval`? (measured 2026-11-16)
+
+**Answer: no, not through any path we can see on-chain.** A factory upgrade affects only what the factory itself does: creating new processors, fees, and the `isCPU` registry that `tapeout` checks for new REF circuits. It doesn't change how an existing circuit evaluates. The one remaining caveat is that the circuit implementation has no verified source (below).
+
+The call path for `eval` on an existing circuit, from `cast call --trace` on processor #101, circuit 3:
+
+```
+caller ──call──▶ processor proxy 0x7315…8F22 (295 bytes, no functions of its own)
+                   │ staticcall implementation()  ──▶ circuit beacon 0xf70d…991C ──returns──▶ 0x977f…29B2
+                   └ delegatecall eval(id, inputs) ──▶ circuit implementation 0x977f…29B2
+                                                         reads the netlist from SSTORE2 data contracts (code, immutable)
+```
+
+The factory (`0x1f09…0761`) **does not appear** in the trace.
+
+| Link in the path | Who can change it | Evidence |
+|---|---|---|
+| Processor proxy → which beacon | **Nobody.** The beacon address is a `PUSH32` constant in the proxy's runtime bytecode, not a storage slot | `cast code 0x7315…8F22` contains `7f…f70d1ed4f62cf3780157b0b421b7e2f45bd0991c`; the proxy has no function selectors; the ERC-1967 implementation and admin slots are 0 |
+| Beacon → which implementation | **Nobody.** Beacon `owner()` = `0x0` (storage slot 0 = 0); `upgradeTo` is `onlyOwner` | `eth_call upgradeTo(...)` from the factory reverts `OwnableUnauthorizedAccount(0x1f09…0761)`, and from the factory owner reverts `OwnableUnauthorizedAccount(0xB3D8…4D3138)`. The beacon isn't a proxy (619 bytes, ERC-1967 implementation slot 0) |
+| Implementation code | **Nobody.** Contract code can't change. The implementation contains **no `DELEGATECALL` and no `SELFDESTRUCT`** opcodes (`cast disassemble`: 5 `CALL`, 6 `STATICCALL`, 1 `CREATE`, 28 `SSTORE`) | |
+| Processor storage (circuit → netlist pointer) | Only through the implementation's own functions: `tapeout` (appends new ids), ERC-721 transfers and approvals, `sweepFees`, `initialize`. `initialize` reverts `InvalidInitialization` for any caller, including the factory | `eth_call` from `0x…dEaD`, the factory owner and the factory |
+| Netlist bytes | **Nobody.** Stored as SSTORE2 contract code | TAP-02 §6 |
+
+**Caveats:**
+
+- No source is verified, so "no setter for a stored netlist" rests on TAP-02 (verified BSC source of the same design) plus the selector list above. No selector looks like a setter.
+- A circuit that uses **REF** also evaluates the referenced circuits. These run on processors with the same beacon, so the same answer applies.
+- **ReleaseGate should pin** the beacon's `implementation()` and the processor's code hash, and refuse to publish if either changes. This is cheap insurance in case the analysis above misses something.
+
+## 7. `eval` gas vs gate count (measured on a fork, 2026-11-16)
+
+`packages/contracts/test/spike/EvalGas.fork.t.sol`: NAND-only 10-input/2-output circuits, taped out on a fork of processor #101. The measurement is the gas a calling contract sees for `CPU.eval(...)` (call + proxy + beacon lookup + evaluation), taking the maximum over 8 random inputs.
+
+| Circuit | Gates | `eval` gas |
+|---|---|---|
+| synthetic 10 in / 2 out | 2 | 36,840 |
+| synthetic 10 in / 2 out | 30 | 99,966 |
+| synthetic 10 in / 2 out | 60 | 167,112 |
+| synthetic 10 in / 2 out | 90 | 234,870 |
+| synthetic 10 in / 2 out | 120 | 302,744 |
+| existing #101/#3, 2 in / 1 out | 3 | 35,563 |
+| existing #101/#2, 9 in / 5 out | 72 | 195,950 |
+| existing #101/#1, 16 in / 16 out | 1,204 | 2,751,177 |
+
+**Fit: gas ≈ 32,300 + 2,253 × gates**, linear. It predicts the 72-gate and 1,204-gate circuits within 1%; TAP-02 measured ~2,317 gas/gate on BSC.
+
+**Estimate for the Signet policy circuit (10 inputs, 2 outputs, 60–120 NANDs): about 170,000–305,000 gas per `eval`.** At 0.02 gwei that is about 0.0000034–0.0000061 OKB per call. Inputs and outputs barely matter; gate count dominates. Even 120 gates fits easily inside `propose`/`publish`.
+
+## 8. Open items
+
+- **Immutability**: answered in §6. One residual risk: unverified source.
 - `createCPU` arguments and fee unit (only needed if Signet wants its own processor).
 - `eval` gas per gate on X Layer for the real ~1,024-row policy circuit (TAP-02 measured ~2,317 gas/gate on BSC).
 - Sources not available: `trytotapeout/awesome-tapeout` returns 404 (2026-11-16); "Forgeout" not found by search; [tapeout.pro](https://tapeout.pro) is a read-only BSC verifier with no X Layer addresses.
