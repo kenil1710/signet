@@ -98,3 +98,14 @@ Measured first on a fork (`test/spike/Operator.fork.t.sol`), because the design 
 | **L-4** | A gate accepts only TapeOut circuit NFTs (sender's code hash), `renewOperator(circuits, id)` (anyone) makes the registry operator for 30 days, and the registry writes release-approved files at the container root, only while the bound gate holds that container's NFT. If that container is the shared one, `projects/` is off limits. `TransferCircuit` (tier 11) is the way out. | The gate doesn't write files itself; it delegates to the registry as operator, which keeps one write path and keeps the gate small. **Operational duty:** someone must call `renewOperator` at least every 30 days (the watchtower should). If it lapses, file writes pause; publishing and validity checks are unaffected. |
 
 **No split was needed.** With the Solidity optimizer on (200 runs), ReleaseGate is 17.7 KB (limit 24.6 KB). The optimizer was off before; nothing had been deployed with either setting.
+
+## 2026-11-16: The shared container is a new container; circuit #5 stays Signet's own site
+
+- **Decision.** SignetRegistry's shared container (free-tier projects under `projects/<domain>/`) is a **new** container, separate from circuit #5's container `0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`, which stays Signet's own site (dashboard), protected by Signet's own gate.
+- **Supersedes** the earlier entries that named `0x8E2E…94Ed` as the shared container.
+- **Why.** Keeps free-tier project files and Signet's own site in different containers with different holders, so neither can ever write into the other.
+- **Contracts.** No change needed: the shared circuit is a constructor argument of SignetRegistry (`circuits`, `circuitId`). The rule that blocks `projects/` for a gate whose own container equals the shared one stays as a safety net.
+- **Tests.** `test/Core.fork.t.sol` now tapes out and opens a fresh container on the fork and uses it as the shared one; circuit #5 is only used as Signet's own site.
+- **Not done on mainnet yet (needs the human's yes):** tape out a 1-gate circuit on processor #101 and open its container. Cost about 0.082 OKB (0.08 opening fee + 0.0013 tape-out fee + 0.000661 for 1 NAND + gas); the dev wallet holds about 0.0466 OKB, so it needs funding first.
+- **After the hackathon: the shared container's circuit NFT moves to a multisig.** Until then the dev wallet holds it and renews the registry's operator grant (at most 30 days per grant). The holder is the one key that could replace the operator or write to the shared container directly, so it must not stay a single key.
+- **First release and the fast lane (confirmed).** The L-1 exemption only lets a first release *ask* for the fast lane; the circuit still requires 3 of 3 for it. With one or two approvals a first release is plain tier 10: 2 approvals + 24 h. Test: `test_L1_firstRelease_fastLaneStillNeedsThreeOfThree`.

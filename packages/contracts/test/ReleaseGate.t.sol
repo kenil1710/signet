@@ -332,6 +332,25 @@ contract ReleaseGateTest is GateBase {
         assertEq(gate.currentRelease(), 1);
     }
 
+    /// The exemption only lets a first release ASK for the fast lane. The circuit still wants 3 of 3 for it.
+    function test_L1_firstRelease_fastLaneStillNeedsThreeOfThree() public {
+        uint8[6] memory masks = [1, 2, 4, 3, 5, 6]; // every set of one or two approvers
+        for (uint256 i; i < masks.length; i++) {
+            uint256 snap = vm.snapshotState();
+            uint64 id = propose(F1, ALLOW, ORIG, true);
+            approveMask(id, masks[i]);
+            assertFalse(tryPublish(id));
+            vm.warp(block.timestamp + 24 hours - 1); // without 3 of 3 it is plain tier 10: 2 approvals + 24 h
+            assertFalse(tryPublish(id));
+            vm.warp(block.timestamp + 1);
+            assertEq(tryPublish(id), masks[i] == 3 || masks[i] == 5 || masks[i] == 6);
+            vm.revertToState(snap);
+        }
+        uint64 all = propose(F1, ALLOW, ORIG, true);
+        approveMask(all, 7);
+        assertTrue(tryPublish(all));
+    }
+
     // ================================================================ freeze / unfreeze, M-2
 
     function test_freeze_blocksEveryTier() public {

@@ -13,6 +13,7 @@ import {
     IContainerOpener,
     ICircuitNFT
 } from "../src/interfaces/ITapeOutPolicy.sol";
+import {ITapeOutProcessor, ITapeOutTransistors, ITapeOutContainerOpener} from "../src/spike/ITapeOut.sol";
 
 interface ISiteRead {
     function read(address container, string calldata path) external view returns (bytes memory);
@@ -26,7 +27,9 @@ contract MirrorProbe {
 }
 
 /// End to end on a LOCAL fork of X Layer mainnet, no mocks: the real policy circuit #6, the real beacon, the real
-/// processor code hash, and the real SiteRegistry with SignetRegistry as operator of the real shared container.
+/// processor code hash, and the real SiteRegistry with SignetRegistry as operator of the shared container.
+/// The shared container is a NEW container (a fresh circuit taped out and opened here, on the fork only),
+/// separate from circuit #5's container, which stays Signet's own site.
 /// Nothing is broadcast. SKIPPED when XLAYER_RPC_URL is unset.
 contract CoreForkTest is Test {
     address constant CPU = 0x73153e5fd2Acac604D49d6ca9fea27b750718F22; // processor #101
@@ -36,7 +39,10 @@ contract CoreForkTest is Test {
     address constant SITES = 0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6;
     address constant OPENER = 0x536adD8F30f03b69f6fbF29d425A816A0dC50106;
     address constant DEV = 0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE; // holds circuits #5 and #6
-    address constant CONTAINER = 0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed;
+    address constant OWN_SITE = 0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed; // circuit #5's container: Signet's own site
+    address SHARED_HOLDER = makeAddr("sharedHolder"); // a multisig after the hackathon
+    uint256 sharedId;
+    address shared; // the new shared container
     string constant DOMAIN = "demo.signet.example";
     string constant JSON = "application/json";
 
@@ -59,8 +65,18 @@ contract CoreForkTest is Test {
         vm.createSelectFork(rpc);
         forked = true;
         string memory json = vm.readFile("../circuit/artifacts/policy.json");
+        // New shared container: mint 1 NAND, tape out a 1-gate circuit, open its container (fork only).
+        vm.deal(SHARED_HOLDER, 1 ether);
+        vm.startPrank(SHARED_HOLDER);
+        ITapeOutTransistors t = ITapeOutTransistors(ITapeOutProcessor(CPU).transistors());
+        t.mint{value: t.mintPrice() + t.protocolFee()}(t.NAND(), 1);
+        sharedId = ITapeOutProcessor(CPU).tapeout{value: ITapeOutProcessor(CPU).TAPEOUT_FEE()}(hex"00000002000003", 2, 1);
+        ITapeOutContainerOpener(OPENER).open{value: ITapeOutContainerOpener(OPENER).FEE()}(CPU, sharedId);
+        vm.stopPrank();
+        shared = IContainerOpener(OPENER).accountOf(CPU, sharedId);
+
         reg = new SignetRegistry(
-            ISiteRegistryWriter(SITES), IContainerOpener(OPENER), CPU, 5, [makeAddr("o0"), makeAddr("o1"), makeAddr("o2")]
+            ISiteRegistryWriter(SITES), IContainerOpener(OPENER), CPU, sharedId, [makeAddr("o0"), makeAddr("o1"), makeAddr("o2")]
         );
         factory = new SignetFactory(
             address(reg),
@@ -72,9 +88,9 @@ contract CoreForkTest is Test {
             IMPL
         );
         reg.initFactory(address(factory));
-        // Circuit #5 stays with its holder; the holder makes the registry the container's operator.
-        vm.prank(DEV);
-        ISiteRegistryWriter(SITES).setOperator(CONTAINER, address(reg), 30 days);
+        // The shared container's NFT stays with its holder, who makes the registry the container's operator.
+        vm.prank(SHARED_HOLDER);
+        ISiteRegistryWriter(SITES).setOperator(shared, address(reg), 30 days);
         gate = _newGate(DOMAIN, address(0), 0);
     }
 
@@ -119,8 +135,10 @@ contract CoreForkTest is Test {
 
     function test_fork_endToEnd_realCircuit_realSiteRegistry_sharedContainer() public {
         if (!forked) vm.skip(true);
-        assertEq(reg.sharedContainer(), CONTAINER);
-        assertEq(ICircuitNFT(CPU).ownerOf(5), DEV); // not transferred
+        assertEq(reg.sharedContainer(), shared);
+        assertTrue(shared != OWN_SITE);
+        assertEq(ICircuitNFT(CPU).ownerOf(sharedId), SHARED_HOLDER); // not transferred to the registry
+        assertEq(ICircuitNFT(CPU).ownerOf(5), DEV); // circuit #5 is not involved
 
         // a 30,000-byte file list (2 chunks) is the only site file of release 1
         bytes memory filesJson = new bytes(30_000);
@@ -141,12 +159,15 @@ contract CoreForkTest is Test {
 
         string memory base = "projects/demo.signet.example/";
         (uint32 size,, bytes32 h,, uint256 chunks) =
-            ISiteRegistryWriter(SITES).fileInfo(CONTAINER, string.concat(base, "signet/files.json"));
+            ISiteRegistryWriter(SITES).fileInfo(shared, string.concat(base, "signet/files.json"));
         assertEq(size, 30_000);
         assertEq(chunks, 2);
         assertEq(h, sha256(filesJson));
-        assertEq(sha256(ISiteRead(SITES).read(CONTAINER, string.concat(base, "signet/files.json"))), h); // TapeKit rule
-        assertEq(ISiteRead(SITES).read(CONTAINER, string.concat(base, "signet/allowlist.json")), ALLOWLIST);
+        assertEq(sha256(ISiteRead(SITES).read(shared, string.concat(base, "signet/files.json"))), h); // TapeKit rule
+        assertEq(ISiteRead(SITES).read(shared, string.concat(base, "signet/allowlist.json")), ALLOWLIST);
+        // nothing of a free-tier project lands in Signet's own site container
+        (,,,, uint256 inOwn) = ISiteRegistryWriter(SITES).fileInfo(OWN_SITE, string.concat(base, "signet/allowlist.json"));
+        assertEq(inOwn, 0);
 
         // H-1 on the real chain: other allowlist bytes are refused
         vm.expectRevert(SignetRegistry.NotApproved.selector);
@@ -223,45 +244,39 @@ contract CoreForkTest is Test {
         vm.warp(block.timestamp + 24 hours);
     }
 
-    /// L-4: Signet's own gate takes circuit #5, keeps the registry as operator, and publishes Signet's own site
-    /// at the container root, while free-tier projects keep working beside it.
-    function test_fork_L4_gateHoldsRealCircuit5_ownSiteAndSharedProjects() public {
+    /// L-4: Signet's own gate takes circuit #5 and publishes Signet's own site at the root of ITS container.
+    /// Free-tier projects live in the separate shared container; neither can write into the other.
+    function test_fork_L4_gateHoldsRealCircuit5_ownSiteSeparateFromSharedProjects() public {
         if (!forked) vm.skip(true);
         ReleaseGate own = _newGate("signet.example", CPU, 5);
         vm.prank(DEV);
         ICircuitNFT(CPU).safeTransferFrom(DEV, address(own), 5); // real processor calls onERC721Received
         assertEq(ICircuitNFT(CPU).ownerOf(5), address(own));
-        // measured: an NFT transfer clears the operator, so the registry can't write until it is renewed
-        own.renewOperator(CPU, 5);
+        own.renewOperator(CPU, 5); // anyone may call; makes the registry operator of circuit #5's container
 
         bytes memory index = bytes("<!doctype html><title>Signet</title>");
-        string memory inProjects = "projects/demo.signet.example/signet/allowlist.json";
-        bytes32 lIndex = _leaf("index.html", "text/html", index);
-        bytes32 lEvil = _leaf(inProjects, JSON, bytes("{}"));
-        bytes32 root = lIndex < lEvil ? sha256(abi.encodePacked(lIndex, lEvil)) : sha256(abi.encodePacked(lEvil, lIndex));
-        uint64 id = _release(own, root, ALLOWLIST, ORIGINS, true);
+        uint64 id = _release(own, _leaf("index.html", "text/html", index), ALLOWLIST, ORIGINS, true);
         _approve(own, id, 7);
         own.publish(id);
+        reg.writeFile("signet.example", "index.html", "text/html", index, none);
+        assertEq(ISiteRead(SITES).read(OWN_SITE, "index.html"), index);
+        (,,,, uint256 inShared) = ISiteRegistryWriter(SITES).fileInfo(shared, "index.html");
+        assertEq(inShared, 0);
 
-        bytes32[] memory proof = new bytes32[](1);
-        proof[0] = lEvil;
-        reg.writeFile("signet.example", "index.html", "text/html", index, proof);
-        assertEq(ISiteRead(SITES).read(CONTAINER, "index.html"), index);
-        proof[0] = lIndex;
-        vm.expectRevert(SignetRegistry.BadPath.selector);
-        reg.writeFile("signet.example", inProjects, JSON, bytes("{}"), proof);
-
-        // a free-tier project in the same container
+        // a free-tier project: its file goes to the shared container, not to Signet's own site
+        string memory inProjects = "projects/demo.signet.example/signet/allowlist.json";
         uint64 r = _release(gate, keccak256("files"), ALLOWLIST, ORIGINS, true);
         _approve(gate, r, 7);
         gate.publish(r);
         reg.writeFile(DOMAIN, "signet/allowlist.json", JSON, ALLOWLIST, none);
-        assertEq(ISiteRead(SITES).read(CONTAINER, inProjects), ALLOWLIST);
+        assertEq(ISiteRead(SITES).read(shared, inProjects), ALLOWLIST);
+        (,,,, uint256 inOwn) = ISiteRegistryWriter(SITES).fileInfo(OWN_SITE, inProjects);
+        assertEq(inOwn, 0);
 
         // the old holder can no longer write; a non-TapeOut NFT callback is refused
         vm.prank(DEV);
         vm.expectRevert();
-        ISiteRegistryWriter(SITES).putFile(CONTAINER, "index.html", "text/html", bytes32(0), "x");
+        ISiteRegistryWriter(SITES).putFile(OWN_SITE, "index.html", "text/html", bytes32(0), "x");
         vm.prank(BEACON);
         vm.expectRevert(ReleaseGate.NotTapeOutCircuit.selector);
         own.onERC721Received(DEV, DEV, 1, "");
