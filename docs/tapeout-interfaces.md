@@ -258,7 +258,33 @@ Error seen: `0x30cd7471` = `NotOwner()` (TAP-10 error list) when the caller can'
 
 **Cost per KB: about 241,000 gas per extra KB** (slope 12 KB → 24 KB), i.e. **≈ 0.0000048 OKB per KB** at 0.02 gwei, plus about 330,000 gas (≈ 0.0000066 OKB) fixed per file. A 5 MB full site costs about 1.24 billion gas ≈ 0.025 OKB in gas (spread over ≥ 214 transactions of ≤ 6M gas; the block gas limit is 210M). A few-KB manifest costs well under 0.0001 OKB. **The dominant cost is the one-time 0.08 OKB container opening, not storage.**
 
-## 9. Open items
+## 9. Signet policy circuit on mainnet (taped out 2026-11-16)
+
+| Item | Value |
+|---|---|
+| Processor | **#101, `0x73153e5fd2Acac604D49d6ca9fea27b750718F22`** |
+| Policy circuit ID | **6** |
+| Holder | dev wallet `0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE` |
+| `circuitInfo(6)` | `nIn` 9, `nOut` 2, `nState` 0, `gateCount` 34 |
+| `netlist(6)` sha256 | `0x1a2e19870a19f653af4bddf049e1070461b7466577640a4cb341a579838b20db` (= reviewed `packages/circuit/artifacts/policy.json`) |
+| Inputs / outputs | `a0 a1 a2 tS tL r1 r0 f e` → `PUBLISH`, `UNFREEZE`; packing per TAP-02 §5 (2 input bytes, 1 output byte) |
+| Truth table | `docs/policy-truth-table.md` |
+| Record | `packages/circuit/artifacts/deployment.json`, `packages/contracts/broadcast/PolicyTapeout.s.sol/196/` |
+
+| # | Tx | Block | Gas used | L2 gas fee (wei) | Value (wei) |
+|---|---|---|---|---|---|
+| 1 | `mint(0, 34)` on transistors `0xBf0B…ae54`: [`0x1c772cbe…b1be`](https://www.oklink.com/xlayer/tx/0x1c772cbe1cfeded533308f7fb3be7a07338144754d8d95205359efef0ff6b1be) | 76,060,132 | 86,399 | 1,727,980,086,399 | 694,000,000,000,000 |
+| 2 | `tapeout(policy netlist, 9, 2)`: [`0x354cb0d5…2b96`](https://www.oklink.com/xlayer/tx/0x354cb0d5e93245326e19cab3c701d5b6b72122d6e293c96f6d7b2211a4f82b96) | 76,060,134 | 298,159 | 5,963,180,298,159 | 1,300,000,000,000,000 |
+| | **Total** | | **384,558** | **7,691,160,384,558** (0.0000077 OKB) | **1,994,000,000,000,000** (0.001994 OKB) |
+
+- Gas price was 20,000,001 wei and the receipts' `l1Fee` was 0.
+- **Total spent: 0.002001691160384558 OKB**, equal to the dev wallet's balance drop between blocks 76,060,131 and 76,060,134.
+- All 34 minted NANDs were burned (NAND balance 0 afterwards).
+- Mainnet gas was below the fork measurement for both transactions (mint 86,399 vs ~101k; tape-out 298,159 vs 352k execution on the fork).
+
+**Verified on mainnet:** `node packages/circuit/scripts/verify-mainnet.ts 0x7315…8F22 6` sent one `eth_call` to `eval(6, input)` for every one of the 512 inputs. They were pinned to block 76,060,204 and sent to both `xlayerrpc.okx.com` and `xlayer.drpc.org`. **512/512 matched the reference on both operators**, and PUBLISH = 1 on 68 rows, as the table says. The forge script had already checked the same 512 rows right after the tape-out (simulation).
+
+## 10. Open items
 
 - **Immutability**: answered in §6. One residual risk: unverified source.
 - `createCPU` arguments and fee unit (only needed if Signet wants its own processor).

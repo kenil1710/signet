@@ -1,11 +1,20 @@
 // Writes artifacts/policy.json and docs/policy-truth-table.md. Run: pnpm --filter @signet/circuit gen
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { artifact } from './artifact.ts';
 import { policy, inputsOf, N_COMBINATIONS, INPUTS } from '../src/reference.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const a = artifact();
+const depPath = `${here}../artifacts/deployment.json`;
+const dep = existsSync(depPath) ? JSON.parse(readFileSync(depPath, 'utf8')) : null;
+if (dep && dep.netlistSha256 !== a.netlistSha256) throw new Error('deployment.json is for a different netlist');
+const okl = (h: string) => `[\`${h.slice(0, 10)}…${h.slice(-4)}\`](https://www.oklink.com/xlayer/tx/${h})`;
+const onChain = dep
+  ? `**Processor #${dep.processorIndex} \`${dep.processor}\`, circuit ID ${dep.circuitId}** (chain ${dep.chainId}). Mint ${okl(dep.mintTx)}, tape-out ${okl(dep.tapeoutTx)} (block ${dep.tapeoutBlock}). All 512 rows checked with \`eval\` on mainnet at block ${dep.verifiedAtBlock} on two RPC operators: 512/512 match`
+  : '_not taped out yet_';
+const cpuArg = dep ? dep.processor : '<processor>';
+const idArg = dep ? String(dep.circuitId) : '<circuitId>';
 writeFileSync(`${here}../artifacts/policy.json`, JSON.stringify(a, null, 2) + '\n');
 
 const b = (v: boolean) => (v ? '1' : '0');
@@ -52,15 +61,15 @@ If **f** = 1, PUBLISH = 0. **UNFREEZE** = at least 2 approvals.
 | Gates | **${a.gates} NAND**, no LATCH (combinational: read with \`eval\`) |
 | Netlist (TAP-02 format, ${a.netlist.length / 2 - 1} bytes) | \`${a.netlist}\` |
 | Netlist SHA-256 | \`${a.netlistSha256}\` |
-| On X Layer mainnet | _not taped out yet_ |
+| On X Layer mainnet | ${onChain} |
 
-**Check any row yourself** (after tape-out): input number \`n\` from the table is packed little-endian into 2 bytes (input i = bit i), for example row 0x1a9 → \`0xa901\`:
+**Check any row yourself**: input number \`n\` from the table is packed little-endian into 2 bytes (input i = bit i), for example row 0x1a9 → \`0xa901\`:
 
 \`\`\`
-cast call <processor> "eval(uint256,bytes)(bytes)" <circuitId> 0xa901 --rpc-url https://xlayerrpc.okx.com
+cast call ${cpuArg} "eval(uint256,bytes)(bytes)" ${idArg} 0xa901 --rpc-url https://xlayerrpc.okx.com
 \`\`\`
 
-The answer byte is bit 0 = PUBLISH, bit 1 = UNFREEZE (\`0x00\`, \`0x01\`, \`0x02\` or \`0x03\`).
+The answer byte is bit 0 = PUBLISH, bit 1 = UNFREEZE (\`0x00\`, \`0x01\`, \`0x02\` or \`0x03\`). To check all 512 rows at once: \`node packages/circuit/scripts/verify-mainnet.ts ${cpuArg} ${idArg}\`.
 
 ## Summary
 
