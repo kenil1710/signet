@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 import {GateBase} from "./GateBase.sol";
 import {ReleaseGate} from "../src/ReleaseGate.sol";
+import {SignetRegistry} from "../src/SignetRegistry.sol";
+import {SignetFactory} from "../src/SignetFactory.sol";
 import {NetlistProcessor, FakeProcessor} from "./mocks/Mocks.sol";
 
 /// ReleaseGate against docs/signet-spec.md and the security-review fixes (H-1..L-4, named in the test names).
@@ -16,8 +18,8 @@ contract ReleaseGateTest is GateBase {
     /// For every circuit input a gate can produce, build that exact state through the gate (approvals, time since
     /// the last approval, tier from hashes, freeze, emergency flag), check the gate hands the circuit exactly
     /// those 9 bits, and check publish succeeds iff the truth table says PUBLISH = 1.
-    /// Unreachable by construction: tL without tS; a timelock bit with no approval (the clock starts at the last
-    /// approval); tier 11 with e (admin proposals have no fast lane).
+    /// Unreachable by construction: tL without tS; a timelock bit with fewer approvals than the tier needs (the
+    /// clock starts when that count is reached); tier 11 with e (admin proposals have no fast lane).
     function test_exhaustive_gateBitsAndPublishMatchTruthTable() public {
         uint256 checked;
         uint256 published;
@@ -27,7 +29,8 @@ contract ReleaseGateTest is GateBase {
             uint8 tier = uint8(((n >> 5) & 1) << 1 | ((n >> 6) & 1)); // r1 r0
             bool e = n & 256 != 0;
             if (tL && !tS) continue;
-            if (n & 7 == 0 && tS) continue;
+            uint8 count = uint8((n & 1) + ((n >> 1) & 1) + ((n >> 2) & 1));
+            if (tS && count < (tier == 0 ? 1 : tier == 3 ? 3 : 2)) continue; // the clock starts at the tier's count
             if (tier == 3 && e) continue;
 
             uint256 snap = vm.snapshotState();
@@ -50,7 +53,7 @@ contract ReleaseGateTest is GateBase {
             checked++;
             vm.revertToState(snap);
         }
-        assertEq(checked, 308); // (7 approval sets x 3 timelock states + 1) x (3 tiers x 2 + 1) x 2 freeze states
+        assertEq(checked, 236); // per tier: 22 x 2 (00), 16 x 2 (01), 16 x 2 (10), 10 (11); x 2 freeze states
         emit log_named_uint("reachable inputs checked", checked);
         emit log_named_uint("of which PUBLISH", published);
     }
@@ -133,15 +136,50 @@ contract ReleaseGateTest is GateBase {
         assertTrue(tryPublish(id));
     }
 
-    function test_H2_laterApprovalRestartsTheClock() public {
+    // ---- L-3 (second review): the clock starts when the tier's approval count is first reached
+
+    function test_L3_clockStartsWhenRequiredCountIsReached() public {
         baseline(F1);
-        uint64 id = propose(F2, ALLOW2, ORIG, false);
+        uint64 id = propose(F2, ALLOW2, ORIG, false); // tier 10 needs 2
         approveMask(id, 1);
+        assertEq(gate.getProposal(id).readyAt, 0); // one approval: not started
         vm.warp(block.timestamp + 23 hours);
-        approveMask(id, 2); // the second approval is the last one
-        vm.warp(block.timestamp + 1 hours);
+        approveMask(id, 2); // the count is reached now
+        assertEq(gate.getProposal(id).readyAt, block.timestamp);
+        vm.warp(block.timestamp + 24 hours - 1);
         assertFalse(tryPublish(id));
-        vm.warp(block.timestamp + 23 hours);
+        vm.warp(block.timestamp + 1);
+        assertTrue(tryPublish(id));
+    }
+
+    function test_L3_extraApprovalsDoNotRestartTheClock() public {
+        baseline(F1);
+        uint64 id = propose(F2, ALLOW, ORIG, false); // tier 00 needs 1
+        approveMask(id, 1);
+        vm.warp(block.timestamp + 50 minutes);
+        approveMask(id, 6); // two more approvals, late
+        vm.warp(block.timestamp + 10 minutes);
+        assertTrue(tryPublish(id)); // 1 h after the FIRST approval
+    }
+
+    function test_L3_droppingBelowTheCountResetsTheClock() public {
+        baseline(F1);
+        uint64 id = propose(F2, ALLOW, ORIG2, false); // tier 01 needs 2
+        approveMask(id, 7);
+        vm.warp(block.timestamp + 30 minutes);
+        vm.prank(A2);
+        gate.withdrawApproval(id); // 2 left: still at the count, clock keeps running
+        assertTrue(gate.getProposal(id).readyAt != 0);
+        vm.prank(A1);
+        gate.withdrawApproval(id); // 1 left: below the count
+        assertEq(gate.getProposal(id).readyAt, 0);
+        vm.warp(block.timestamp + 2 hours);
+        assertFalse(tryPublish(id));
+        vm.prank(A1);
+        gate.approve(id); // reached again: the clock starts over
+        vm.warp(block.timestamp + 1 hours - 1);
+        assertFalse(tryPublish(id));
+        vm.warp(block.timestamp + 1);
         assertTrue(tryPublish(id));
     }
 
@@ -549,7 +587,7 @@ contract ReleaseGateTest is GateBase {
         beacon.set(evil);
         assertFalse(tryPublish(denied)); // the mirror applies the same policy
         vm.expectEmit(false, false, false, true, address(gate));
-        emit ReleaseGate.PolicyFallbackActive(evil);
+        emit ReleaseGate.PolicyFallbackActive(evil, 1);
         gate.publish(ok);
         assertEq(gate.currentRelease(), ok);
     }
@@ -577,11 +615,35 @@ contract ReleaseGateTest is GateBase {
         assertFalse(gate.frozen());
     }
 
+    function test_info_circuitEvalReverts_mirrorDecides_andEventIsEmitted() public {
+        baseline(F1);
+        uint64 denied = propose(F2, ALLOW, ORIG2, true); // tier 01: no fast lane, also under the mirror
+        approveMask(denied, 7);
+        uint64 ok = propose(F3, ALLOW, ORIG, true);
+        approveMask(ok, 7);
+        vm.mockCallRevert(address(cpu), abi.encodeWithSelector(NetlistProcessor.eval.selector), "circuit unavailable");
+        assertFalse(tryPublish(denied));
+        vm.expectEmit(false, false, false, true, address(gate));
+        emit ReleaseGate.PolicyFallbackActive(IMPL, 2);
+        gate.publish(ok);
+        assertEq(gate.currentRelease(), ok);
+    }
+
+    function test_info_circuitAnswersWithBadLength_mirrorDecides() public {
+        baseline(F1);
+        uint64 id = propose(F2, ALLOW, ORIG, false); // one approval, no timelock yet: must stay denied
+        approveMask(id, 1);
+        vm.mockCall(address(cpu), abi.encodeWithSelector(NetlistProcessor.eval.selector), abi.encode(hex"0303"));
+        assertFalse(tryPublish(id));
+        vm.warp(block.timestamp + 1 hours);
+        assertTrue(tryPublish(id));
+    }
+
     function test_M1_beaconUnchanged_noFallbackEvent() public {
         vm.recordLogs();
         baseline(F1);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 topic = keccak256("PolicyFallbackActive(address)");
+        bytes32 topic = keccak256("PolicyFallbackActive(address,uint8)");
         assertGt(logs.length, 0);
         for (uint256 i; i < logs.length; i++) {
             assertTrue(logs[i].topics[0] != topic);
@@ -772,9 +834,9 @@ contract ReleaseGateTest is GateBase {
         gate.revoke(id);
         vm.prank(A1);
         gate.voteUnrevoke(id);
-        vm.prank(A0);
-        gate.revoke(id);
         vm.prank(A2);
+        gate.revoke(id);
+        vm.prank(A0);
         gate.voteUnrevoke(id);
         assertFalse(gate.isValidManifest(mh(F1, ALLOW, ORIG)));
     }
@@ -1016,22 +1078,29 @@ contract ReleaseGateTest is GateBase {
         assertEq(prefix, "projects/app.example.org/");
     }
 
-    function test_threat11_rebindDomainNeedsTier11() public {
+    function test_threat11_rebindDomainNeedsTier11_andTheNewGateMustAccept() public {
+        ReleaseGate mine = gate;
         ReleaseGate other = newGate("other.example.org");
         uint64 id = proposeAdmin(ReleaseGate.Action.TransferDomain, abi.encode(DOMAIN, address(other)));
         approveMask(id, 3);
         vm.warp(block.timestamp + 5 days);
-        assertFalse(tryPublish(id));
+        assertFalse(tryPublish(id)); // 2 of 3 is not enough
         approveMask(id, 4);
         vm.warp(block.timestamp + 24 hours);
         assertTrue(tryPublish(id));
         (address g,,) = reg.bindingOf(DOMAIN);
+        assertEq(g, address(mine)); // L-4: nothing moves until the receiving gate accepts
+        assertEq(reg.pendingGateOf(DOMAIN), address(other));
+        gate = other;
+        admin(ReleaseGate.Action.AcceptDomain, abi.encode(DOMAIN));
+        (g,,) = reg.bindingOf(DOMAIN);
         assertEq(g, address(other));
+        assertEq(reg.pendingGateOf(DOMAIN), address(0));
     }
 
     function test_edge_manyDomains_oneGate_andOwnContainer() public {
-        admin(ReleaseGate.Action.BindDomain, abi.encode("docs.example.org", address(0), uint256(0)));
-        admin(ReleaseGate.Action.BindDomain, abi.encode("beta.example.org", address(cpu), uint256(77)));
+        bindDomain("docs.example.org", address(0), 0);
+        bindDomain("beta.example.org", address(cpu), 77);
         (address g1, address c1,) = reg.bindingOf("docs.example.org");
         (address g2, address c2, string memory p2) = reg.bindingOf("beta.example.org");
         assertEq(g1, address(gate));
@@ -1040,9 +1109,35 @@ contract ReleaseGateTest is GateBase {
         assertEq(c2, opener.accountOf(address(cpu), 77));
         assertEq(p2, "");
         // an existing binding moves to an own container (Pro/Enterprise upgrade)
-        admin(ReleaseGate.Action.BindDomain, abi.encode(DOMAIN, address(cpu), uint256(77)));
+        admin(ReleaseGate.Action.SetContainer, abi.encode(DOMAIN, address(cpu), uint256(77)));
         (, address c3,) = reg.bindingOf(DOMAIN);
         assertEq(c3, opener.accountOf(address(cpu), 77));
+    }
+
+    function test_info_bindDomain_showsTheRealError() public {
+        // an already-bound domain: the registry's own error comes through, nothing is silently retried
+        bytes32 salt = keccak256("s");
+        bytes32 c = factory.commitmentOf(DOMAIN, salt, address(gate)); // before vm.prank (it is a call)
+        vm.prank(A0);
+        gate.commitDomain(c);
+        vm.roll(block.number + 2);
+        uint64 id = proposeAdmin(ReleaseGate.Action.BindDomain, abi.encode(DOMAIN, salt, address(0), uint256(0)));
+        approveMask(id, 7);
+        vm.warp(block.timestamp + 24 hours);
+        vm.expectRevert(SignetRegistry.AlreadyBound.selector);
+        gate.publish(id);
+        // no commit: the factory's error comes through
+        id = proposeAdmin(ReleaseGate.Action.BindDomain, abi.encode("new.example.org", salt, address(0), uint256(0)));
+        approveMask(id, 7);
+        vm.warp(block.timestamp + 24 hours);
+        vm.expectRevert(SignetFactory.NoCommit.selector);
+        gate.publish(id);
+    }
+
+    function test_commitDomain_onlyApprovers() public {
+        vm.prank(P);
+        vm.expectRevert(ReleaseGate.NotApprover.selector);
+        gate.commitDomain(bytes32(uint256(1)));
     }
 
     function test_edge_giveUpDomain_unbindIsTier11() public {
@@ -1099,6 +1194,138 @@ contract ReleaseGateTest is GateBase {
         cpu.safeTransferFrom(X, address(gate), 77);
         admin(ReleaseGate.Action.TransferCircuit, abi.encode(address(cpu), uint256(77), X));
         assertEq(cpu.ownerOf(77), X);
+    }
+
+    // ================================================================ second review
+
+    // M-1: the tier is compared with the most recent NON-revoked release
+    function test_R2M1_tierIsComparedWithLastNonRevokedRelease() public {
+        baseline(F1); // allowlist v1
+        uint64 r2 = propose(F2, ALLOW2, ORIG, true); // allowlist v2, fast lane
+        approveMask(r2, 7);
+        gate.publish(r2);
+        assertEq(gate.getProposal(propose(F3, ALLOW2, ORIG, false)).tier, 0); // vs r2: code only
+        vm.prank(A0);
+        gate.revoke(r2); // v2 turned out to be bad
+        // the same hashes are now a NEW contract list compared with the last good release (r1)
+        assertEq(gate.getProposal(propose(F3, ALLOW2, ORIG, false)).tier, 2);
+        assertEq(gate.getProposal(propose(F3, ALLOW, ORIG, false)).tier, 0);
+    }
+
+    function test_R2M1_proposalMadeBeforeARevoke_isStale() public {
+        baseline(F1);
+        uint64 r2 = propose(F2, ALLOW2, ORIG, true);
+        approveMask(r2, 7);
+        gate.publish(r2);
+        uint64 pending = propose(F3, ALLOW2, ORIG, false); // tier 00 against r2
+        approveMask(pending, 1);
+        vm.prank(A2);
+        gate.revoke(r2);
+        vm.warp(block.timestamp + 1 hours);
+        vm.expectRevert(ReleaseGate.StaleBase.selector); // its tier was computed against a now-revoked release
+        gate.publish(pending);
+    }
+
+    function test_R2M1_revokedManifestCannotBeProposedAgain_onlyUnrevoked() public {
+        baseline(F1);
+        uint64 r2 = propose(F2, ALLOW2, ORIG, true);
+        approveMask(r2, 7);
+        gate.publish(r2);
+        vm.prank(A0);
+        gate.revoke(r2);
+        vm.prank(P);
+        vm.expectRevert(ReleaseGate.RevokedManifest.selector);
+        gate.proposeRelease(F2, ALLOW2, ORIG, false);
+        vm.prank(A1); // an approver can't re-propose it either
+        vm.expectRevert(ReleaseGate.RevokedManifest.selector);
+        gate.proposeRelease(F2, ALLOW2, ORIG, true);
+        vm.prank(A1);
+        gate.voteUnrevoke(r2);
+        vm.prank(A2);
+        gate.voteUnrevoke(r2);
+        assertTrue(gate.isValidManifest(mh(F2, ALLOW2, ORIG)));
+        propose(F2, ALLOW2, ORIG, false); // allowed again
+    }
+
+    function test_R2M1_everyReleaseRevoked_nextOneIsTier10() public {
+        uint64 r1 = baseline(F1);
+        vm.prank(A0);
+        gate.revoke(r1);
+        assertEq(gate.getProposal(propose(F2, ALLOW, ORIG, false)).tier, 2); // nothing good to compare with
+    }
+
+    // M-4: the approver who proposed a release can't count their own approval
+    function test_R2M4_proposingApproverCannotApproveOwnRelease() public {
+        baseline(F1);
+        vm.prank(A0);
+        uint64 id = gate.proposeRelease(F2, ALLOW, ORIG, false); // tier 00 would need just one approval
+        vm.prank(A0);
+        vm.expectRevert(ReleaseGate.OwnProposal.selector);
+        gate.approve(id);
+        vm.warp(block.timestamp + 6 days);
+        assertFalse(tryPublish(id)); // one stolen approver key can't propose and approve alone
+        approveMask(id, 2); // another approver
+        vm.warp(block.timestamp + 1 hours);
+        assertTrue(tryPublish(id));
+    }
+
+    function test_R2M4_ownProposal_cannotUseTheFastLane_adminIsUnaffected() public {
+        baseline(F1);
+        vm.prank(A0);
+        uint64 id = gate.proposeRelease(F2, ALLOW, ORIG, true);
+        approveMask(id, 6); // only 2 of 3 can ever approve it
+        assertFalse(tryPublish(id));
+        vm.warp(block.timestamp + 1 hours);
+        assertTrue(tryPublish(id)); // the normal path still works
+        // admin proposals need 3 of 3, so the proposing approver's approval counts
+        admin(ReleaseGate.Action.SetObserveMode, "");
+    }
+
+    // L-1: revoke cooldown
+    function test_R2L1_revokeCooldown_onePer24hPerApprover() public {
+        uint64 r1 = baseline(F1);
+        uint64 r2 = propose(F2, ALLOW, ORIG, true);
+        approveMask(r2, 7);
+        gate.publish(r2);
+        vm.prank(A0);
+        gate.revoke(r1);
+        vm.prank(A0);
+        vm.expectRevert(ReleaseGate.RevokeCooldown.selector);
+        gate.revoke(r2);
+        vm.warp(block.timestamp + 24 hours - 1);
+        vm.prank(A0);
+        vm.expectRevert(ReleaseGate.RevokeCooldown.selector);
+        gate.revoke(r2);
+        vm.prank(A1);
+        gate.revoke(r2); // another approver is not blocked
+        vm.warp(block.timestamp + 1);
+        vm.prank(A0);
+        gate.revoke(r2);
+    }
+
+    // L-2: guardian-removal votes expire after 7 days
+    function test_R2L2_guardianRemovalVotesExpireAfter7Days() public {
+        vm.prank(A0);
+        gate.voteRemoveGuardian();
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(A1);
+        gate.voteRemoveGuardian();
+        assertEq(gate.guardian(), G); // A0's vote is too old
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(A2);
+        gate.voteRemoveGuardian(); // exactly 7 days after A1: still counts
+        assertEq(gate.guardian(), address(0));
+    }
+
+    // L-7: zero hashes are rejected
+    function test_R2L7_zeroAllowlistOrOriginsHash_rejected() public {
+        vm.startPrank(P);
+        vm.expectRevert(ReleaseGate.BadProposal.selector);
+        gate.proposeRelease(F1, bytes32(0), ORIG, false);
+        vm.expectRevert(ReleaseGate.BadProposal.selector);
+        gate.proposeRelease(F1, ALLOW, bytes32(0), false);
+        gate.proposeRelease(F1, sha256("[]"), sha256("[]"), false); // an explicit empty list is fine
+        vm.stopPrank();
     }
 
     // ================================================================ helpers

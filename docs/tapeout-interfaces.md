@@ -238,6 +238,8 @@ Sources:
 
 **Operators (measured on a fork, 2026-11-16, `test/spike/Operator.fork.t.sol`):** `setOperator(container, op, ttl)` is holder-only and works for a contract holder; `ttl` above 30 days reverts; one operator per container (a new one replaces the old); an operator can `putFile`, `appendChunk`, `removeFile` and `setFallback` but can't set an operator; the grant ends at `operatorUntil` and is cleared when the circuit NFT is transferred. `setFallback` is one path per container. Views: `operatorOf(address)` (`0x636f35d3`), `operatorUntil(address)` (`0xc85cf62b`).
 
+**Per-transaction gas limit (measured 2026-11-17, `xlayerrpc.okx.com`):** block `gasLimit` is 210,000,000. `eth_estimateGas` for a contract creation that burns ~13M, 16M, 18M, 31M, 104M and 195M gas all succeed (the last returns 196,586,042), so no 2^24 cap is enforced in estimation. In the latest 600 blocks (20,452 transactions) the largest transaction gas limit was 11,054,062, so nothing above 16.7M was observed on-chain either way. Optimism's docs say OP-stack chains reject transactions above 16,777,216 gas after their Osaka upgrade and that estimates then never exceed it ([Osaka on L2](https://docs.optimism.io/op-stack/features/osaka-on-l2), [EIP-7825](https://eips.ethereum.org/EIPS/eip-7825)). SignetRegistry therefore keeps single writes under that cap (48,000 bytes = 10.5M gas).
+
 **Processor proxy code hash:** `0x57aa306fd0be97087da3534e03398f5ff4efd533b5be4e45a405ce86fa6717d5` for processors #1 and #101 (`cast keccak $(cast code …)`), equal to TAP-10's "Processor proxy code hash" for Base/X Layer. ReleaseGate pins it.
 
 Error seen: `0x30cd7471` = `NotOwner()` (TAP-10 error list) when the caller can't edit.

@@ -37,9 +37,6 @@ abstract contract GateBase is Test {
     address R = makeAddr("recovery");
     address G = makeAddr("guardian");
     address X = makeAddr("stranger");
-    address O0 = makeAddr("ops0");
-    address O1 = makeAddr("ops1");
-    address O2 = makeAddr("ops2");
     address SHARED_HOLDER = makeAddr("sharedHolder"); // holds circuit #5 (the dev wallet today)
 
     bytes32 constant ALLOW = keccak256("allowlist-v1");
@@ -65,7 +62,7 @@ abstract contract GateBase is Test {
         sites.registerContainer(sharedContainer, cpu, SHARED_ID);
 
         reg = new SignetRegistry(
-            ISiteRegistryWriter(address(sites)), IContainerOpener(address(opener)), address(cpu), SHARED_ID, [O0, O1, O2]
+            ISiteRegistryWriter(address(sites)), IContainerOpener(address(opener)), address(cpu), SHARED_ID
         );
         factory = new SignetFactory(
             address(reg),
@@ -97,8 +94,28 @@ abstract contract GateBase is Test {
         uint256 tokenId
     ) internal returns (ReleaseGate) {
         SignetFactory.DomainInit[] memory d = new SignetFactory.DomainInit[](bytes(domain).length > 0 ? 1 : 0);
-        if (d.length > 0) d[0] = SignetFactory.DomainInit(domain, circuits, tokenId);
+        if (d.length > 0) {
+            bytes32 salt = keccak256(bytes(domain));
+            d[0] = SignetFactory.DomainInit(domain, salt, circuits, tokenId);
+            bytes32 c = factory.commitmentOf(domain, salt, address(this));
+            (uint64 at,) = factory.commits(c);
+            if (at == 0) factory.commit(c); // commit, then reveal at least 2 blocks later
+            vm.roll(block.number + 2);
+        }
         return ReleaseGate(factory.createGate(a, prop, rec, guard, d));
+    }
+
+    /// Commit, wait 2 blocks, then expect the reveal (createGate) itself to revert with `err`.
+    function expectCreateRevert(bytes4 err, string memory domain) internal {
+        bytes32 salt = keccak256(bytes(domain));
+        SignetFactory.DomainInit[] memory d = new SignetFactory.DomainInit[](1);
+        d[0] = SignetFactory.DomainInit(domain, salt, address(0), 0);
+        bytes32 c = factory.commitmentOf(domain, salt, address(this));
+        (uint64 at,) = factory.commits(c);
+        if (at == 0) factory.commit(c);
+        vm.roll(block.number + 2);
+        vm.expectRevert(err);
+        factory.createGate([A0, A1, A2], P, R, G, d);
     }
 
     // ---------------------------------------------------------------- helpers
@@ -144,7 +161,17 @@ abstract contract GateBase is Test {
         gate.publish(id);
     }
 
-    /// Run a tier-11 admin action to completion: 3 of 3, then the long timelock from the last approval.
+    /// A gate adds a domain: an approver commits, then a tier-11 BindDomain reveals it.
+    function bindDomain(string memory domain, address circuits, uint256 tokenId) internal {
+        bytes32 salt = keccak256(bytes(domain));
+        bytes32 c = factory.commitmentOf(domain, salt, address(gate));
+        vm.prank(A1);
+        gate.commitDomain(c);
+        vm.roll(block.number + 2);
+        admin(ReleaseGate.Action.BindDomain, abi.encode(domain, salt, circuits, tokenId));
+    }
+
+    /// Run a tier-11 admin action to completion: 3 of 3, then the long timelock from the third approval.
     function admin(ReleaseGate.Action a, bytes memory args) internal {
         uint64 id = proposeAdmin(a, args);
         approveMask(id, 7);

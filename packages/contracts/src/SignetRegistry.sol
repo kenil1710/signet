@@ -9,27 +9,35 @@ interface IReleaseGateView {
 
 /// Domain -> project binding, and the file writer for sealed releases (docs/decisions.md).
 ///
-/// Bindings. Only gates made by SignetFactory can be bound. The first claim of a domain is open (spec threat 11:
-/// DNS TXT proof at first claim, checked off-chain). After that only the bound gate can change the binding, and a
-/// gate does that only by executing a tier-11 proposal.
+/// Bindings. Only gates made by SignetFactory can be bound, and a first claim goes through the factory's
+/// commit-reveal. After that only the bound gate can change the binding, and a gate does that only by executing
+/// a tier-11 proposal. A transfer needs the receiving gate to accept. After an unbind, only the previous gate
+/// can claim the domain again for 30 days.
 ///
 /// Files. This contract never holds a circuit NFT. It writes as the SiteRegistry OPERATOR of a container, a
 /// right the container's holder grants for at most 30 days at a time:
-///   - free tier:  Signet's shared container, under `projects/<domain>/`
+///   - Signet's shared container:  `projects/<domain>/` for every free-tier project, and `signet/` for
+///     Signet's own site (one gate, named once by the deployer). The two prefixes can never overlap.
 ///   - own container: a container whose circuit NFT the bound gate itself holds, at the container root
 /// It writes only bytes the bound gate's current, non-revoked release approves:
 ///   signet/allowlist.json   sha256(bytes) == allowlistHash
 ///   signet/origins.json     sha256(bytes) == originsHash
-///   any other path          sha256-Merkle proof of leaf(path, contentType, sha256(bytes)) against filesRoot
+///   any other path          sha256-Merkle proof of leaf(domain, path, contentType, sha256(bytes)) against filesRoot
 /// Anyone may relay the bytes; the content is fixed by the gate's approval.
 ///
-/// Migration. Signet ops (2 of 3) can announce a successor registry; it takes effect 7 days after a public
-/// event. From then on this registry stops accepting claims and writes. Gates follow by their own tier-11 vote.
+/// There is no owner, no upgrade and no migration switch: this registry never locks. A future v2 registry
+/// would import these bindings read-only.
 contract SignetRegistry {
     struct Binding {
         address gate;
         address circuits; // 0 = Signet's shared container; else the processor of the gate's own container
         uint256 tokenId;
+        address pendingGate; // a started transfer waiting for this gate to accept
+    }
+
+    struct Unbound {
+        address gate;
+        uint40 at;
     }
 
     ISiteRegistryWriter public immutable siteRegistry;
@@ -40,55 +48,45 @@ contract SignetRegistry {
     address public immutable deployer;
 
     uint256 public constant CHUNK = 24_000; // SiteRegistry CHUNK_MAX
-    uint256 public constant MAX_FILE_BYTES = 96_000; // 4 chunks, written and hash-checked in one transaction
-    uint256 public constant MIGRATION_DELAY = 7 days;
+    /// 2 chunks. One write of this size used 10.5M gas on a fork, under a 2^24 (16.7M) per-transaction cap.
+    /// X Layer shows no such cap today (2026-11-17, docs/tapeout-interfaces.md), but OP-stack chains are adopting it.
+    uint256 public constant MAX_FILE_BYTES = 48_000;
+    uint256 public constant RECLAIM_WINDOW = 30 days;
     string public constant ALLOWLIST_PATH = "signet/allowlist.json";
     string public constant ORIGINS_PATH = "signet/origins.json";
 
     address public factory;
+    address public signetSiteGate; // the one gate whose shared-container files live under `signet/`
     mapping(address => bool) public isGate;
     mapping(bytes32 => Binding) internal bindings; // keccak256(domain)
-
-    address[3] public ops;
-    address public pendingSuccessor;
-    address public pendingBy;
-    uint40 public migrationAt; // 0 = not scheduled
-    address public successor; // set once the migration executed
+    mapping(bytes32 => Unbound) public lastUnbound;
 
     event Claimed(string domain, address indexed gate, address circuits, uint256 tokenId);
     event ContainerSet(string domain, address indexed gate, address circuits, uint256 tokenId);
+    event TransferStarted(string domain, address indexed fromGate, address indexed toGate);
     event Transferred(string domain, address indexed fromGate, address indexed toGate);
-    event Unbound(string domain, address indexed gate);
+    event Unbound_(string domain, address indexed gate);
     event FileWritten(string domain, address indexed gate, string path, bytes32 sha256Hash, uint256 size);
     event FileRemoved(string domain, address indexed gate, string path);
-    event MigrationProposed(address indexed successor, address indexed by);
-    event MigrationScheduled(address indexed successor, uint256 executeAfter);
-    event MigrationCancelled(address indexed by);
-    event Migrated(address indexed successor);
 
     error BadDomain();
     error BadPath();
     error AlreadyBound();
+    error Reserved();
     error NotBoundGate();
     error NotFactoryGate();
     error NotApproved();
     error BadSize();
     error NotHolder();
     error SharedHasNoFallback();
-    error NotOps();
-    error MigrationClosed();
-    error TooEarly();
     error BadConfig();
 
-    constructor(ISiteRegistryWriter siteRegistry_, IContainerOpener opener_, address circuits, uint256 circuitId, address[3] memory ops_) {
-        if (ops_[0] == address(0) || ops_[1] == address(0) || ops_[2] == address(0)) revert BadConfig();
-        if (ops_[0] == ops_[1] || ops_[0] == ops_[2] || ops_[1] == ops_[2]) revert BadConfig();
+    constructor(ISiteRegistryWriter siteRegistry_, IContainerOpener opener_, address circuits, uint256 circuitId) {
         siteRegistry = siteRegistry_;
         opener = opener_;
         sharedCircuits = circuits;
         sharedCircuitId = circuitId;
         sharedContainer = opener_.accountOf(circuits, circuitId);
-        ops = ops_;
         deployer = msg.sender;
     }
 
@@ -96,6 +94,13 @@ contract SignetRegistry {
     function initFactory(address factory_) external {
         if (msg.sender != deployer || factory != address(0) || factory_ == address(0)) revert BadConfig();
         factory = factory_;
+    }
+
+    /// One time, by the deployer: the factory-made gate of Signet's own site. Its shared-container files go
+    /// under `signet/` instead of `projects/<domain>/`.
+    function initSignetSite(address gate) external {
+        if (msg.sender != deployer || signetSiteGate != address(0) || !isGate[gate]) revert BadConfig();
+        signetSiteGate = gate;
     }
 
     // ---------------------------------------------------------------- bindings
@@ -106,16 +111,19 @@ contract SignetRegistry {
         isGate[gate] = true;
     }
 
-    /// Factory only: first claim for a gate it just deployed (same transaction as the deployment).
+    /// Factory only, after it checked the claimant's commit: bind a new domain to a factory-made gate.
     function claimFor(address gate, string calldata domain, address circuits, uint256 tokenId) external {
-        if (msg.sender != factory) revert NotFactoryGate();
-        _claim(gate, domain, circuits, tokenId);
-    }
-
-    /// A factory-made gate claims another domain (tier-11 on the gate's side).
-    function claim(string calldata domain, address circuits, uint256 tokenId) external {
-        if (!isGate[msg.sender]) revert NotFactoryGate();
-        _claim(msg.sender, domain, circuits, tokenId);
+        if (msg.sender != factory || !isGate[gate]) revert NotFactoryGate();
+        _checkDomain(domain);
+        bytes32 key = keccak256(bytes(domain));
+        Binding storage b = bindings[key];
+        if (b.gate != address(0)) revert AlreadyBound();
+        Unbound storage u = lastUnbound[key];
+        if (u.gate != address(0) && u.gate != gate && block.timestamp < uint256(u.at) + RECLAIM_WINDOW) revert Reserved();
+        b.gate = gate;
+        b.circuits = circuits;
+        b.tokenId = tokenId;
+        emit Claimed(domain, gate, circuits, tokenId);
     }
 
     function setContainer(string calldata domain, address circuits, uint256 tokenId) external {
@@ -125,63 +133,76 @@ contract SignetRegistry {
         emit ContainerSet(domain, msg.sender, circuits, tokenId);
     }
 
+    /// Step 1 of a transfer (the bound gate, tier 11). Nothing changes until the new gate accepts.
     function transfer(string calldata domain, address newGate) external {
         Binding storage b = _own(domain);
         if (!isGate[newGate]) revert NotFactoryGate();
-        b.gate = newGate;
-        emit Transferred(domain, msg.sender, newGate);
+        b.pendingGate = newGate;
+        emit TransferStarted(domain, msg.sender, newGate);
+    }
+
+    /// Step 2: the receiving gate accepts (tier 11 on its side). The domain moves to the shared container.
+    function acceptTransfer(string calldata domain) external {
+        Binding storage b = _bound(domain);
+        if (b.pendingGate != msg.sender) revert NotBoundGate();
+        emit Transferred(domain, b.gate, msg.sender);
+        b.gate = msg.sender;
+        b.pendingGate = address(0);
+        b.circuits = address(0);
+        b.tokenId = 0;
     }
 
     function unbind(string calldata domain) external {
         _own(domain);
-        delete bindings[keccak256(bytes(domain))];
-        emit Unbound(domain, msg.sender);
+        bytes32 key = keccak256(bytes(domain));
+        delete bindings[key];
+        lastUnbound[key] = Unbound(msg.sender, uint40(block.timestamp));
+        emit Unbound_(domain, msg.sender);
     }
 
     function bindingOf(string calldata domain) external view returns (address gate, address container, string memory prefix) {
         Binding storage b = bindings[keccak256(bytes(domain))];
         if (b.gate == address(0)) return (address(0), address(0), "");
-        if (b.circuits == address(0)) return (b.gate, sharedContainer, string.concat("projects/", domain, "/"));
+        if (b.circuits == address(0)) return (b.gate, sharedContainer, _sharedPrefix(b.gate, domain));
         return (b.gate, opener.accountOf(b.circuits, b.tokenId), "");
+    }
+
+    function pendingGateOf(string calldata domain) external view returns (address) {
+        return bindings[keccak256(bytes(domain))].pendingGate;
     }
 
     // ---------------------------------------------------------------- files
 
-    /// Writes one file of the domain's current release. Anyone may call. The whole file comes in one transaction,
-    /// is checked against the approved hashes here, and is stored in 24,000-byte chunks.
-    function writeFile(
-        string calldata domain,
-        string calldata path,
-        string calldata contentType,
-        bytes calldata data,
-        bytes32[] calldata proof
-    ) external {
-        if (data.length == 0 || data.length > MAX_FILE_BYTES) revert BadSize();
-        _checkPath(path);
-        Binding storage b = _bound(domain);
-        bytes32 h = _checkApproved(b.gate, path, contentType, data, proof);
-        (address container, string memory full) = _target(b, domain, path);
-        _store(container, full, contentType, h, data);
-        emit FileWritten(domain, b.gate, path, h, data.length);
+    struct File {
+        string domain;
+        string path;
+        string contentType;
+        bytes data;
+        bytes32[] proof; // Merkle proof against filesRoot (empty for the allowlist and origins files)
     }
 
-    function _checkApproved(
-        address gate,
-        string calldata path,
-        string calldata contentType,
-        bytes calldata data,
-        bytes32[] calldata proof
-    ) internal view returns (bytes32 h) {
+    /// Writes one file of the domain's current release. Anyone may call. The whole file comes in one transaction,
+    /// is checked against the approved hashes here, and is stored in 24,000-byte chunks.
+    function writeFile(File calldata f) external {
+        if (f.data.length == 0 || f.data.length > MAX_FILE_BYTES) revert BadSize();
+        _checkPath(f.path);
+        Binding storage b = _bound(f.domain);
+        bytes32 h = sha256(f.data);
+        // the domain is part of the leaf: a file sealed for one domain of a gate can't be written for another
+        _checkApproved(b.gate, keccak256(bytes(f.path)), h, sha256(abi.encode(f.domain, f.path, f.contentType, h)), f.proof);
+        (address container, string memory full) = _target(b, f.domain, f.path);
+        _store(container, full, f.contentType, h, f.data);
+        emit FileWritten(f.domain, b.gate, f.path, h, f.data.length);
+    }
+
+    function _checkApproved(address gate, bytes32 pathHash, bytes32 h, bytes32 node, bytes32[] calldata proof) internal view {
         (bytes32 filesRoot, bytes32 allowlistHash, bytes32 originsHash, bool ok) = IReleaseGateView(gate).activeRelease();
         if (!ok) revert NotApproved();
-        h = sha256(data);
-        bytes32 pathHash = keccak256(bytes(path));
         if (pathHash == keccak256(bytes(ALLOWLIST_PATH))) {
             if (h != allowlistHash) revert NotApproved();
         } else if (pathHash == keccak256(bytes(ORIGINS_PATH))) {
             if (h != originsHash) revert NotApproved();
         } else {
-            bytes32 node = sha256(abi.encode(path, contentType, h));
             for (uint256 i; i < proof.length; i++) {
                 bytes32 p = proof[i];
                 node = node < p ? sha256(abi.encodePacked(node, p)) : sha256(abi.encodePacked(p, node));
@@ -202,7 +223,7 @@ contract SignetRegistry {
         }
     }
 
-    /// Bound gate only (tier 11 on the gate's side): remove a file of this domain.
+    /// Bound gate only: remove a file of this domain (tier 11, or 2 approvals while the release is revoked).
     function removeFile(string calldata domain, string calldata path) external {
         Binding storage b = _own(domain);
         (address container, string memory full) = _target(b, domain, path);
@@ -210,8 +231,8 @@ contract SignetRegistry {
         emit FileRemoved(domain, msg.sender, path);
     }
 
-    /// Bound gate only (tier 11). SiteRegistry has ONE fallback path per container, so a project inside the
-    /// shared container can't have its own; only a gate's own container can.
+    /// Bound gate only (tier 11). SiteRegistry has ONE fallback path per container, so nothing inside the
+    /// shared container (projects or Signet's own site) can have one; only a gate's own container can.
     function setFallback(string calldata domain, string calldata path) external {
         Binding storage b = _own(domain);
         if (b.circuits == address(0)) revert SharedHasNoFallback();
@@ -219,55 +240,9 @@ contract SignetRegistry {
         siteRegistry.setFallback(container, full);
     }
 
-    // ---------------------------------------------------------------- migration (Signet ops, 2 of 3)
-
-    /// Two different ops proposing the same successor schedule the migration, 7 days ahead.
-    function proposeMigration(address next) external {
-        _onlyOps();
-        if (successor != address(0) || next == address(0) || next == address(this)) revert MigrationClosed();
-        if (pendingSuccessor == next && pendingBy != msg.sender && migrationAt == 0) {
-            migrationAt = uint40(block.timestamp + MIGRATION_DELAY);
-            emit MigrationScheduled(next, migrationAt);
-        } else {
-            pendingSuccessor = next;
-            pendingBy = msg.sender;
-            migrationAt = 0;
-            emit MigrationProposed(next, msg.sender);
-        }
-    }
-
-    /// Any one op can cancel a proposed or scheduled migration.
-    function cancelMigration() external {
-        _onlyOps();
-        if (successor != address(0)) revert MigrationClosed();
-        delete pendingSuccessor;
-        delete pendingBy;
-        migrationAt = 0;
-        emit MigrationCancelled(msg.sender);
-    }
-
-    function executeMigration() external {
-        if (migrationAt == 0 || successor != address(0)) revert MigrationClosed();
-        if (block.timestamp < migrationAt) revert TooEarly();
-        successor = pendingSuccessor;
-        emit Migrated(successor);
-    }
-
     // ---------------------------------------------------------------- internals
 
-    function _claim(address gate, string calldata domain, address circuits, uint256 tokenId) internal {
-        if (successor != address(0)) revert MigrationClosed();
-        _checkDomain(domain);
-        Binding storage b = bindings[keccak256(bytes(domain))];
-        if (b.gate != address(0)) revert AlreadyBound();
-        b.gate = gate;
-        b.circuits = circuits;
-        b.tokenId = tokenId;
-        emit Claimed(domain, gate, circuits, tokenId);
-    }
-
     function _bound(string calldata domain) internal view returns (Binding storage b) {
-        if (successor != address(0)) revert MigrationClosed();
         b = bindings[keccak256(bytes(domain))];
         if (b.gate == address(0)) revert NotBoundGate();
     }
@@ -277,25 +252,23 @@ contract SignetRegistry {
         if (b.gate != msg.sender) revert NotBoundGate();
     }
 
-    /// Where a domain's file goes. Shared: `projects/<domain>/<path>`. Own container: `<path>`, and only while the
-    /// bound gate itself holds that container's circuit NFT. If the own container is the shared one (Signet's own
-    /// site), `projects/` stays off limits.
+    function _sharedPrefix(address gate, string calldata domain) internal view returns (string memory) {
+        return gate == signetSiteGate ? "signet/" : string.concat("projects/", domain, "/");
+    }
+
+    /// Where a domain's file goes. Shared container: `signet/<path>` for Signet's own site, otherwise
+    /// `projects/<domain>/<path>`. Own container: `<path>`, only while the bound gate itself holds that
+    /// container's circuit NFT, and never the shared container.
     function _target(Binding storage b, string calldata domain, string calldata path)
         internal
         view
         returns (address container, string memory full)
     {
         _checkPath(path);
-        if (b.circuits == address(0)) return (sharedContainer, string.concat("projects/", domain, "/", path));
-        if (ICircuitNFT(b.circuits).ownerOf(b.tokenId) != b.gate) revert NotHolder();
+        if (b.circuits == address(0)) return (sharedContainer, string.concat(_sharedPrefix(b.gate, domain), path));
         container = opener.accountOf(b.circuits, b.tokenId);
-        bytes calldata p = bytes(path);
-        if (container == sharedContainer && p.length >= 9 && bytes9(p[:9]) == "projects/") revert BadPath();
+        if (container == sharedContainer || ICircuitNFT(b.circuits).ownerOf(b.tokenId) != b.gate) revert NotHolder();
         return (container, path);
-    }
-
-    function _onlyOps() internal view {
-        if (msg.sender != ops[0] && msg.sender != ops[1] && msg.sender != ops[2]) revert NotOps();
     }
 
     /// Relative path of printable ASCII, 1..200 bytes, no empty, "." or ".." segments.
