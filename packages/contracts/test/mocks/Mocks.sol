@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+interface IERC721ReceiverLike {
+    function onERC721Received(address, address, uint256, bytes calldata) external returns (bytes4);
+}
+
 /// Processor stand-in that evaluates real TAP-02 NAND netlists (no LATCH/REF): same semantics as the chain
-/// (docs/tapeout-interfaces.md §2), so unit tests run the actual policy netlist bytes.
+/// (docs/tapeout-interfaces.md §2), so unit tests run the actual policy netlist bytes. Also a tiny ERC-721.
 contract NetlistProcessor {
     struct C {
         bytes netlist;
@@ -21,6 +25,18 @@ contract NetlistProcessor {
 
     function setOwner(uint256 id, address o) external {
         ownerOf[id] = o;
+    }
+
+    function safeTransferFrom(address from, address to, uint256 id) external {
+        require(ownerOf[id] == from && msg.sender == from, "not owner");
+        ownerOf[id] = to;
+        if (to.code.length > 0) {
+            require(
+                IERC721ReceiverLike(to).onERC721Received(msg.sender, from, id, "")
+                    == IERC721ReceiverLike.onERC721Received.selector,
+                "unsafe recipient"
+            );
+        }
     }
 
     function circuitInfo(uint256 id) external view returns (uint32, uint32, uint32, uint32) {
@@ -60,6 +76,27 @@ contract NetlistProcessor {
     }
 }
 
+/// Different code (so a different code hash) that answers like a processor: a fake "processor".
+contract FakeProcessor {
+    bytes internal nl;
+
+    constructor(bytes memory n) {
+        nl = n;
+    }
+
+    function circuitInfo(uint256) external view returns (uint32, uint32, uint32, uint32) {
+        return (9, 2, 0, uint32(nl.length / 7));
+    }
+
+    function netlist(uint256) external view returns (bytes memory) {
+        return nl;
+    }
+
+    function eval(uint256, bytes calldata) external pure returns (bytes memory) {
+        return hex"03"; // always PUBLISH + UNFREEZE
+    }
+}
+
 contract MockBeacon {
     address public implementation;
 
@@ -73,46 +110,87 @@ contract MockBeacon {
 }
 
 contract MockOpener {
-    address public immutable container;
-
-    constructor(address c) {
-        container = c;
-    }
-
-    function accountOf(address, uint256) external view returns (address) {
-        return container;
+    function accountOf(address circuits, uint256 tokenId) public pure returns (address) {
+        return address(uint160(uint256(keccak256(abi.encode("container", circuits, tokenId)))));
     }
 }
 
-/// Records putFile calls; like the real one, only the circuit holder may write.
+/// SiteRegistry stand-in with the measured rules (docs §8): the circuit holder or the container's single
+/// operator may write; setOperator is holder-only with ttl <= 30 days; chunks <= 24,000 bytes; one fallback
+/// per container.
 contract MockSiteRegistry {
-    NetlistProcessor public immutable nft;
-    uint256 public immutable id;
+    struct Token {
+        NetlistProcessor nft;
+        uint256 id;
+    }
 
     struct File {
         bytes32 h;
+        string contentType;
         bytes data;
-        address container;
-        uint256 writes;
+        uint256 chunks;
     }
 
-    mapping(string => File) public files;
+    mapping(address => Token) public tokenOf;
+    mapping(address => address) public operatorOf;
+    mapping(address => uint256) public operatorUntil;
+    mapping(address => mapping(string => File)) internal files;
+    mapping(address => string) public fallbackPath;
 
-    constructor(NetlistProcessor n, uint256 i) {
-        nft = n;
-        id = i;
+    function registerContainer(address container, NetlistProcessor nft, uint256 id) external {
+        tokenOf[container] = Token(nft, id);
     }
 
-    function putFile(address container, string calldata path, string calldata, bytes32 h, bytes calldata data) external {
-        require(nft.ownerOf(id) == msg.sender, "NotOwner");
-        File storage f = files[path];
-        f.h = h;
-        f.data = data;
-        f.container = container;
-        f.writes++;
+    function _holder(address c) internal view returns (address) {
+        Token storage t = tokenOf[c];
+        return address(t.nft) == address(0) ? address(0) : t.nft.ownerOf(t.id);
     }
 
-    function fileData(string calldata path) external view returns (bytes memory) {
-        return files[path].data;
+    function canEdit(address c, address who) public view returns (bool) {
+        return who != address(0) && (_holder(c) == who || (operatorOf[c] == who && block.timestamp < operatorUntil[c]));
+    }
+
+    modifier editor(address c) {
+        require(canEdit(c, msg.sender), "NotOwner");
+        _;
+    }
+
+    function setOperator(address c, address op, uint256 ttl) external {
+        require(_holder(c) == msg.sender, "NotOwner");
+        require(ttl <= 30 days, "ttl");
+        operatorOf[c] = op;
+        operatorUntil[c] = block.timestamp + ttl;
+    }
+
+    function putFile(address c, string calldata path, string calldata contentType, bytes32 h, bytes calldata data)
+        external
+        editor(c)
+    {
+        require(data.length <= 24_000, "chunk");
+        files[c][path] = File(h, contentType, data, 1);
+    }
+
+    function appendChunk(address c, string calldata path, uint256 expectIndex, bytes calldata data) external editor(c) {
+        File storage f = files[c][path];
+        require(f.chunks == expectIndex && data.length <= 24_000, "chunk");
+        f.data = bytes.concat(f.data, data);
+        f.chunks++;
+    }
+
+    function removeFile(address c, string calldata path) external editor(c) {
+        delete files[c][path];
+    }
+
+    function setFallback(address c, string calldata path) external editor(c) {
+        fallbackPath[c] = path;
+    }
+
+    function fileInfo(address c, string calldata path) external view returns (uint32, string memory, bytes32, uint40, uint256) {
+        File storage f = files[c][path];
+        return (uint32(f.data.length), f.contentType, f.h, 0, f.chunks);
+    }
+
+    function read(address c, string calldata path) external view returns (bytes memory) {
+        return files[c][path].data;
     }
 }

@@ -16,10 +16,15 @@ interface ICircuitBeacon {
     function implementation() external view returns (address);
 }
 
-/// SiteRegistry (TAP-10 Appendix A).
+/// SiteRegistry (TAP-10 Appendix A). Writes are allowed for the circuit holder or the container's operator.
 interface ISiteRegistryWriter {
     function putFile(address container, string calldata path, string calldata contentType, bytes32 sha256Hash, bytes calldata data)
         external;
+    function appendChunk(address container, string calldata path, uint256 expectIndex, bytes calldata data) external;
+    function removeFile(address container, string calldata path) external;
+    function setFallback(address container, string calldata path) external;
+    /// Holder only. One operator per container, ttl <= 30 days (measured, docs §8).
+    function setOperator(address container, address op, uint256 ttl) external;
     function fileInfo(address container, string calldata path)
         external
         view
@@ -31,7 +36,8 @@ interface IContainerOpener {
     function accountOf(address circuits, uint256 tokenId) external view returns (address);
 }
 
-/// Processor ERC-721 owner lookup.
+/// Processor ERC-721 functions.
 interface ICircuitNFT {
     function ownerOf(uint256 id) external view returns (address);
+    function safeTransferFrom(address from, address to, uint256 id) external;
 }
