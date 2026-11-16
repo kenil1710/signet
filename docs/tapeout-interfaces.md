@@ -236,6 +236,10 @@ Sources:
 | `appendChunk(address container, string path, uint256 expectIndex, bytes data)` | `0xe2b51347` | TAP-10 + measured on fork | 2-chunk file read back and verified |
 | `removeFile(address,string)`, `setFallback(address,string)`, `setOperator(address,address,uint256)` | `0x0a9c1871`, `0x4dc21ad0`, `0xc88cb026` | TAP-10 + bytecode | not used yet |
 
+**Operators (measured on a fork, 2026-11-16, `test/spike/Operator.fork.t.sol`):** `setOperator(container, op, ttl)` is holder-only and works for a contract holder; `ttl` above 30 days reverts; one operator per container (a new one replaces the old); an operator can `putFile`, `appendChunk`, `removeFile` and `setFallback` but can't set an operator; the grant ends at `operatorUntil` and is cleared when the circuit NFT is transferred. `setFallback` is one path per container. Views: `operatorOf(address)` (`0x636f35d3`), `operatorUntil(address)` (`0xc85cf62b`).
+
+**Processor proxy code hash:** `0x57aa306fd0be97087da3534e03398f5ff4efd533b5be4e45a405ce86fa6717d5` for processors #1 and #101 (`cast keccak $(cast code …)`), equal to TAP-10's "Processor proxy code hash" for Base/X Layer. ReleaseGate pins it.
+
 Error seen: `0x30cd7471` = `NotOwner()` (TAP-10 error list) when the caller can't edit.
 
 **Display vs read:** the TapeKit kernel's `resolve` returns status `unpaid` when no DomainBinding is paid, and official shells don't display such sites (TAP-10 §6.3). But `getFile` and `SiteRegistry.read` don't check payment ([kernel.js](https://github.com/TapeOutProtocol/TapeKit/blob/37c617e7e332787c8a32a81e4d7d05a28a06c156/kernel/src/kernel.js)). **Signet's Guard can read manifests from an opened, unpaid container.** The DeWEB failover copy, which users open in a shell, would need DomainBinding paid (`monthlyFee()`, not read yet).

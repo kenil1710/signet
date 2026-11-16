@@ -157,6 +157,7 @@ contract SignetRegistry {
         bytes32[] calldata proof
     ) external {
         if (data.length == 0 || data.length > MAX_FILE_BYTES) revert BadSize();
+        _checkPath(path);
         Binding storage b = _bound(domain);
         bytes32 h = _checkApproved(b.gate, path, contentType, data, proof);
         (address container, string memory full) = _target(b, domain, path);
