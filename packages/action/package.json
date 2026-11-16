@@ -2,7 +2,20 @@
   "name": "@signet/action",
   "version": "0.0.0",
   "private": true,
-  "description": "Signet GitHub Action",
+  "description": "Signet GitHub Action: verify, seal, propose, wait until published on-chain, then deploy",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@signet/cli": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@signet/contracts": "workspace:*",
+    "viem": "^2.57.20",
+    "yaml": "^2.9.1"
+  }
 }

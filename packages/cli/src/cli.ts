@@ -68,7 +68,8 @@ program.command('seal <buildDir>')
     log(`External origins the site may load from or connect to (${r.origins.length}):`);
     for (const x of r.origins) log(`    ${x}`);
     if (r.ignoredOrigins.length) log(`  not listed (documentation links in the code): ${r.ignoredOrigins.join(', ')}`);
-    for (const s of r.externalScripts) log(`  cross-origin script ${s.url}  ${s.integrity ? `SRI ${s.integrity.slice(0, 22)}...` : 'NO SRI'}`);
+    for (const s of r.scripts) log(`  cross-origin script ${s.url}  ${s.integrity ? `SRI ${s.integrity.slice(0, 22)}...` : 'NO SRI'}`);
+    if (r.scripts.length) log('  A new cross-origin script or a changed SRI hash counts as an origins change (tier 01).');
     for (const w of r.warnings) log(`  warning: ${w}`);
     log();
     log(`Wrote ${buildDir}/signet-manifest.json and ${buildDir}/signet/{allowlist,origins,files}.json`);
@@ -92,8 +93,27 @@ program.command('verify <target>')
 program.command('propose <buildDir>')
   .description('propose the sealed build as a release (the CI key can do only this)')
   .option('--emergency', 'ask for the fast lane: 3 of 3 approvals publish at once (tiers 00 and 10)')
-  .action(async (buildDir: string, o) => {
-    await cmd.propose(ctx(), buildDir, o, log);
+  .option('--reuse', 'send nothing if this build is already proposed or already the current release (CI re-runs)')
+  .option('--json', 'print the result as JSON on stdout (the text goes to stderr)')
+  .action(async (buildDir: string, o: { emergency?: boolean; reuse?: boolean; json?: boolean }) => {
+    const r = await cmd.propose(ctx(), buildDir, o, o.json ? (l = '') => console.error(l) : log);
+    if (o.json) log(JSON.stringify({ ...r, id: r.id === null ? null : String(r.id) }));
+  });
+
+program.command('diff <id> [buildDir]')
+  .description('Diff Guard: what proposal <id> changes compared with the current release, in plain words')
+  .option('--base <dir>', "the current release's sealed build dir (default: its sealed lists are read from the chain)")
+  .option('--json', 'print the report as JSON (what the dashboard shows)')
+  .action(async (v: string, buildDir: string | undefined, o: { base?: string; json?: boolean }) => {
+    await cmd.diff(ctx(), id(v), buildDir ?? 'dist', o, log);
+  });
+
+program.command('wait <buildDir>')
+  .description('wait until this exact build is published on-chain (CI runs this before deploying); sends nothing')
+  .option('--timeout <seconds>', 'give up after this long (exit code 3; the proposal stays open)', '19800')
+  .option('--interval <seconds>', 'time between checks', '30')
+  .action(async (buildDir: string, o: { timeout: string; interval: string }) => {
+    await cmd.wait(ctx(), buildDir, { timeout: Number(o.timeout), interval: Number(o.interval) }, log);
   });
 
 program.command('approve <id>').description('approve a proposal (approvers only)').action(async (v: string) => cmd.approve(ctx(), id(v), log));
@@ -120,5 +140,5 @@ program.command('network').description('show the chain and contract addresses in
 
 program.parseAsync().catch((e: unknown) => {
   console.error(e instanceof SignetError ? `signet: ${e.message}` : e instanceof Error ? `signet: ${e.message}` : e);
-  process.exitCode = 1;
+  process.exitCode = (e as { exitCode?: number }).exitCode ?? 1;
 });

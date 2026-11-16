@@ -1,0 +1,98 @@
+name: Signet release gate
+description: >
+  Verify and seal the build, propose it as a release with the CI proposer key, wait until the release is
+  published on-chain (approved by the team's approvers, decided by the policy circuit), and only then deploy.
+author: Signet
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  build-dir:
+    description: The static build output to seal (for example dist)
+    required: true
+  proposer-key:
+    description: The CI proposer key (secrets.SIGNET_PROPOSER_KEY). It can only propose releases.
+    required: true
+  deploy:
+    description: >
+      Your deploy command. It runs only after the release is published on-chain. Leave it empty to deploy in
+      your own later steps: they are not reached unless this action succeeds.
+    required: false
+    default: ''
+  project-dir:
+    description: Where signet.config.json lives
+    required: false
+    default: '.'
+  wait-timeout:
+    description: >
+      Seconds to wait for the release to be published (default 5 h 30 min; a GitHub-hosted job ends after 6 h).
+      If it runs out, the job fails without deploying; re-run it after the release is published.
+    required: false
+    default: '19800'
+  poll-interval:
+    description: Seconds between checks of the chain
+    required: false
+    default: '30'
+  upload-manifest:
+    description: >
+      After the release is published, write its three manifest files (allowlist, origins, file list) on-chain if
+      they are not there yet, so Guard can read the release before the site changes. Costs the proposer key gas.
+    required: false
+    default: 'true'
+  emergency:
+    description: Ask for the emergency fast lane (3 of 3 approvals, no timelock; tiers 00 and 10)
+    required: false
+    default: 'false'
+  strict:
+    description: Fail on signet verify warnings too
+    required: false
+    default: 'false'
+
+outputs:
+  release-id:
+    description: The proposal id (empty if this build was already the current release)
+    value: ${{ steps.signet.outputs.release-id }}
+  tier:
+    description: The risk tier the gate computed on-chain (0, 1 or 2)
+    value: ${{ steps.signet.outputs.tier }}
+  manifest-hash:
+    description: The sealed manifest hash
+    value: ${{ steps.signet.outputs.manifest-hash }}
+  diff-json:
+    description: Path of the Diff Guard report (JSON) for this proposal
+    value: ${{ steps.signet.outputs.diff-json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Node 22
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Install the Signet CLI
+      shell: bash
+      run: '"${{ github.action_path }}/install.sh"'
+
+    - name: Verify, seal, propose, wait until published on-chain
+      id: signet
+      shell: bash
+      env:
+        INPUT_BUILD_DIR: ${{ inputs.build-dir }}
+        INPUT_PROJECT_DIR: ${{ inputs.project-dir }}
+        INPUT_PROPOSER_KEY: ${{ inputs.proposer-key }}
+        INPUT_WAIT_TIMEOUT: ${{ inputs.wait-timeout }}
+        INPUT_POLL_INTERVAL: ${{ inputs.poll-interval }}
+        INPUT_UPLOAD_MANIFEST: ${{ inputs.upload-manifest }}
+        INPUT_EMERGENCY: ${{ inputs.emergency }}
+        INPUT_STRICT: ${{ inputs.strict }}
+      run: '"${{ github.action_path }}/run.sh"'
+
+    - name: Deploy (the release is published on-chain)
+      if: ${{ inputs.deploy != '' }}
+      shell: bash
+      env:
+        SIGNET_RELEASE_ID: ${{ steps.signet.outputs.release-id }}
+        SIGNET_MANIFEST_HASH: ${{ steps.signet.outputs.manifest-hash }}
+      run: ${{ inputs.deploy }}

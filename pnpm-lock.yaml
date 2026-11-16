@@ -173,7 +173,21 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
-  packages/action: {}
+  packages/action:
+    dependencies:
+      '@signet/cli':
+        specifier: workspace:*
+        version: link:../cli
+    devDependencies:
+      '@signet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      viem:
+        specifier: ^2.57.20
+        version: 2.57.20(typescript@5.9.3)
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
 
   packages/circuit: {}
 
@@ -199,7 +213,7 @@ importers:
     devDependencies:
       vite:
         specifier: ^8.3.8
-        version: 8.3.8(@types/node@22.20.5)
+        version: 8.3.8(@types/node@22.20.5)(yaml@2.9.1)
 
   packages/demo-dapp:
     dependencies:
@@ -209,7 +223,7 @@ importers:
     devDependencies:
       vite:
         specifier: ^8.3.8
-        version: 8.3.8(@types/node@22.20.5)
+        version: 8.3.8(@types/node@22.20.5)(yaml@2.9.1)
 
   packages/extension:
     dependencies:
@@ -630,6 +644,11 @@ packages:
       utf-8-validate:
         optional: true
 
+  yaml@2.9.1:
+    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
 snapshots:
 
   '@adraffy/ens-normalize@1.11.1': {}
@@ -906,7 +925,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  vite@8.3.8(@types/node@22.20.5):
+  vite@8.3.8(@types/node@22.20.5)(yaml@2.9.1):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -916,5 +935,8 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.20.5
       fsevents: 2.3.3
+      yaml: 2.9.1
 
   ws@8.21.0: {}
+
+  yaml@2.9.1: {}

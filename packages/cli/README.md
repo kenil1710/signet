@@ -8,7 +8,9 @@ Run it from the repo with `pnpm signet <command>` (or `node packages/cli/src/cli
 | `signet init --domain … --approvers a,b,c --recovery … [--guardian …] [--proposer …]` | Commits to the domain, then (2 blocks later) creates the gate through SignetFactory and binds the domain. Writes `signet.config.json`. Safe to rerun. | Anyone (the creator gets no rights) |
 | `signet verify <buildDir \| url> [--build dir] [--strict]` | Checks that Guard can verify the site: static build, SRI on cross-origin scripts, `no-store`, CDN rewrites, SSR. Exit 1 on problems. | Anyone, no key |
 | `signet seal <buildDir>` | Hashes every file, builds `filesRoot`, extracts the allowlist and the external origins, writes `signet-manifest.json` and `signet/{allowlist,origins,files}.json`. | Anyone, no key |
-| `signet propose <buildDir> [--emergency]` | Proposes the sealed build. The gate computes the risk tier. | CI proposer key or an approver |
+| `signet propose <buildDir> [--emergency] [--reuse] [--json]` | Proposes the sealed build. The gate computes the risk tier. `--reuse` sends nothing if the build is already proposed or current. | CI proposer key or an approver |
+| `signet diff <id> [buildDir] [--base dir] [--json]` | **Diff Guard.** What the proposal changes compared with the current release: files, contract addresses and spenders, origins, SRI hashes, approve/permit/transfer calls in the code, and the on-chain risk tier with the reason. The build must hash to the proposal; the current release's lists are read from the chain and hash-checked. | Anyone, no key |
+| `signet wait <buildDir> [--timeout s] [--interval s]` | Polls until this exact build is the gate's current release (exit 0), the proposal is closed (exit 1) or time runs out (exit 3). Sends nothing. | CI, no key |
 | `signet approve <id>` / `signet cancel <id>` | Approve or cancel a proposal. | Approvers |
 | `signet publish <id> [buildDir] [--full]` | Publishes if the policy circuit allows it, then writes the manifest files on-chain. | Anyone |
 | `signet upload <buildDir> [--full]` | Only the file-writing step; skips files already on-chain. | Anyone |
@@ -28,6 +30,6 @@ Run it from the repo with `pnpm signet <command>` (or `node packages/cli/src/cli
 }
 ```
 
-**Tests.** `pnpm --filter @signet/cli test` (20 unit tests: hashing, Merkle proofs, extraction, verify against a local web server). `pnpm --filter @signet/cli test:staging` (7 end-to-end tests that run every command against the staging chain; needs `pnpm staging:up`). `pnpm staging:demo` prints the whole flow.
+**Tests.** `pnpm --filter @signet/cli test` (29 unit tests: hashing, Merkle proofs, extraction, Diff Guard, verify against a local web server). `pnpm --filter @signet/cli test:staging` (9 end-to-end tests that run every command against the staging chain; needs `pnpm staging:up`). `pnpm staging:demo` prints the whole flow.
 
 `src/abi.ts` is generated from the Foundry build: `forge build` in `packages/contracts`, then `pnpm --filter @signet/cli gen:abi`.

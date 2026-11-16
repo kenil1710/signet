@@ -64,7 +64,7 @@ CI can only propose. A release goes live only when the TapeOut circuit says ALLO
 
 **Where releases are stored.** One Signet container, circuit #5's container `0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed` on processor #101, holds both Signet's own site under `signet/<domain>/` (the dashboard uses hash routing, so it needs no fallback path) and every free-tier project under `projects/<domain>/`. The two prefixes can't overlap, and tests prove neither side can write into the other. SignetRegistry writes there as the container's SiteRegistry operator, and only files a project's ReleaseGate has published. Circuit #5 stays with Signet (the dev wallet now, a multisig after the hackathon). Pro and Enterprise projects can have their own container, held by their ReleaseGate. Opening a container costs a one-time 0.08 OKB while storage costs about 0.0000048 OKB per KB (Spike B), so sharing keeps the free tier cheap. See `docs/decisions.md`.
 
-**What a release commits to.** `proposeRelease(filesRoot, allowlistHash, originsHash, emergency)`. The contract computes `manifestHash = sha256(abi.encode(filesRoot, allowlistHash, originsHash))` and the risk tier from the same three values, so CI can't ship a new allowlist at a lower tier. `allowlistHash` = SHA-256 of the bytes of `signet/allowlist.json`; `originsHash` = SHA-256 of the bytes of `signet/origins.json`. Neither may be zero: an empty list is the hash of an explicit empty list file. `filesRoot` = SHA-256 Merkle root (sorted pairs) over `sha256(abi.encode(domain, path, contentType, sha256(bytes)))` for every other file, including the file list `signet/files.json`. One file is at most 48,000 bytes on-chain. **Guard, the dashboard and the watchtower must reject any manifest whose allowlist or origins don't hash to the on-chain values, and any file list that doesn't rebuild the on-chain `filesRoot`.**
+**What a release commits to.** `proposeRelease(filesRoot, allowlistHash, originsHash, emergency)`. The contract computes `manifestHash = sha256(abi.encode(filesRoot, allowlistHash, originsHash))` and the risk tier from the same three values, so CI can't ship a new allowlist at a lower tier. `allowlistHash` = SHA-256 of the bytes of `signet/allowlist.json`; `originsHash` = SHA-256 of the bytes of `signet/origins.json`, which lists the external origins **and the SRI hash of every cross-origin script**. Neither may be zero: an empty list is the hash of an explicit empty list file. `filesRoot` = SHA-256 Merkle root (sorted pairs) over `sha256(abi.encode(domain, path, contentType, sha256(bytes)))` for every other file, including the file list `signet/files.json`. One file is at most 48,000 bytes on-chain. **Guard, the dashboard and the watchtower must reject any manifest whose allowlist or origins don't hash to the on-chain values, and any file list that doesn't rebuild the on-chain `filesRoot`.**
 
 ```
 TEAM                              X LAYER · TAPEOUT                      USERS
@@ -110,7 +110,7 @@ The policy is a TapeOut NAND/LATCH circuit that nobody can change. The ReleaseGa
 | Tier | When | Rule (output PUBLISH) |
 | --- | --- | --- |
 | 00 Code only | allowlistHash and originsHash unchanged | ≥1 approval and tS, or 3 of 3 with e |
-| 01 New external origin | originsHash changed | ≥2 approvals and tS |
+| 01 New external origin, or a changed SRI hash | originsHash changed (origins, cross-origin scripts and their SRI hashes) | ≥2 approvals and tS |
 | 10 New contract / spender | allowlistHash changed | ≥2 approvals and tL, or 3 of 3 with e |
 | 11 Admin change | approver set, domain binding, timelocks or circuit swap | 3 of 3 and tL, no fast lane |
 
@@ -158,7 +158,7 @@ The biggest product risk is not missing an attack. It's **blocking real users by
 | CDN rewrites HTML (Cloudflare Rocket Loader, email obfuscation, auto-minify) | `verify` detects these and asks the team to turn them off; hashes use the decoded body, so gzip/brotli is fine |
 | A/B tests, per-region or per-language bundles | Each variant is sealed in the same release; the manifest lists all of them |
 | Lazy-loaded chunks | All chunks from the build output are sealed, not just the ones on first load |
-| Third-party scripts (analytics, chat widgets, WalletConnect modal from CDN) | Recommend self-hosting pinned versions. Otherwise list them as allowed external origins: lower trust, still covered by the signing allowlist. **`signet verify` requires an SRI `integrity` attribute on every cross-origin script, and `seal` stores those SRI hashes in the manifest** (Guard can't read cross-origin bytes from the cache; the browser enforces SRI, so Guard checks the attribute against the sealed hash). See `docs/decisions.md`, Spike C. |
+| Third-party scripts (analytics, chat widgets, WalletConnect modal from CDN) | Recommend self-hosting pinned versions. Otherwise list them as allowed external origins: lower trust, still covered by the signing allowlist. **`signet verify` requires an SRI `integrity` attribute on every cross-origin script, and `seal` stores those SRI hashes in `origins.json`, so a changed SRI hash is a tier-01 change** (Guard can't read cross-origin bytes from the cache; the browser enforces SRI, so Guard checks the attribute against the sealed hash). See `docs/decisions.md`, Spike C. |
 | Scripts or HTML served with `Cache-Control: no-store` | Guard can't read them from the cache, so it can only mark them "unverified". **`signet verify` warns about `no-store` on JS and HTML** and prints the header fix. See `docs/decisions.md`, Spike C. |
 | Inline scripts | Hashed by content |
 
@@ -227,7 +227,7 @@ After setup, everything runs on its own. People act only when a new release need
 1. A dev merges to main → the Action builds, seals and proposes
 2. ReleaseGate computes the tier on-chain; approvers get a TapeSend and Telegram ping
 3. An approver opens Diff Guard: "3 files changed, no new contracts, no new origins → tier 00" → one click
-4. After the 1 h timelock, anyone calls `publish` (the Action does it) → the Action deploys to hosting
+4. After the 1 h timelock, anyone calls `publish` (`signet publish <id>`; the Action never does, it only proposes) → the Action sees the release on-chain, writes the manifest files and deploys to hosting
 
 **3. End user**
 
@@ -333,8 +333,8 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 
 **Week 2 (Nov 23–29): the user-facing product**
 
-- [ ] Nov 23: GitHub Action (seal → propose → wait → publish → deploy)
-- [ ] Nov 24: Diff Guard analyzer (new files, new addresses, new origins, new approve/permit calls)
+- [x] GitHub Action (verify → seal → propose → wait until published on-chain → deploy): built and tested on staging with a local runner, not yet run on GitHub (2026-11-17, `packages/action`)
+- [x] Diff Guard analyzer, `signet diff <id>` (files, addresses and spenders, origins, SRI hashes, approve/permit/transfer calls, tier and why; text + JSON): tested on staging (2026-11-17, `packages/cli`)
 - [ ] Nov 24–26: Guard extension: manifest fetch from 2 RPCs, page hash check, red block page, window.ethereum + EIP-6963 wrap, allowlist + calldata decode, failover button, observe/enforce modes
 - [ ] Nov 27: **submit the extension to the Chrome Web Store** (keep an unpacked build for the demo as backup)
 - [ ] Nov 28–29: watchtower (3 regions, 1-min checks, 2-region confirm) + alerts via TapeSend, a Telegram bot and X posts
