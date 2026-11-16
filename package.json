@@ -10,7 +10,12 @@
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "typecheck": "pnpm -r run typecheck",
-    "env:link": "ln -sf ../../.env packages/contracts/.env"
+    "env:link": "ln -sf ../../.env packages/contracts/.env",
+    "staging:up": "staging/up.sh",
+    "staging:down": "staging/down.sh",
+    "staging:time": "staging/time.sh",
+    "staging:fund": "staging/fund.sh",
+    "staging:smoke": "staging/smoke.sh"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

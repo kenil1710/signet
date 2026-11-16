@@ -4,5 +4,11 @@
   "private": true,
   "description": "Signet CLI: init, seal, verify",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@signet/contracts": "workspace:*"
+  },
+  "scripts": {
+    "network": "node src/network.ts"
+  }
 }

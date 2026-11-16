@@ -32,3 +32,9 @@ packages/extension/*.crx
 *.log
 .vscode/
 .idea/
+
+# local staging chain
+staging/.run/
+packages/contracts/deployments/local.json
+packages/contracts/broadcast/Staging.s.sol/
+packages/extension/signet-network.json

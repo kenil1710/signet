@@ -177,13 +177,29 @@ importers:
 
   packages/circuit: {}
 
-  packages/cli: {}
+  packages/cli:
+    dependencies:
+      '@signet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/contracts: {}
 
-  packages/dashboard: {}
+  packages/dashboard:
+    dependencies:
+      '@signet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      vite:
+        specifier: ^8.3.8
+        version: 8.3.8(@types/node@22.20.5)
 
   packages/demo-dapp:
+    dependencies:
+      '@signet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       vite:
         specifier: ^8.3.8
@@ -191,6 +207,9 @@ importers:
 
   packages/extension:
     dependencies:
+      '@signet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@tapekit/kernel':
         specifier: github:TapeOutProtocol/TapeKit#37c617e7e332787c8a32a81e4d7d05a28a06c156&path:/kernel
         version: https://codeload.github.com/TapeOutProtocol/TapeKit/tar.gz/37c617e7e332787c8a32a81e4d7d05a28a06c156#path:/kernel

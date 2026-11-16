@@ -4,5 +4,17 @@
   "private": true,
   "description": "Signet approver dashboard",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@signet/contracts": "workspace:*"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
 }
