@@ -38,7 +38,7 @@ Public RPCs (from [TapeKit `kernel/src/config.js`](https://github.com/TapeOutPro
 
 | Function | Selector | Source | Notes |
 |---|---|---|---|
-| `nextId() view returns (uint256)` | `0x61b8ce8c` | Spec ([TAP-02 §6](https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md#6-contract-interface-read-only-part)) + bytecode | |
+| `nextId() view returns (uint256)` | `0x61b8ce8c` | Spec ([TAP-02 §6](https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-02.md#6-contract-interface-read-only-part)) + bytecode + measured | **Returns the last id assigned, not the next one** (TAP-02 says "the id the next taped-out circuit will get"): on #101 it returns 5 while circuit 5 exists and a tape-out gets 6 (2026-11-16). Read the id from the `tapeout` return value or the NFT mint event instead |
 | `circuitInfo(uint256 id) view returns (uint32 nIn, uint32 nOut, uint32 nState, uint32 gateCount)` | `0x084d60f1` | Spec + bytecode + measured (fork) | reverts `no circuit` |
 | `netlist(uint256 id) view returns (bytes)` | `0x3fc4be56` | Spec + bytecode + measured (fork) | |
 | `eval(uint256 id, bytes inputs) view returns (bytes)` | `0x934d06ea` | Spec + bytecode + **measured: callable from a Solidity contract** (fork) | Combinational only; reverts `has latch: use step` if `nState > 0` |
