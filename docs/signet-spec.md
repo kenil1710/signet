@@ -151,7 +151,8 @@ The biggest product risk is not missing an attack. It's **blocking real users by
 | CDN rewrites HTML (Cloudflare Rocket Loader, email obfuscation, auto-minify) | `verify` detects these and asks the team to turn them off; hashes use the decoded body, so gzip/brotli is fine |
 | A/B tests, per-region or per-language bundles | Each variant is sealed in the same release; the manifest lists all of them |
 | Lazy-loaded chunks | All chunks from the build output are sealed, not just the ones on first load |
-| Third-party scripts (analytics, chat widgets, WalletConnect modal from CDN) | Recommend self-hosting pinned versions. Otherwise list them as allowed external origins: lower trust, still covered by the signing allowlist. |
+| Third-party scripts (analytics, chat widgets, WalletConnect modal from CDN) | Recommend self-hosting pinned versions. Otherwise list them as allowed external origins: lower trust, still covered by the signing allowlist. **`signet verify` requires an SRI `integrity` attribute on every cross-origin script, and `seal` stores those SRI hashes in the manifest** (Guard can't read cross-origin bytes from the cache; the browser enforces SRI, so Guard checks the attribute against the sealed hash). See `docs/decisions.md`, Spike C. |
+| Scripts or HTML served with `Cache-Control: no-store` | Guard can't read them from the cache, so it can only mark them "unverified". **`signet verify` warns about `no-store` on JS and HTML** and prints the header fix. See `docs/decisions.md`, Spike C. |
 | Inline scripts | Hashed by content |
 
 **Releases and timing**
@@ -210,7 +211,7 @@ After setup, everything runs on its own. People act only when a new release need
 1. `npx signet init` → connect a wallet, pick 3 approver addresses and a recovery address
 2. The CLI mints a circuit NFT on X Layer (the container), deploys a ReleaseGate that holds it, and links the shared policy circuit
 3. Domain proof: add a DNS TXT record, and the CLI binds the domain in the Registry
-4. `signet verify` checks for static build, CDN rewrites and third-party scripts, then prints fixes
+4. `signet verify` checks for static build, CDN rewrites and third-party scripts (cross-origin scripts must carry SRI), warns about `no-store` on scripts and HTML, then prints fixes
 5. Paste the GitHub Action (5 lines) and add a `SIGNET_PROPOSER_KEY` secret (a key that can only propose)
 6. First release: confirm the extracted allowlist once in the dashboard → approve → the project is live in **observe mode** for 7 days, then switches to enforce
 
@@ -318,7 +319,8 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 - [ ] Nov 18: **Spike C**: extension reads script bytes via cache (`only-if-cached`) and hashes them; test on a Vite app
 - [ ] Nov 18–19: design the policy circuit in the TapeOut canvas or as a netlist; exhaustive 1,024-case test against a JS reference; tape out → record the Processor address + circuit ID
 - [ ] Nov 19–21: Foundry contracts: ReleaseGate (propose, approve, tier calc, publish, freeze/unfreeze, recovery) + Registry (bind/unbind domain); tests for every tier and edge case
-- [ ] Nov 22: deploy to X Layer mainnet; CLI `init` + `seal` (hash build, extract allowlist)
+- [ ] Nov 22: deploy to X Layer mainnet; CLI `init` + `seal` (hash build, extract allowlist, store SRI hashes of cross-origin scripts)
+- [ ] With the CLI: `signet verify` warns about `Cache-Control: no-store` on scripts/HTML and fails on cross-origin scripts without an SRI `integrity` attribute (from Spike C)
 
 **Week 2 (Nov 23–29): the user-facing product**
 

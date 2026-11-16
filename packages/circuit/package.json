@@ -4,5 +4,10 @@
   "private": true,
   "description": "Release-policy circuit and truth-table test",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "gen": "node scripts/gen.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
 }

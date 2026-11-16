@@ -20,7 +20,9 @@ contract SpikeBForkTest is Test {
     function setUp() public {
         string memory rpc = vm.envOr("XLAYER_RPC_URL", string(""));
         if (bytes(rpc).length == 0) return;
-        vm.createSelectFork(rpc);
+        // Pinned to the last block before the mainnet open (tx 0x7125a14a…, block 76,058,449), so this record
+        // of Spike B still starts from an unopened container.
+        vm.createSelectFork(rpc, 76_058_448);
         forked = true;
         vm.deal(DEV, 1 ether); // fork-only balance
         container = OPENER.accountOf(address(CPU), CIRCUIT_ID);
