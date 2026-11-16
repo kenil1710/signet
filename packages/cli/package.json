@@ -2,13 +2,23 @@
   "name": "@signet/cli",
   "version": "0.0.0",
   "private": true,
-  "description": "Signet CLI: init, seal, verify",
+  "description": "Signet CLI: init, seal, verify, propose, approve, publish, status, freeze",
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@signet/contracts": "workspace:*"
+    "@signet/contracts": "workspace:*",
+    "commander": "^12.1.0",
+    "viem": "^2.57.20"
   },
   "scripts": {
-    "network": "node src/network.ts"
+    "signet": "node src/cli.ts",
+    "network": "node src/cli.ts network",
+    "gen:abi": "node scripts/gen-abi.mjs",
+    "test": "node --test test/*.test.ts",
+    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "bin": {
+    "signet": "./bin/signet.mjs"
   }
 }

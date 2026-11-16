@@ -1,0 +1,386 @@
+// The commands that talk to the chain: init, propose, approve, publish (+ upload), status, freeze, unfreeze, cancel.
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { parseEventLogs, getAddress, zeroAddress, formatEther, type Address, type Hex, type TransactionReceipt } from 'viem';
+import { gateAbi, factoryAbi, registryAbi, siteReadAbi } from './abi.ts';
+import {
+  SignetError, CONFIG_NAME, needDeployed, needProject, signerFor, resolveAddress, newKeyFile, addressOfKeyFile, statePath,
+  read, send, errorName, chainTime, fmtTime, fmtSpan, showPath, type Ctx, type ProjectConfig, type Signer,
+} from './chain.ts';
+import { sha256Hex } from './merkle.ts';
+import { loadSealed, isValidDomain, isOnchainPath, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH, MAX_ONCHAIN_BYTES, type SealedBuild } from './seal.ts';
+
+type Log = (line?: string) => void;
+const KEYS = ['SIGNET_PRIVATE_KEY'];
+const TIERS = ['00 code only', '01 new external origin', '10 allowlist changed', '11 admin change'];
+const NEED = [1, 2, 2, 3];
+const popcount = (m: number) => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1);
+
+// ---------------------------------------------------------------- init
+
+export interface InitOptions { domain?: string; approvers?: string; proposer?: string; recovery?: string; guardian?: string; wait?: boolean; waitSeconds?: number }
+interface InitState {
+  network: string; domain: string; claimant: Address; salt: Hex; commitment: Hex;
+  approvers: Address[]; proposer: Address; recovery: Address; guardian: Address; gate?: Address;
+}
+
+export async function init(ctx: Ctx, o: InitOptions, log: Log): Promise<{ gate: Address | null; waiting: boolean }> {
+  const { factory, registry } = needDeployed(ctx);
+  const stateFile = statePath(ctx.dir, 'init.json');
+  const keyFile = statePath(ctx.dir, 'proposer.key');
+  let st: InitState | null = existsSync(stateFile) ? (JSON.parse(readFileSync(stateFile, 'utf8')) as InitState) : null;
+  if (st && (st.network !== ctx.net.name || (o.domain && o.domain !== st.domain))) st = null; // a different project: start over
+  const signer = await signerFor(ctx, KEYS);
+
+  if (st?.gate || ctx.config?.gate) {
+    log(`Already set up: ${st?.domain ?? ctx.config!.domain} is protected by gate ${st?.gate ?? ctx.config!.gate} (${CONFIG_NAME}).`);
+    return { gate: (st?.gate ?? ctx.config!.gate) as Address, waiting: false };
+  }
+
+  if (!st) {
+    const domain = o.domain;
+    if (!domain || !isValidDomain(domain)) throw new SignetError('domain', `--domain must be a lowercase domain name like app.example.org (got "${domain ?? ''}")`);
+    const approvers = (o.approvers ?? '').split(',').filter(Boolean).map((a) => resolveAddress(ctx.net, a.trim()));
+    if (approvers.length !== 3) throw new SignetError('approvers', '--approvers needs exactly 3 addresses, separated by commas');
+    if (!o.recovery) throw new SignetError('recovery', '--recovery <address> is required (a key kept offline that can replace the approvers after 7 days)');
+    const recovery = resolveAddress(ctx.net, o.recovery);
+    const guardian = !o.guardian || o.guardian === 'none' ? zeroAddress : resolveAddress(ctx.net, o.guardian);
+    let proposer: Address;
+    if (o.proposer) proposer = resolveAddress(ctx.net, o.proposer);
+    else {
+      proposer = existsSync(keyFile) ? addressOfKeyFile(keyFile) : newKeyFile(keyFile);
+      log(`CI proposer key: created a new key for ${proposer}. It can only propose releases.`);
+      log(`  saved to ${showPath(keyFile)} (git-ignored, readable only by you; the key is never printed)`);
+    }
+    const roles = [...approvers, proposer, recovery, ...(guardian === zeroAddress ? [] : [guardian])];
+    if (new Set(roles.map((a) => a.toLowerCase())).size !== roles.length) throw new SignetError('roles', 'the 3 approvers, the proposer, the recovery address and the guardian must all be different addresses');
+    const salt = `0x${randomBytes(32).toString('hex')}` as Hex;
+    const commitment = await read<Hex>(ctx, { address: factory, abi: factoryAbi, functionName: 'commitmentOf', args: [domain, salt, signer.address] });
+    st = { network: ctx.net.name, domain, claimant: signer.address, salt, commitment, approvers, proposer, recovery, guardian };
+    writeFileSync(stateFile, JSON.stringify(st, null, 2) + '\n'); // saved before the commit is sent, so a rerun can finish it
+  }
+  if (st.claimant.toLowerCase() !== signer.address.toLowerCase()) throw new SignetError('claimant', `this setup was started by ${st.claimant}; finish it with the same key (you are ${signer.address})`);
+
+  const bound = await read<Address>(ctx, { address: registry, abi: registryAbi, functionName: 'gateOf', args: [st.domain] });
+  if (bound !== zeroAddress) throw new SignetError('AlreadyBound', `${st.domain} is already bound to gate ${bound}. If that is your gate, put it in ${CONFIG_NAME}.`);
+
+  log(`Setting up ${st.domain} on ${ctx.net.name} (chain ${ctx.net.chainId}) as ${signer.label}`);
+  // Step 1: commit. The hash hides the domain, so nobody can copy the claim out of the mempool.
+  try {
+    const r = await send(ctx, signer, { address: factory, abi: factoryAbi, functionName: 'commit', args: [st.commitment] });
+    log(`1/2 commitment sent (tx ${r.transactionHash}, block ${r.blockNumber}). The domain stays hidden until step 2.`);
+  } catch (e) {
+    if (!(e instanceof SignetError) || e.code !== 'CommitExists') throw e;
+    log('1/2 commitment is already on-chain (CommitExists): continuing to the reveal.'); // success, not an error
+  }
+  const [commitBlock, commitTime] = await read<[bigint, bigint]>(ctx, { address: factory, abi: factoryAbi, functionName: 'commits', args: [st.commitment] });
+  if (commitBlock === 0n) throw new SignetError('NoCommit', 'the commitment is not on-chain. Run signet init again.');
+  if ((await chainTime(ctx)) > Number(commitTime) + 7 * 86400) {
+    writeFileSync(stateFile, JSON.stringify({ ...st, salt: undefined }, null, 2));
+    throw new SignetError('CommitExpired', `the commitment is older than 7 days. Delete ${stateFile} and run signet init again.`);
+  }
+
+  // Step 2 must be mined at least 2 blocks after the commit.
+  const ready = async () => (await ctx.pub.getBlockNumber()) >= commitBlock + 2n;
+  if (!(await ready())) {
+    if (o.wait === false) {
+      log(`    The reveal needs 2 more blocks. Run "signet init" again to finish${ctx.net.name === 'local' ? ' (staging: pnpm staging:time blocks 2)' : ''}.`);
+      return { gate: null, waiting: true };
+    }
+    log('    waiting for 2 blocks...');
+    const deadline = Date.now() + (o.waitSeconds ?? 120) * 1000;
+    while (!(await ready())) {
+      if (Date.now() > deadline) throw new SignetError('wait', `still waiting for 2 blocks after the commit. Run "signet init" again to finish${ctx.net.name === 'local' ? ' (staging mines only on demand: pnpm staging:time blocks 2)' : ''}.`);
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
+  // Step 2: one transaction deploys the gate, sets the roles and binds the domain.
+  const receipt = await send(ctx, signer, {
+    address: factory, abi: factoryAbi, functionName: 'createGate',
+    args: [st.approvers, st.proposer, st.recovery, st.guardian, [{ domain: st.domain, salt: st.salt, circuits: zeroAddress, tokenId: 0n }]],
+  });
+  const created = parseEventLogs({ abi: factoryAbi, logs: receipt.logs, eventName: 'GateCreated' })[0];
+  if (!created) throw new SignetError('init', `createGate succeeded but no GateCreated event was found (tx ${receipt.transactionHash})`);
+  const gate = getAddress(created.args.gate);
+  st.gate = gate;
+  writeFileSync(stateFile, JSON.stringify({ ...st, salt: undefined }, null, 2) + '\n');
+  const config: ProjectConfig = { network: ctx.net.name, chainId: ctx.net.chainId, domain: st.domain, gate };
+  writeFileSync(join(ctx.dir, CONFIG_NAME), JSON.stringify(config, null, 2) + '\n');
+  const [, container, prefix] = await read<[Address, Address, string]>(ctx, { address: registry, abi: registryAbi, functionName: 'bindingOf', args: [st.domain] });
+
+  log(`2/2 gate created and domain bound (tx ${receipt.transactionHash}, gas ${receipt.gasUsed})`);
+  log();
+  log(`  gate        ${gate}`);
+  log(`  domain      ${st.domain}  ->  ${container} / ${prefix}`);
+  st.approvers.forEach((a, i) => log(`  approver ${i + 1}  ${a}`));
+  log(`  proposer    ${st.proposer}  (CI: can only propose)`);
+  log(`  recovery    ${st.recovery}`);
+  log(`  guardian    ${st.guardian === zeroAddress ? 'none' : `${st.guardian}  (can only freeze)`}`);
+  log(`  mode        observe (Guard reports, never blocks, until you turn enforcement on)`);
+  log(`  wrote       ${CONFIG_NAME}`);
+  log();
+  log('Next steps');
+  log(`  1. Prove the domain is yours: add the DNS record   _signet.${st.domain}  TXT  "gate=${gate}; chain=${ctx.net.chainId}"`);
+  log('  2. Check your build:        signet verify <buildDir>      (then: signet verify https://' + st.domain + ' --build <buildDir>)');
+  log('  3. Seal it:                 signet seal <buildDir>        and review the allowlist it prints');
+  log('  4. Propose the release:     signet propose <buildDir>');
+  log('  5. Approvers:               signet approve <id>, then signet publish <id> <buildDir>');
+  if (!o.proposer) log(`  6. CI: add the content of ${showPath(keyFile)} as the secret SIGNET_PROPOSER_KEY, fund ${st.proposer} with a little OKB for gas, then delete the file`);
+  else log('  6. CI: add the proposer key as the secret SIGNET_PROPOSER_KEY');
+  return { gate, waiting: false };
+}
+
+// ---------------------------------------------------------------- gate state
+
+interface Proposal {
+  kind: number; tier: number; emergency: boolean; executed: boolean; cancelled: boolean; approvals: number; proposerSlot: number;
+  proposedAt: number; readyAt: number; baseRelease: bigint; baseline: bigint; approverSet: bigint;
+  filesRoot: Hex; allowlistHash: Hex; originsHash: Hex; adminData: Hex;
+}
+interface GateState {
+  approvers: readonly Address[]; proposer: Address; recovery: Address; guardian: Address; frozen: boolean; enforced: boolean;
+  shortDelay: number; longDelay: number; graceWindow: number; proposalCount: bigint; currentRelease: bigint; approverSet: bigint; unfreezeApprovals: number;
+}
+
+async function gateState(ctx: Ctx, gate: Address): Promise<GateState> {
+  const g = <T>(functionName: string) => read<T>(ctx, { address: gate, abi: gateAbi, functionName });
+  const [approvers, proposer, recovery, guardian, frozen, enforced, shortDelay, longDelay, graceWindow, proposalCount, currentRelease, approverSet, unfreezeApprovals] = await Promise.all([
+    g<readonly Address[]>('getApprovers'), g<Address>('proposer'), g<Address>('recovery'), g<Address>('guardian'), g<boolean>('frozen'), g<boolean>('enforced'),
+    g<number>('shortDelay'), g<number>('longDelay'), g<number>('graceWindow'), g<bigint>('proposalCount'), g<bigint>('currentRelease'), g<bigint>('approverSet'), g<number>('unfreezeApprovals'),
+  ]);
+  return { approvers, proposer, recovery, guardian, frozen, enforced, shortDelay, longDelay, graceWindow, proposalCount, currentRelease, approverSet, unfreezeApprovals };
+}
+
+async function getProposal(ctx: Ctx, gate: Address, id: bigint): Promise<Proposal> {
+  const p = await read<Proposal>(ctx, { address: gate, abi: gateAbi, functionName: 'getProposal', args: [id] });
+  if (Number(p.kind) === 0) throw new SignetError('NotLive', `there is no proposal #${id} on this gate`);
+  return { ...p, proposedAt: Number(p.proposedAt), readyAt: Number(p.readyAt) };
+}
+
+/// Where a proposal stands, in words. The contract (through the policy circuit) has the last word; this explains it.
+export function describeProposal(p: Proposal, s: GateState, now: number): { open: boolean; publishable: boolean; text: string } {
+  const count = popcount(p.approvals);
+  const need = NEED[p.tier]!;
+  const votes = `${count} of 3 approvals`;
+  if (p.executed) return { open: false, publishable: false, text: p.kind === 1 ? 'published' : 'executed' };
+  if (p.cancelled) return { open: false, publishable: false, text: 'cancelled' };
+  if (p.approverSet !== s.approverSet) return { open: false, publishable: false, text: 'void (the approvers changed)' };
+  if (now > p.proposedAt + 7 * 86400) return { open: false, publishable: false, text: 'expired' };
+  if (p.kind === 1 && p.baseRelease !== s.currentRelease) return { open: false, publishable: false, text: 'stale (another release was published since): propose again' };
+  const frozen = s.frozen ? ' The gate is FROZEN: nothing publishes until 2 approvers unfreeze.' : '';
+  if (p.emergency && count === 3 && (p.tier === 0 || p.tier === 2)) return { open: true, publishable: !s.frozen, text: `${votes}, emergency fast lane: can publish now.${frozen}` };
+  if (p.readyAt === 0) {
+    const fast = p.emergency && (p.tier === 0 || p.tier === 2) ? ' (or 3 of 3 to publish at once)' : '';
+    return { open: true, publishable: false, text: `${votes}: needs ${need - count} more approval${need - count > 1 ? 's' : ''}${fast}.${frozen}` };
+  }
+  const at = p.readyAt + (p.tier <= 1 ? s.shortDelay : s.longDelay);
+  if (now >= at) return { open: true, publishable: !s.frozen, text: `${votes}, timelock over: can publish now.${frozen}` };
+  return { open: true, publishable: false, text: `${votes}, timelock running: can publish at ${fmtTime(at)} (in ${fmtSpan(at - now)}).${frozen}` };
+}
+
+function ruleOf(tier: number, s: GateState, emergency: boolean): string {
+  const fast = emergency && (tier === 0 || tier === 2) ? ', or 3 of 3 approvals at once (emergency fast lane)' : '';
+  return `${NEED[tier]} approval${NEED[tier]! > 1 ? 's' : ''} + ${fmtSpan(tier <= 1 ? s.shortDelay : s.longDelay)} timelock${fast}`;
+}
+
+function checkBuild(build: SealedBuild, cfg: ProjectConfig): void {
+  if (build.manifest.domain !== cfg.domain) throw new SignetError('domain', `this build was sealed for ${build.manifest.domain}, but the project is ${cfg.domain}`);
+}
+
+// ---------------------------------------------------------------- propose / approve / cancel
+
+export async function propose(ctx: Ctx, buildDir: string, o: { emergency?: boolean }, log: Log): Promise<bigint> {
+  const cfg = needProject(ctx);
+  const build = loadSealed(buildDir);
+  checkBuild(build, cfg);
+  const m = build.manifest;
+  const signer = await signerFor(ctx, ['SIGNET_PROPOSER_KEY', ...KEYS], statePath(ctx.dir, 'proposer.key'));
+  const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'proposeRelease', args: [m.filesRoot, m.allowlistHash, m.originsHash, !!o.emergency] });
+  const ev = parseEventLogs({ abi: gateAbi, logs: receipt.logs, eventName: 'Proposed' })[0]!;
+  const s = await gateState(ctx, cfg.gate);
+  log(`Proposed release #${ev.args.id} for ${cfg.domain} as ${signer.label}`);
+  log(`  manifest   ${ev.args.manifestHash}`);
+  log(`  risk tier  ${TIERS[ev.args.tier]} (computed on-chain from the allowlist and origins hashes)`);
+  log(`  needs      ${ruleOf(ev.args.tier, s, ev.args.emergency)}`);
+  log(`  tx         ${receipt.transactionHash} (gas ${receipt.gasUsed})`);
+  log(`Next: an approver runs  signet approve ${ev.args.id}`);
+  return ev.args.id;
+}
+
+export async function approve(ctx: Ctx, id: bigint, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const signer = await signerFor(ctx, KEYS);
+  await getProposal(ctx, cfg.gate, id);
+  const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'approve', args: [id] });
+  const [p, s, now] = [await getProposal(ctx, cfg.gate, id), await gateState(ctx, cfg.gate), await chainTime(ctx)];
+  log(`Approved #${id} as ${signer.label} (tx ${receipt.transactionHash})`);
+  log(`  tier ${TIERS[p.tier]}: ${describeProposal(p, s, now).text}`);
+}
+
+export async function cancel(ctx: Ctx, id: bigint, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const signer = await signerFor(ctx, KEYS);
+  const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'cancel', args: [id] });
+  log(`Cancelled #${id} as ${signer.label} (tx ${receipt.transactionHash})`);
+}
+
+// ---------------------------------------------------------------- publish + upload
+
+function fallbackNote(receipt: TransactionReceipt, log: Log): void {
+  const logs = parseEventLogs({ abi: gateAbi, logs: receipt.logs });
+  if (logs.some((l) => l.eventName === 'PolicyFallbackBeaconChanged' || l.eventName === 'PolicyFallbackEvalFailed')) {
+    log('  note: the policy circuit could not be read in this transaction; the on-chain Solidity mirror of the same policy decided.');
+  } else log('  decided by the TapeOut policy circuit');
+}
+
+export async function publish(ctx: Ctx, id: bigint, buildDir: string | undefined, o: { full?: boolean; upload?: boolean }, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const signer = await signerFor(ctx, KEYS); // anyone may publish; the circuit decides
+  const before = await getProposal(ctx, cfg.gate, id);
+  let build: SealedBuild | null = null;
+  if (before.kind === 1 && buildDir) {
+    build = loadSealed(buildDir);
+    checkBuild(build, cfg);
+    const m = build.manifest;
+    if (m.filesRoot !== before.filesRoot || m.allowlistHash !== before.allowlistHash || m.originsHash !== before.originsHash) {
+      throw new SignetError('build', `${buildDir} is not the build that was proposed as #${id}`);
+    }
+  }
+  let receipt: TransactionReceipt;
+  try {
+    receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'publish', args: [id] }, { pad: true });
+  } catch (e) {
+    if (e instanceof SignetError && e.code === 'PolicyDenied') {
+      const d = describeProposal(before, await gateState(ctx, cfg.gate), await chainTime(ctx));
+      throw new SignetError('PolicyDenied', `Not yet: the policy circuit refused to publish #${id}.\n  tier ${TIERS[before.tier]}: ${d.text}`);
+    }
+    throw e;
+  }
+  log(`Published ${before.kind === 1 ? 'release' : 'admin change'} #${id} (tx ${receipt.transactionHash}, gas ${receipt.gasUsed})`);
+  fallbackNote(receipt, log);
+  if (before.kind !== 1) return;
+  if (!build) log(`  The release is live on-chain. Guard also needs its files: signet upload <buildDir>`);
+  else if (o.upload !== false) await upload(ctx, buildDir!, { full: o.full }, log);
+}
+
+/// Writes the release's files through SignetRegistry, which accepts only bytes of the gate's current release.
+/// Default: the three manifest files (what Guard reads). --full: every file that fits on-chain (the verified copy).
+export async function upload(ctx: Ctx, buildDir: string, o: { full?: boolean }, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const { registry } = needDeployed(ctx);
+  const build = loadSealed(buildDir);
+  checkBuild(build, cfg);
+  const m = build.manifest;
+  const [filesRoot, allowlistHash, originsHash, ok] = await read<[Hex, Hex, Hex, boolean]>(ctx, { address: cfg.gate, abi: gateAbi, functionName: 'activeRelease' });
+  if (!ok || filesRoot !== m.filesRoot || allowlistHash !== m.allowlistHash || originsHash !== m.originsHash) {
+    throw new SignetError('NotApproved', `${buildDir} is not the gate's current release, so its files can't be written. Publish it first.`);
+  }
+  const [, container, prefix] = await read<[Address, Address, string]>(ctx, { address: registry, abi: registryAbi, functionName: 'bindingOf', args: [cfg.domain] });
+  if (container === zeroAddress) throw new SignetError('NotBoundGate', `${cfg.domain} has no valid container binding`);
+  const sites = ctx.net.tapeout.siteRegistry as Address;
+  const signer = await signerFor(ctx, KEYS);
+
+  const wanted: { path: string; contentType: string; proof: Hex[] }[] = [
+    { path: ALLOWLIST_PATH, contentType: 'application/json', proof: [] },
+    { path: ORIGINS_PATH, contentType: 'application/json', proof: [] },
+  ];
+  const skipped: string[] = [];
+  for (const f of build.files) {
+    if (f.path !== FILES_PATH && !o.full) continue;
+    if (f.size === 0 || f.size > MAX_ONCHAIN_BYTES || !isOnchainPath(f.path)) skipped.push(f.path);
+    else wanted.push({ path: f.path, contentType: f.contentType, proof: build.proof(f.path) });
+  }
+  log(`Writing ${wanted.length} file(s) to ${container} under ${prefix || '(container root)'}`);
+  let gas = 0n;
+  let fee = 0n;
+  for (const w of wanted) {
+    const data = build.bytes(w.path);
+    const want = sha256Hex(data);
+    const info = await read<[number, string, Hex, number, bigint]>(ctx, { address: sites, abi: siteReadAbi, functionName: 'fileInfo', args: [container, prefix + w.path] });
+    if (info[4] > 0n && info[2] === want && info[1] === w.contentType) {
+      log(`  same    ${w.path}`);
+      continue;
+    }
+    const r = await send(ctx, signer, { address: registry, abi: registryAbi, functionName: 'writeFile', args: [{ domain: cfg.domain, path: w.path, contentType: w.contentType, data: `0x${data.toString('hex')}`, proof: w.proof }] });
+    gas += r.gasUsed;
+    fee += r.gasUsed * r.effectiveGasPrice;
+    log(`  wrote   ${w.path}  (${data.length} bytes, gas ${r.gasUsed})`);
+  }
+  for (const p of skipped) log(`  skipped ${p}  (empty, over ${MAX_ONCHAIN_BYTES} bytes, or a path that can't be stored on-chain)`);
+  const back = await read<Hex>(ctx, { address: sites, abi: siteReadAbi, functionName: 'read', args: [container, prefix + FILES_PATH] });
+  if (back !== `0x${build.bytes(FILES_PATH).toString('hex')}`) throw new SignetError('read-back', `${FILES_PATH} read back from the chain does not match`);
+  log(`  read back ${prefix}${FILES_PATH}: matches. Total gas ${gas} (${formatEther(fee)} OKB).`);
+}
+
+// ---------------------------------------------------------------- status
+
+export async function status(ctx: Ctx, buildDir: string | undefined, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const { registry } = needDeployed(ctx);
+  const [s, now] = [await gateState(ctx, cfg.gate), await chainTime(ctx)];
+  const [boundGate, container, prefix] = await read<[Address, Address, string]>(ctx, { address: registry, abi: registryAbi, functionName: 'bindingOf', args: [cfg.domain] });
+  log(`${cfg.domain} on ${ctx.net.name} (chain ${ctx.net.chainId}), chain time ${fmtTime(now)}`);
+  log(`  gate       ${cfg.gate}${boundGate.toLowerCase() === cfg.gate.toLowerCase() ? '' : '   WARNING: the registry does not bind this domain to this gate'}`);
+  log(`  files      ${container} / ${prefix}`);
+  log(`  state      ${s.frozen ? `FROZEN (${popcount(s.unfreezeApprovals)} of 2 unfreeze approvals)` : 'active'}, ${s.enforced ? 'enforce mode' : 'observe mode'}`);
+  log(`  timelocks  ${fmtSpan(s.shortDelay)} (tiers 00, 01), ${fmtSpan(s.longDelay)} (tiers 10, 11), grace ${fmtSpan(s.graceWindow)}`);
+  log(`  approvers  ${s.approvers.join(', ')}`);
+  log(`  proposer   ${s.proposer}   recovery ${s.recovery}   guardian ${s.guardian === zeroAddress ? 'none' : s.guardian}`);
+  if (s.currentRelease === 0n) log('  release    none yet');
+  else {
+    const [manifestHash, , , , publishedAt] = await read<[Hex, Hex, Hex, Hex, number, bigint]>(ctx, { address: cfg.gate, abi: gateAbi, functionName: 'releases', args: [s.currentRelease] });
+    const valid = await read<boolean>(ctx, { address: cfg.gate, abi: gateAbi, functionName: 'isValidManifest', args: [manifestHash] });
+    log(`  release    #${s.currentRelease}, published ${fmtTime(Number(publishedAt))}${valid ? '' : '   REVOKED'}`);
+    log(`             manifest ${manifestHash}`);
+    if (buildDir) {
+      const m = loadSealed(buildDir).manifest;
+      log(`             ${buildDir} ${m.manifestHash === manifestHash ? 'IS the current release' : 'is NOT the current release'}`);
+    }
+  }
+  const open: string[] = [];
+  for (let id = s.proposalCount; id >= 1n && id > s.proposalCount - 25n; id--) {
+    const p = await getProposal(ctx, cfg.gate, id);
+    const d = describeProposal(p, s, now);
+    if (d.open) open.push(`  #${id}  ${p.kind === 1 ? 'release' : 'admin  '}  tier ${TIERS[p.tier]}${p.emergency ? ', emergency' : ''}\n      ${d.text}\n      expires ${fmtTime(p.proposedAt + 7 * 86400)}`);
+  }
+  log(open.length === 0 ? 'No open proposals.' : `Open proposals (${open.length}):`);
+  for (const line of open) log(line);
+}
+
+// ---------------------------------------------------------------- freeze / unfreeze
+
+export async function freeze(ctx: Ctx, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const signer = await signerFor(ctx, KEYS);
+  const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'freeze' });
+  log(`FROZEN by ${signer.label} (tx ${receipt.transactionHash})`);
+  log('  Nothing can be published until 2 of the 3 approvers run: signet unfreeze');
+}
+
+export async function unfreeze(ctx: Ctx, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const signer = await signerFor(ctx, KEYS);
+  let s = await gateState(ctx, cfg.gate);
+  if (!s.frozen) throw new SignetError('NotFrozen', 'the gate is not frozen');
+  const slot = s.approvers.findIndex((a) => a.toLowerCase() === signer.address.toLowerCase());
+  if (slot >= 0 && (s.unfreezeApprovals & (1 << slot)) === 0) {
+    await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'approveUnfreeze' });
+    s = await gateState(ctx, cfg.gate);
+    log(`Unfreeze approved by ${signer.label}: ${popcount(s.unfreezeApprovals)} of 2`);
+  }
+  if (slot < 0 && popcount(s.unfreezeApprovals) < 2) throw new SignetError('NotApprover', `only the 3 approvers can approve an unfreeze (${popcount(s.unfreezeApprovals)} of 2 so far) [NotApprover]`);
+  if (popcount(s.unfreezeApprovals) < 2) {
+    log(`  Still frozen: ${2 - popcount(s.unfreezeApprovals)} more approver(s) must run signet unfreeze.`);
+    return;
+  }
+  try {
+    const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'unfreeze' }, { pad: true });
+    log(`Unfrozen (tx ${receipt.transactionHash})`);
+    fallbackNote(receipt, log);
+  } catch (e) {
+    if (errorName(e) === 'PolicyDenied' || (e instanceof SignetError && e.code === 'PolicyDenied')) throw new SignetError('PolicyDenied', 'the policy circuit refused to unfreeze: it needs 2 of 3 approvers');
+    throw e;
+  }
+}

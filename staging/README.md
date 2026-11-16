@@ -10,6 +10,7 @@ pnpm staging:smoke         # one full release on the demo gate (propose, 3 appro
 pnpm staging:time 24h      # jump the clock (90s, 10m, 1h, 7d ...)
 pnpm staging:time blocks 2 # mine blocks (commit-reveal needs 2)
 pnpm staging:fund 0xAddr 5 # give any address OKB
+pnpm staging:demo          # the whole CLI flow as a transcript (init, verify, seal, 2 releases, freeze)
 pnpm staging:down          # stop; state is discarded, the next `up` starts fresh
 ```
 

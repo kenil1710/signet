@@ -326,9 +326,10 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 - [ ] Nov 18: **Spike C**: extension reads script bytes via cache (`only-if-cached`) and hashes them; test on a Vite app
 - [ ] Nov 18–19: design the policy circuit in the TapeOut canvas or as a netlist; exhaustive 512-case test (9 input bits) against a JS reference; tape out → record the Processor address + circuit ID
 - [ ] Nov 19–21: Foundry contracts: ReleaseGate (propose, approve, tier calc, publish, freeze/unfreeze, recovery) + Registry (bind/unbind domain); tests for every tier and edge case
-- [ ] Nov 22: deploy to X Layer mainnet; CLI `init` + `seal` (hash build, extract allowlist, store SRI hashes of cross-origin scripts)
-- [ ] With the CLI: domain claims are commit-reveal; the CLI treats the factory's `CommitExists` error as success and continues to the reveal
-- [ ] With the CLI: `signet verify` warns about `Cache-Control: no-store` on scripts/HTML and fails on cross-origin scripts without an SRI `integrity` attribute (from Spike C)
+- [ ] Nov 22: deploy to X Layer mainnet
+- [x] CLI `init` + `seal` (hash build, extract allowlist, store SRI hashes of cross-origin scripts) + `verify`, `propose`, `approve`, `publish`, `status`, `freeze`: built and tested on the staging chain (2026-11-17, `packages/cli`)
+- [x] With the CLI: domain claims are commit-reveal; the CLI treats the factory's `CommitExists` error as success and continues to the reveal
+- [x] With the CLI: `signet verify` warns about `Cache-Control: no-store` on scripts/HTML and fails on cross-origin scripts without an SRI `integrity` attribute (from Spike C)
 
 **Week 2 (Nov 23–29): the user-facing product**
 
