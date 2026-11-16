@@ -1,0 +1,8 @@
+{
+  "name": "@signet/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Signet approver dashboard",
+  "license": "MIT",
+  "type": "module"
+}

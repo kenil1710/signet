@@ -1,0 +1,33 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# build output
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+
+# foundry
+packages/contracts/cache/
+packages/contracts/out/
+packages/contracts/broadcast/*/31337/
+packages/contracts/broadcast/**/dry-run/
+
+# extension
+packages/extension/*.zip
+packages/extension/*.crx
+
+# misc
+.DS_Store
+*.log
+.vscode/
+.idea/

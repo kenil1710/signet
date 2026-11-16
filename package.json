@@ -1,0 +1,16 @@
+{
+  "name": "signet",
+  "private": true,
+  "description": "Signet: sealed releases and signing-time allowlists for dApp frontends on X Layer (TapeOut).",
+  "packageManager": "pnpm@12.6.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.0"
+  }
+}

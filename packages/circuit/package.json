@@ -1,0 +1,8 @@
+{
+  "name": "@signet/circuit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Release-policy circuit and truth-table test",
+  "license": "MIT",
+  "type": "module"
+}
