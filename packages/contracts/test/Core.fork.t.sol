@@ -28,7 +28,8 @@ contract MirrorProbe {
 
 /// End to end on a LOCAL fork of X Layer mainnet, no mocks: the real policy circuit #6, the real beacon, the real
 /// processor code hash, and the real SiteRegistry with SignetRegistry as operator of circuit #5's container.
-/// That one container holds Signet's own site under `signet/` and free-tier projects under `projects/<domain>/`.
+/// That one container holds Signet's own site under `signet/<domain>/` and free-tier projects under
+/// `projects/<domain>/`.
 /// Circuit #5 stays with its holder (the dev wallet; a multisig after the hackathon).
 /// Nothing is broadcast. SKIPPED when XLAYER_RPC_URL is unset.
 contract CoreForkTest is Test {
@@ -64,7 +65,11 @@ contract CoreForkTest is Test {
         vm.createSelectFork(rpc);
         forked = true;
         string memory json = vm.readFile("../circuit/artifacts/policy.json");
-        reg = new SignetRegistry(ISiteRegistryWriter(SITES), IContainerOpener(OPENER), CPU, 5);
+        // the factory and Signet's site gate are fixed in the registry at deployment, as predicted addresses
+        address predictedFactory = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
+        reg = new SignetRegistry(
+            ISiteRegistryWriter(SITES), IContainerOpener(OPENER), CPU, 5, predictedFactory, vm.computeCreateAddress(predictedFactory, 2)
+        );
         factory = new SignetFactory(
             address(reg),
             IPolicyProcessor(CPU),
@@ -74,12 +79,12 @@ contract CoreForkTest is Test {
             ICircuitBeacon(BEACON),
             IMPL
         );
-        reg.initFactory(address(factory));
+        require(address(factory) == predictedFactory, "factory address");
         vm.prank(DEV); // the holder keeps circuit #5 and makes the registry the container's operator
         ISiteRegistryWriter(SITES).setOperator(SHARED, address(reg), 30 days);
+        site = _newGate(SITE, address(0), 0); // the factory's first gate
+        require(address(site) == reg.signetSiteGate(), "site gate address");
         gate = _newGate(DOMAIN, address(0), 0);
-        site = _newGate(SITE, address(0), 0);
-        reg.initSignetSite(address(site));
     }
 
     function _newGate(string memory domain, address circuits, uint256 tokenId) internal returns (ReleaseGate) {
@@ -224,7 +229,7 @@ contract CoreForkTest is Test {
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = lDeep;
         _write(SITE, "index.html", "text/html", index, proof);
-        assertEq(ISiteRead(SITES).read(SHARED, "signet/index.html"), index);
+        assertEq(ISiteRead(SITES).read(SHARED, "signet/signet.example/index.html"), index);
         // a "projects/..." path approved by Signet's own gate lands inside signet/, not in the project
         proof[0] = lIndex;
         _write(SITE, deep, JSON, bytes("{}"), proof);
@@ -239,7 +244,7 @@ contract CoreForkTest is Test {
         _write(DOMAIN, "signet/index.html", "text/html", fake, none);
         _write(DOMAIN, "signet/allowlist.json", JSON, ALLOWLIST, none);
         assertEq(ISiteRead(SITES).read(SHARED, "projects/demo.signet.example/signet/index.html"), fake);
-        assertEq(ISiteRead(SITES).read(SHARED, "signet/index.html"), index);
+        assertEq(ISiteRead(SITES).read(SHARED, "signet/signet.example/index.html"), index);
         assertEq(ISiteRead(SITES).read(SHARED, deep), ALLOWLIST);
 
         // the Spike B file is still there, untouched, and no fallback was ever set (hash routing)
@@ -262,7 +267,7 @@ contract CoreForkTest is Test {
         vm.expectRevert(ReleaseGate.PolicyDenied.selector);
         gate.publish(denied);
         vm.expectEmit(false, false, false, true, address(gate));
-        emit ReleaseGate.PolicyFallbackActive(other, 1);
+        emit ReleaseGate.PolicyFallbackBeaconChanged(other);
         gate.publish(ok);
 
         vm.revertToState(snap);
@@ -271,7 +276,7 @@ contract CoreForkTest is Test {
         vm.expectRevert(ReleaseGate.PolicyDenied.selector);
         gate.publish(denied);
         vm.expectEmit(false, false, false, true, address(gate));
-        emit ReleaseGate.PolicyFallbackActive(IMPL, 2);
+        emit ReleaseGate.PolicyFallbackEvalFailed();
         gate.publish(ok);
     }
 

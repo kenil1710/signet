@@ -23,7 +23,9 @@ abstract contract GateBase is Test {
     MockSiteRegistry sites;
     SignetRegistry reg;
     SignetFactory factory;
-    ReleaseGate gate;
+    ReleaseGate gate; // a free-tier project (DOMAIN)
+    ReleaseGate site; // Signet's own site (SITE_DOMAIN)
+    string constant SITE_DOMAIN = "signet.example";
     address sharedContainer;
 
     bytes netlist;
@@ -61,8 +63,18 @@ abstract contract GateBase is Test {
         sharedContainer = opener.accountOf(address(cpu), SHARED_ID);
         sites.registerContainer(sharedContainer, cpu, SHARED_ID);
 
+        // The registry is told, at deployment, which factory and which Signet site gate will exist.
+        // Both are predicted addresses: the factory is our next deployment, the site gate the factory's first clone
+        // (a new contract's nonce starts at 1 and the factory's constructor uses it for the gate implementation).
+        address predictedFactory = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
+        address predictedSite = vm.computeCreateAddress(predictedFactory, 2);
         reg = new SignetRegistry(
-            ISiteRegistryWriter(address(sites)), IContainerOpener(address(opener)), address(cpu), SHARED_ID
+            ISiteRegistryWriter(address(sites)),
+            IContainerOpener(address(opener)),
+            address(cpu),
+            SHARED_ID,
+            predictedFactory,
+            predictedSite
         );
         factory = new SignetFactory(
             address(reg),
@@ -73,10 +85,12 @@ abstract contract GateBase is Test {
             ICircuitBeacon(address(beacon)),
             IMPL
         );
-        reg.initFactory(address(factory));
+        assertEq(address(factory), predictedFactory);
         vm.prank(SHARED_HOLDER);
         sites.setOperator(sharedContainer, address(reg), 30 days);
 
+        site = newGate(SITE_DOMAIN); // the factory's first gate: Signet's own site
+        assertEq(address(site), predictedSite);
         gate = newGate(DOMAIN);
     }
 
@@ -161,14 +175,15 @@ abstract contract GateBase is Test {
         gate.publish(id);
     }
 
-    /// A gate adds a domain: an approver commits, then a tier-11 BindDomain reveals it.
+    /// A gate adds a domain: the tier-11 proposal stores only a commitment; publishBind reveals the domain.
     function bindDomain(string memory domain, address circuits, uint256 tokenId) internal {
         bytes32 salt = keccak256(bytes(domain));
         bytes32 c = factory.commitmentOf(domain, salt, address(gate));
-        vm.prank(A1);
-        gate.commitDomain(c);
+        uint64 id = proposeAdmin(ReleaseGate.Action.BindDomain, abi.encode(c, circuits, tokenId)); // commits too
+        approveMask(id, 7);
         vm.roll(block.number + 2);
-        admin(ReleaseGate.Action.BindDomain, abi.encode(domain, salt, circuits, tokenId));
+        vm.warp(block.timestamp + gate.longDelay());
+        gate.publishBind(id, domain, salt); // the domain is revealed only now
     }
 
     /// Run a tier-11 admin action to completion: 3 of 3, then the long timelock from the third approval.

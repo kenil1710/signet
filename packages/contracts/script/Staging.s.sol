@@ -50,8 +50,18 @@ contract Staging is Script {
     function deploy() external {
         _init();
         string memory json = vm.readFile("../circuit/artifacts/policy.json");
+        // The registry fixes the factory and Signet's site gate at deployment, as predicted addresses:
+        // the factory is the deployer's next contract, the site gate the factory's first clone.
+        address predictedFactory = vm.computeCreateAddress(acct[0], vm.getNonce(acct[0]) + 1);
         vm.startBroadcast(acct[0]);
-        SignetRegistry reg = new SignetRegistry(ISiteRegistryWriter(SITES), IContainerOpener(OPENER), CPU, SHARED_CIRCUIT);
+        SignetRegistry reg = new SignetRegistry(
+            ISiteRegistryWriter(SITES),
+            IContainerOpener(OPENER),
+            CPU,
+            SHARED_CIRCUIT,
+            predictedFactory,
+            vm.computeCreateAddress(predictedFactory, 2)
+        );
         SignetFactory factory = new SignetFactory(
             address(reg),
             IPolicyProcessor(CPU),
@@ -61,7 +71,7 @@ contract Staging is Script {
             ICircuitBeacon(BEACON),
             IMPL
         );
-        reg.initFactory(address(factory));
+        require(address(factory) == predictedFactory, "factory address was predicted wrong");
         factory.commit(factory.commitmentOf(SITE_DOMAIN, _salt(SITE_DOMAIN), acct[0]));
         factory.commit(factory.commitmentOf(DEMO_DOMAIN, _salt(DEMO_DOMAIN), acct[0]));
         vm.stopBroadcast();
@@ -81,12 +91,12 @@ contract Staging is Script {
         SignetFactory factory = SignetFactory(vm.parseJsonAddress(cfg, ".contracts.factory"));
 
         vm.startBroadcast(acct[0]);
-        address site = _create(factory, SITE_DOMAIN);
+        address site = _create(factory, SITE_DOMAIN); // must be the factory's FIRST gate
         address demo = _create(factory, DEMO_DOMAIN);
-        reg.initSignetSite(site);
         vm.stopBroadcast();
+        require(site == reg.signetSiteGate(), "site gate address was predicted wrong");
 
-        vm.writeJson(_gateJson("site", site, SITE_DOMAIN, "signet/"), OUT, ".gates.site");
+        vm.writeJson(_gateJson("site", site, SITE_DOMAIN, string.concat("signet/", SITE_DOMAIN, "/")), OUT, ".gates.site");
         vm.writeJson(_gateJson("demo", demo, DEMO_DOMAIN, string.concat("projects/", DEMO_DOMAIN, "/")), OUT, ".gates.demo");
         console2.log("Signet site gate:", site);
         console2.log("demo project gate:", demo);

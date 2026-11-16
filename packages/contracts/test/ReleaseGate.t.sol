@@ -587,7 +587,7 @@ contract ReleaseGateTest is GateBase {
         beacon.set(evil);
         assertFalse(tryPublish(denied)); // the mirror applies the same policy
         vm.expectEmit(false, false, false, true, address(gate));
-        emit ReleaseGate.PolicyFallbackActive(evil, 1);
+        emit ReleaseGate.PolicyFallbackBeaconChanged(evil);
         gate.publish(ok);
         assertEq(gate.currentRelease(), ok);
     }
@@ -624,7 +624,7 @@ contract ReleaseGateTest is GateBase {
         vm.mockCallRevert(address(cpu), abi.encodeWithSelector(NetlistProcessor.eval.selector), "circuit unavailable");
         assertFalse(tryPublish(denied));
         vm.expectEmit(false, false, false, true, address(gate));
-        emit ReleaseGate.PolicyFallbackActive(IMPL, 2);
+        emit ReleaseGate.PolicyFallbackEvalFailed();
         gate.publish(ok);
         assertEq(gate.currentRelease(), ok);
     }
@@ -643,10 +643,10 @@ contract ReleaseGateTest is GateBase {
         vm.recordLogs();
         baseline(F1);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 topic = keccak256("PolicyFallbackActive(address,uint8)");
         assertGt(logs.length, 0);
         for (uint256 i; i < logs.length; i++) {
-            assertTrue(logs[i].topics[0] != topic);
+            assertTrue(logs[i].topics[0] != ReleaseGate.PolicyFallbackBeaconChanged.selector);
+            assertTrue(logs[i].topics[0] != ReleaseGate.PolicyFallbackEvalFailed.selector);
         }
     }
 
@@ -828,16 +828,19 @@ contract ReleaseGateTest is GateBase {
         assertTrue(gate.isValidManifest(m));
     }
 
-    function test_M7_revokeAgainClearsUnrevokeVotes() public {
+    function test_M7_unrevokeVotesStartOverAfterANewRevoke() public {
         uint64 id = baseline(F1);
         vm.prank(A0);
         gate.revoke(id);
         vm.prank(A1);
         gate.voteUnrevoke(id);
         vm.prank(A2);
-        gate.revoke(id);
-        vm.prank(A0);
-        gate.voteUnrevoke(id);
+        gate.voteUnrevoke(id); // 2 of 3: valid again
+        assertTrue(gate.isValidManifest(mh(F1, ALLOW, ORIG)));
+        vm.prank(A2);
+        gate.revoke(id); // revoked a second time
+        vm.prank(A1);
+        gate.voteUnrevoke(id); // the earlier votes don't carry over: this is 1 of 3
         assertFalse(gate.isValidManifest(mh(F1, ALLOW, ORIG)));
     }
 
@@ -1099,6 +1102,7 @@ contract ReleaseGateTest is GateBase {
     }
 
     function test_edge_manyDomains_oneGate_andOwnContainer() public {
+        cpu.setOwner(77, address(gate)); // the gate holds its own container's circuit NFT
         bindDomain("docs.example.org", address(0), 0);
         bindDomain("beta.example.org", address(cpu), 77);
         (address g1, address c1,) = reg.bindingOf("docs.example.org");
@@ -1114,30 +1118,98 @@ contract ReleaseGateTest is GateBase {
         assertEq(c3, opener.accountOf(address(cpu), 77));
     }
 
-    function test_info_bindDomain_showsTheRealError() public {
-        // an already-bound domain: the registry's own error comes through, nothing is silently retried
-        bytes32 salt = keccak256("s");
-        bytes32 c = factory.commitmentOf(DOMAIN, salt, address(gate)); // before vm.prank (it is a call)
-        vm.prank(A0);
-        gate.commitDomain(c);
-        vm.roll(block.number + 2);
-        uint64 id = proposeAdmin(ReleaseGate.Action.BindDomain, abi.encode(DOMAIN, salt, address(0), uint256(0)));
-        approveMask(id, 7);
-        vm.warp(block.timestamp + 24 hours);
-        vm.expectRevert(SignetRegistry.AlreadyBound.selector);
-        gate.publish(id);
-        // no commit: the factory's error comes through
-        id = proposeAdmin(ReleaseGate.Action.BindDomain, abi.encode("new.example.org", salt, address(0), uint256(0)));
-        approveMask(id, 7);
-        vm.warp(block.timestamp + 24 hours);
-        vm.expectRevert(SignetFactory.NoCommit.selector);
-        gate.publish(id);
+    // ---- third review M-1: a BindDomain proposal stores only a commitment
+
+    function _bindProposal(string memory domain, bytes32 salt) internal returns (uint64 id, bytes32 c) {
+        c = factory.commitmentOf(domain, salt, address(gate));
+        id = proposeAdmin(ReleaseGate.Action.BindDomain, abi.encode(c, address(0), uint256(0)));
     }
 
-    function test_commitDomain_onlyApprovers() public {
-        vm.prank(P);
-        vm.expectRevert(ReleaseGate.NotApprover.selector);
-        gate.commitDomain(bytes32(uint256(1)));
+    function test_R3M1_bindProposal_hidesTheDomain_andCommitsAtProposalTime() public {
+        string memory d = "secret-launch.example.org";
+        (uint64 id, bytes32 c) = _bindProposal(d, keccak256("salt"));
+        // nothing on-chain names the domain: not the proposal, not the factory
+        bytes memory stored = gate.getProposal(id).adminData;
+        assertEq(stored.length, abi.encode(ReleaseGate.Action.BindDomain, abi.encode(c, address(0), uint256(0))).length);
+        assertFalse(_contains(stored, bytes(d)));
+        (uint64 committedAt,) = factory.commits(c);
+        assertEq(committedAt, block.number); // the gate committed in the same transaction
+
+        approveMask(id, 7);
+        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 24 hours);
+        vm.expectRevert(ReleaseGate.BadProposal.selector); // plain publish can't execute it
+        gate.publish(id);
+        vm.expectRevert(ReleaseGate.BadProposal.selector); // another domain than the committed one
+        gate.publishBind(id, "other.example.org", keccak256("salt"));
+        vm.expectRevert(ReleaseGate.BadProposal.selector); // wrong salt
+        gate.publishBind(id, d, keccak256("guess"));
+        vm.prank(X); // anyone who knows the reveal may execute, like publish
+        gate.publishBind(id, d, keccak256("salt"));
+        assertEq(reg.gateOf(d), address(gate));
+    }
+
+    function test_R3M1_watcherOfThePendingProposal_cannotTakeTheDomain() public {
+        string memory d = "secret-launch.example.org";
+        (uint64 id,) = _bindProposal(d, keccak256("salt"));
+        approveMask(id, 7);
+        // 24 h pass with the proposal public. It shows only a hash, so nobody can claim "the same domain" first;
+        // and the gate's commit is already old enough the moment the timelock ends.
+        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 24 hours);
+        gate.publishBind(id, d, keccak256("salt"));
+        expectCreateRevert(SignetRegistry.AlreadyBound.selector, d);
+    }
+
+    function test_R3M1_bindStillNeedsTier11_andShowsRealErrors() public {
+        (uint64 id,) = _bindProposal("new.example.org", keccak256("s"));
+        approveMask(id, 3);
+        vm.warp(block.timestamp + 5 days);
+        vm.expectRevert(ReleaseGate.PolicyDenied.selector); // 2 of 3
+        gate.publishBind(id, "new.example.org", keccak256("s"));
+        // an already-bound domain: the registry's own error comes through
+        (id,) = _bindProposal(DOMAIN, keccak256("s"));
+        approveMask(id, 7);
+        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 24 hours);
+        vm.expectRevert(SignetRegistry.AlreadyBound.selector);
+        gate.publishBind(id, DOMAIN, keccak256("s"));
+    }
+
+    function test_R3M1_existingCommit_doesNotBlockTheProposal() public {
+        bytes32 c = factory.commitmentOf("new.example.org", keccak256("s"), address(gate));
+        factory.commit(c); // someone (or an earlier proposal) already sent this commitment
+        (uint64 id,) = _bindProposal("new.example.org", keccak256("s"));
+        approveMask(id, 7);
+        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 24 hours);
+        gate.publishBind(id, "new.example.org", keccak256("s"));
+        assertEq(reg.gateOf("new.example.org"), address(gate));
+    }
+
+    function _contains(bytes memory hay, bytes memory needle) internal pure returns (bool) {
+        if (needle.length > hay.length) return false;
+        for (uint256 i; i <= hay.length - needle.length; i++) {
+            bool ok = true;
+            for (uint256 j; j < needle.length && ok; j++) ok = hay[i + j] == needle[j];
+            if (ok) return true;
+        }
+        return false;
+    }
+
+    // ---- third review, info: revoking an already-revoked manifest
+    function test_R3info_revokingARevokedManifest_reverts_withoutUsingTheCooldown() public {
+        uint64 r1 = baseline(F1);
+        uint64 r2 = propose(F2, ALLOW, ORIG, true);
+        approveMask(r2, 7);
+        gate.publish(r2);
+        vm.prank(A1);
+        gate.revoke(r1);
+        vm.prank(A0);
+        vm.expectRevert(ReleaseGate.BadProposal.selector);
+        gate.revoke(r1); // already revoked
+        vm.prank(A0);
+        gate.revoke(r2); // A0's one revoke per 24 h is still available
     }
 
     function test_edge_giveUpDomain_unbindIsTier11() public {
@@ -1287,6 +1359,9 @@ contract ReleaseGateTest is GateBase {
         uint64 r2 = propose(F2, ALLOW, ORIG, true);
         approveMask(r2, 7);
         gate.publish(r2);
+        uint64 r3 = propose(F3, ALLOW, ORIG, true);
+        approveMask(r3, 7);
+        gate.publish(r3);
         vm.prank(A0);
         gate.revoke(r1);
         vm.prank(A0);
@@ -1300,7 +1375,7 @@ contract ReleaseGateTest is GateBase {
         gate.revoke(r2); // another approver is not blocked
         vm.warp(block.timestamp + 1);
         vm.prank(A0);
-        gate.revoke(r2);
+        gate.revoke(r3);
     }
 
     // L-2: guardian-removal votes expire after 7 days

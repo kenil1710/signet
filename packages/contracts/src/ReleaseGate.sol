@@ -15,6 +15,7 @@ interface ISignetRegistryForGate {
     function setContainer(string calldata domain, address circuits, uint256 tokenId) external;
     function transfer(string calldata domain, address newGate) external;
     function acceptTransfer(string calldata domain) external;
+    function cancelTransfer(string calldata domain) external;
     function unbind(string calldata domain) external;
     function removeFile(string calldata domain, string calldata path) external;
     function setFallback(string calldata domain, string calldata path) external;
@@ -59,9 +60,11 @@ contract ReleaseGate {
         SetGuardian, //      (address, 0 = none)
         SetTimelocks, //     (uint32 short, uint32 long, uint32 grace)
         SetPolicyCircuit, // (address processor, uint256 circuitId): another copy of the SAME netlist
-        BindDomain, //       (string domain, bytes32 salt, address circuits, uint256 tokenId)  a NEW domain (commit first)
+        BindDomain, //       (bytes32 commitment, address circuits, uint256 tokenId)  a NEW domain. Only
+        //                   keccak256(abi.encode(domain, salt, gate)) is stored; publishBind reveals it
         SetContainer, //     (string domain, address circuits, uint256 tokenId)  circuits 0 = shared container
-        TransferDomain, //   (string domain, address newGate)  the new gate must accept
+        TransferDomain, //   (string domain, address newGate)  the new gate must accept within 7 days
+        CancelTransfer, //   (string domain)
         AcceptDomain, //     (string domain)
         UnbindDomain, //     (string domain)
         SetObserveMode, //   ()
@@ -171,7 +174,8 @@ contract ReleaseGate {
     mapping(address => uint40) public lastFreezeAt;
     mapping(address => uint40) public lastRevokeAt;
     mapping(bytes32 => Revocation) public revocations; // by manifest hash
-    mapping(bytes32 => uint8) internal removeVotes; // keccak256(domain, path, approverSet) => approver bits
+    uint64 public revokeEpoch; // bumped on every revoke, un-revoke and publish: file-removal votes start over
+    mapping(bytes32 => uint8) internal removeVotes; // keccak256(domain, path, approverSet, revokeEpoch) => bits
 
     uint64 public proposalCount;
     uint64 public currentRelease; // proposal id, 0 = none yet
@@ -187,8 +191,9 @@ contract ReleaseGate {
     event Cancelled(uint64 indexed id, address indexed by);
     event Published(uint64 indexed id, bytes32 manifestHash, uint8 tier);
     event AdminExecuted(uint64 indexed id, Action action);
-    /// reason 1 = the beacon's implementation changed, 2 = the circuit call failed or answered badly
-    event PolicyFallbackActive(address beaconImplementation, uint8 reason);
+    /// The Solidity mirror decided instead of the circuit, because ...
+    event PolicyFallbackBeaconChanged(address beaconImplementation); // ... the beacon points at other code
+    event PolicyFallbackEvalFailed(); // ... the circuit call failed (reverted, ran out of gas, or answered badly)
     event FileRemovalVote(string domain, string path, uint8 slot);
     event Frozen(address indexed by);
     event UnfreezeApproved(uint8 slot);
@@ -317,6 +322,12 @@ contract ReleaseGate {
         p.proposedAt = uint40(block.timestamp);
         p.approverSet = approverSet;
         p.adminData = abi.encode(action, args);
+        if (action == Action.BindDomain) {
+            // Commit now, so the commit is old enough when the proposal can execute (24 h later). The domain
+            // itself stays out of the chain until publishBind. An existing identical commit is fine.
+            (bytes32 commitment,,) = abi.decode(args, (bytes32, address, uint256));
+            try ISignetFactoryForGate(registry.factory()).commit(commitment) {} catch {}
+        }
         emit Proposed(id, Kind.Admin, TIER_ADMIN, false, msg.sender, bytes32(0));
     }
 
@@ -356,6 +367,15 @@ contract ReleaseGate {
 
     /// Anyone may call. Publishes (or executes an admin change) only if the policy says PUBLISH.
     function publish(uint64 id) public {
+        _publish(id, "");
+    }
+
+    /// Executes a BindDomain proposal, revealing the domain and salt behind its stored commitment.
+    function publishBind(uint64 id, string calldata domain, bytes32 salt) external {
+        _publish(id, abi.encode(domain, salt));
+    }
+
+    function _publish(uint64 id, bytes memory reveal) internal {
         Proposal storage p = _live(id);
         bytes32 mHash;
         if (p.kind == Kind.Release) {
@@ -377,9 +397,10 @@ contract ReleaseGate {
             r.publishedAt = uint40(block.timestamp);
             r.prev = currentRelease;
             currentRelease = id;
+            revokeEpoch++;
             emit Published(id, mHash, p.tier);
         } else {
-            _execute(id, p.adminData);
+            _execute(id, p.adminData, reveal);
         }
     }
 
@@ -467,12 +488,14 @@ contract ReleaseGate {
         _approver();
         Release storage r = releases[releaseId];
         if (r.publishedAt == 0) revert BadProposal();
+        Revocation storage v = revocations[r.manifestHash];
+        if (v.revoked) revert BadProposal(); // already revoked: nothing to do, and no cooldown is used up
         uint40 last = lastRevokeAt[msg.sender];
         if (last != 0 && block.timestamp < uint256(last) + REVOKE_COOLDOWN) revert RevokeCooldown();
         lastRevokeAt[msg.sender] = uint40(block.timestamp);
-        Revocation storage v = revocations[r.manifestHash];
         v.revoked = true;
         v.unrevokeVotes = 0;
+        revokeEpoch++;
         emit Revoked(releaseId, r.manifestHash, msg.sender);
     }
 
@@ -489,6 +512,7 @@ contract ReleaseGate {
         if (_count(v.unrevokeVotes) >= 2) {
             v.revoked = false;
             v.unrevokeVotes = 0;
+            revokeEpoch++;
             emit Unrevoked(releaseId, mHash);
         }
     }
@@ -498,7 +522,7 @@ contract ReleaseGate {
     function voteRemoveFile(string calldata domain, string calldata path) external {
         uint8 slot = _approver();
         if (currentRelease == 0 || !revocations[releases[currentRelease].manifestHash].revoked) revert BadProposal();
-        bytes32 key = keccak256(abi.encode(domain, path, approverSet));
+        bytes32 key = keccak256(abi.encode(domain, path, approverSet, revokeEpoch));
         uint8 votes = removeVotes[key] | uint8(1 << slot);
         emit FileRemovalVote(domain, path, slot);
         if (_count(votes) >= 2) {
@@ -507,12 +531,6 @@ contract ReleaseGate {
         } else {
             removeVotes[key] = votes;
         }
-    }
-
-    /// Any approver can commit to a further domain (commit-reveal in SignetFactory) before a tier-11 BindDomain.
-    function commitDomain(bytes32 commitment) external {
-        _approver();
-        ISignetFactoryForGate(registry.factory()).commit(commitment);
     }
 
     // ---------------------------------------------------------------- observe / enforce
@@ -618,7 +636,7 @@ contract ReleaseGate {
     function _policy(uint16 bits) internal returns (bool publishOut, bool unfreezeOut) {
         address impl = beacon.implementation();
         if (impl != pinnedImplementation) {
-            emit PolicyFallbackActive(impl, 1);
+            emit PolicyFallbackBeaconChanged(impl);
             return PolicyMirror.eval(bits);
         }
         try policyProcessor.eval(policyCircuitId, abi.encodePacked(uint8(bits & 0xff), uint8(bits >> 8))) returns (
@@ -627,7 +645,7 @@ contract ReleaseGate {
             if (out.length == 1) return (uint8(out[0]) & 1 != 0, uint8(out[0]) & 2 != 0);
         } catch {}
         // the circuit could not be read: the mirror (equal to it on all 512 inputs) decides
-        emit PolicyFallbackActive(impl, 2);
+        emit PolicyFallbackEvalFailed();
         return PolicyMirror.eval(bits);
     }
 
@@ -637,7 +655,7 @@ contract ReleaseGate {
         if (block.timestamp > uint256(p.proposedAt) + PROPOSAL_TTL) revert Expired();
     }
 
-    function _execute(uint64 id, bytes memory data) internal {
+    function _execute(uint64 id, bytes memory data, bytes memory reveal) internal {
         (Action action, bytes memory args) = abi.decode(data, (Action, bytes));
         if (action == Action.SetApprover) {
             (uint8 slot, address a) = abi.decode(args, (uint8, address));
@@ -664,8 +682,10 @@ contract ReleaseGate {
             (address cpu, uint256 cid) = abi.decode(args, (address, uint256));
             _setPolicy(IPolicyProcessor(cpu), cid);
         } else if (action == Action.BindDomain) {
-            (string memory d, bytes32 salt, address circuits, uint256 tokenId) =
-                abi.decode(args, (string, bytes32, address, uint256));
+            (bytes32 commitment, address circuits, uint256 tokenId) = abi.decode(args, (bytes32, address, uint256));
+            if (reveal.length == 0) revert BadProposal(); // use publishBind
+            (string memory d, bytes32 salt) = abi.decode(reveal, (string, bytes32));
+            if (keccak256(abi.encode(d, salt, address(this))) != commitment) revert BadProposal();
             ISignetFactoryForGate(registry.factory()).claim(d, salt, circuits, tokenId);
         } else if (action == Action.SetContainer) {
             (string memory d, address circuits, uint256 tokenId) = abi.decode(args, (string, address, uint256));
@@ -673,6 +693,8 @@ contract ReleaseGate {
         } else if (action == Action.TransferDomain) {
             (string memory d, address g2) = abi.decode(args, (string, address));
             registry.transfer(d, g2);
+        } else if (action == Action.CancelTransfer) {
+            registry.cancelTransfer(abi.decode(args, (string)));
         } else if (action == Action.AcceptDomain) {
             registry.acceptTransfer(abi.decode(args, (string)));
         } else if (action == Action.UnbindDomain) {

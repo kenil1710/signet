@@ -5,6 +5,7 @@ import {GateBase} from "./GateBase.sol";
 import {ReleaseGate} from "../src/ReleaseGate.sol";
 import {SignetRegistry} from "../src/SignetRegistry.sol";
 import {SignetFactory} from "../src/SignetFactory.sol";
+import {ISiteRegistryWriter, IContainerOpener} from "../src/interfaces/ITapeOutPolicy.sol";
 
 /// SignetRegistry and SignetFactory: sealed-file writer (as SiteRegistry operator), bindings, commit-reveal.
 /// Review fixes are named in the test names: H-1, H-3, M-6, M-7, L-4 (first review); R2 = second review.
@@ -385,6 +386,11 @@ contract SignetRegistryTest is GateBase {
         (address b2, address k2,) = reg.bindingOf("two.example.org");
         assertEq(b1, g);
         assertEq(k1, sharedContainer);
+        assertEq(b2, address(0)); // R3 info: an own container the gate doesn't hold reads as "not protected"
+        assertEq(k2, address(0));
+        assertEq(reg.gateOf("two.example.org"), g);
+        cpu.setOwner(77, g);
+        (b2, k2,) = reg.bindingOf("two.example.org");
         assertEq(b2, g);
         assertEq(k2, opener.accountOf(address(cpu), 77));
         assertEq(ReleaseGate(g).getApprovers()[2], A2);
@@ -411,9 +417,18 @@ contract SignetRegistryTest is GateBase {
         factory.claim("fake.example.org", bytes32(0), address(0), 0);
     }
 
-    function test_M6_initFactory_once_byDeployerOnly() public {
+    function test_R3L3_factoryAndSiteGateAreFixedAtDeployment_noInitFunctions() public {
+        assertEq(reg.factory(), address(factory));
+        assertEq(reg.signetSiteGate(), address(site));
+        (bool ok,) = address(reg).call(abi.encodeWithSignature("initFactory(address)", X));
+        assertFalse(ok);
+        (ok,) = address(reg).call(abi.encodeWithSignature("initSignetSite(address)", address(gate)));
+        assertFalse(ok);
+        // a registry can't be deployed pointing at a factory or site gate that already exists
         vm.expectRevert(SignetRegistry.BadConfig.selector);
-        reg.initFactory(X); // already set
+        new SignetRegistry(ISiteRegistryWriter(address(sites)), IContainerOpener(address(opener)), address(cpu), 5, address(factory), address(0));
+        vm.expectRevert(SignetRegistry.BadConfig.selector);
+        new SignetRegistry(ISiteRegistryWriter(address(sites)), IContainerOpener(address(opener)), address(cpu), 5, makeAddr("f"), address(gate));
     }
 
     function test_claim_firstWins() public {
@@ -540,17 +555,15 @@ contract SignetRegistryTest is GateBase {
 
     // ---------------------------------------------------------------- one container: Signet's site + projects
 
-    function _signetSite() internal returns (ReleaseGate site) {
-        site = newGate("signet.example");
-        reg.initSignetSite(address(site));
+    function _signetSite() internal view returns (ReleaseGate) {
+        return site; // created in setUp as the factory's first gate, bound to signet.example
     }
 
     function test_container_signetSiteUnderSignet_projectsUnderProjects_neverMix() public {
         ReleaseGate project = gate;
-        ReleaseGate site = _signetSite();
         (, address c, string memory prefix) = reg.bindingOf("signet.example");
         assertEq(c, sharedContainer);
-        assertEq(prefix, "signet/");
+        assertEq(prefix, "signet/signet.example/");
         (,, string memory projectPrefix) = reg.bindingOf(DOMAIN);
         assertEq(projectPrefix, BASE);
 
@@ -563,13 +576,13 @@ contract SignetRegistryTest is GateBase {
         releaseRoot(pair(lIndex, lDeep));
         write("signet.example", "index.html", HTML, INDEX, proof1(lDeep));
         write("signet.example", P_ALLOW, JSON, ALLOWLIST, none);
-        assertEq(stored(sharedContainer, "signet/index.html"), INDEX);
-        assertEq(stored(sharedContainer, "signet/signet/allowlist.json"), ALLOWLIST);
+        assertEq(stored(sharedContainer, "signet/signet.example/index.html"), INDEX);
+        assertEq(stored(sharedContainer, "signet/signet.example/signet/allowlist.json"), ALLOWLIST);
         vm.expectRevert(SignetRegistry.BadPath.selector);
         write("signet.example", climb, JSON, ALLOWLIST_EVIL, none);
         // an approved "projects/..." path only ever lands INSIDE signet/
         write("signet.example", deep, JSON, ALLOWLIST_EVIL, proof1(lIndex));
-        assertEq(stored(sharedContainer, string.concat("signet/", deep)), ALLOWLIST_EVIL);
+        assertEq(stored(sharedContainer, string.concat("signet/signet.example/", deep)), ALLOWLIST_EVIL);
         assertEq(stored(sharedContainer, deep).length, 0);
 
         // a project's release: its "signet/..." paths only ever land inside projects/<domain>/
@@ -579,10 +592,10 @@ contract SignetRegistryTest is GateBase {
         write(DOMAIN, "signet/index.html", HTML, bytes("<h1>fake dashboard</h1>"), none);
         write(DOMAIN, P_ALLOW, JSON, ALLOWLIST, none);
         assertEq(stored(sharedContainer, at("signet/index.html")), bytes("<h1>fake dashboard</h1>"));
-        assertEq(stored(sharedContainer, "signet/index.html"), INDEX); // Signet's site is untouched
+        assertEq(stored(sharedContainer, "signet/signet.example/index.html"), INDEX); // Signet's site is untouched
         assertEq(stored(sharedContainer, at(P_ALLOW)), ALLOWLIST);
         vm.expectRevert(SignetRegistry.BadPath.selector);
-        write(DOMAIN, "../../signet/index.html", HTML, INDEX, none);
+        write(DOMAIN, "../../signet/signet.example/index.html", HTML, INDEX, none);
         // nothing was ever written at the container root
         assertEq(stored(sharedContainer, "index.html").length, 0);
     }
@@ -603,16 +616,40 @@ contract SignetRegistryTest is GateBase {
         assertEq(sites.fallbackPath(sharedContainer), "");
     }
 
-    function test_container_initSignetSite_once_deployerOnly_factoryGatesOnly() public {
-        ReleaseGate site = newGate("signet.example");
-        vm.prank(X);
-        vm.expectRevert(SignetRegistry.BadConfig.selector);
-        reg.initSignetSite(address(site));
-        vm.expectRevert(SignetRegistry.BadConfig.selector);
-        reg.initSignetSite(X); // not a factory gate
-        reg.initSignetSite(address(site));
-        vm.expectRevert(SignetRegistry.BadConfig.selector);
-        reg.initSignetSite(address(gate)); // only once
+    function test_R3L3_siteGate_oneSharedDomainOnly_prefixIncludesTheDomain() public {
+        (address g, address c, string memory prefix) = reg.bindingOf(SITE_DOMAIN);
+        assertEq(g, address(site));
+        assertEq(c, sharedContainer);
+        assertEq(prefix, "signet/signet.example/");
+        assertEq(reg.signetSiteDomain(), keccak256(bytes(SITE_DOMAIN)));
+        // a second shared-container domain for the site gate is refused
+        gate = site;
+        bytes32 salt = keccak256("s");
+        bytes32 cm = factory.commitmentOf("second.example", salt, address(site));
+        uint64 id = proposeAdmin(ReleaseGate.Action.BindDomain, abi.encode(cm, address(0), uint256(0)));
+        approveMask(id, 7);
+        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 24 hours);
+        vm.expectRevert(SignetRegistry.SiteGateHasADomain.selector);
+        gate.publishBind(id, "second.example", salt);
+        // after giving the domain up, it may take one again
+        admin(ReleaseGate.Action.UnbindDomain, abi.encode(SITE_DOMAIN));
+        assertEq(reg.signetSiteDomain(), bytes32(0));
+        bindDomain("second.example", address(0), 0);
+        (,, prefix) = reg.bindingOf("second.example");
+        assertEq(prefix, "signet/second.example/");
+    }
+
+    function test_R3L3_siteGateCannotCollectDomainsByTransfer() public {
+        ReleaseGate project = gate;
+        admin(ReleaseGate.Action.TransferDomain, abi.encode(DOMAIN, address(site)));
+        gate = site;
+        uint64 id = proposeAdmin(ReleaseGate.Action.AcceptDomain, abi.encode(DOMAIN));
+        approveMask(id, 7);
+        vm.warp(block.timestamp + 24 hours);
+        vm.expectRevert(SignetRegistry.SiteGateHasADomain.selector);
+        gate.publish(id);
+        assertEq(reg.gateOf(DOMAIN), address(project));
     }
 
     function test_container_noGateCanBindTheSharedContainerAsItsOwn() public {
@@ -674,6 +711,113 @@ contract SignetRegistryTest is GateBase {
         release("pro.example.org", ALLOWLIST, ORIGINS);
         vm.expectRevert(SignetRegistry.NotHolder.selector);
         write("pro.example.org", P_ALLOW, JSON, ALLOWLIST, none);
+    }
+
+    // ---------------------------------------------------------------- third review
+
+    function test_R3L1_fileRemovalVotes_resetAfterRevokeUnrevokeOrPublish() public {
+        uint64 id = release(DOMAIN, ALLOWLIST, ORIGINS);
+        write(DOMAIN, P_ALLOW, JSON, ALLOWLIST, none);
+        vm.prank(A0);
+        gate.revoke(id);
+        vm.prank(A0);
+        gate.voteRemoveFile(DOMAIN, P_ALLOW); // 1 of 2, cast during THIS revocation
+        // the release is un-revoked (2 of 3), then revoked again later
+        vm.prank(A1);
+        gate.voteUnrevoke(id);
+        vm.prank(A2);
+        gate.voteUnrevoke(id);
+        vm.prank(A2);
+        gate.revoke(id);
+        vm.prank(A1);
+        gate.voteRemoveFile(DOMAIN, P_ALLOW); // the old vote doesn't count any more
+        assertEq(stored(sharedContainer, at(P_ALLOW)), ALLOWLIST);
+        vm.prank(A2);
+        gate.voteRemoveFile(DOMAIN, P_ALLOW); // 2 fresh votes
+        assertEq(stored(sharedContainer, at(P_ALLOW)).length, 0);
+    }
+
+    function test_R3L1_revokeEpoch_movesOnRevokeUnrevokeAndPublish() public {
+        uint64 e0 = gate.revokeEpoch();
+        uint64 id = release(DOMAIN, ALLOWLIST, ORIGINS);
+        assertEq(gate.revokeEpoch(), e0 + 1);
+        vm.prank(A0);
+        gate.revoke(id);
+        assertEq(gate.revokeEpoch(), e0 + 2);
+        vm.prank(A1);
+        gate.voteUnrevoke(id);
+        assertEq(gate.revokeEpoch(), e0 + 2); // a single vote changes nothing
+        vm.prank(A2);
+        gate.voteUnrevoke(id);
+        assertEq(gate.revokeEpoch(), e0 + 3);
+    }
+
+    function test_R3L2_pendingTransferExpiresAfter7Days() public {
+        ReleaseGate mine = gate;
+        ReleaseGate other = newGate("other.example.org");
+        admin(ReleaseGate.Action.TransferDomain, abi.encode(DOMAIN, address(other)));
+        assertEq(reg.pendingGateOf(DOMAIN), address(other));
+        gate = other;
+        vm.warp(block.timestamp + 5 days); // the receiving team takes its time
+        uint64 id = proposeAdmin(ReleaseGate.Action.AcceptDomain, abi.encode(DOMAIN));
+        approveMask(id, 7);
+        vm.warp(block.timestamp + 1 days); // the offer is 6 days old: fine
+        uint256 snap = vm.snapshotState();
+        gate.publish(id);
+        assertEq(reg.gateOf(DOMAIN), address(other));
+        vm.revertToState(snap);
+        vm.warp(block.timestamp + 1 days + 1); // the offer is just past 7 days (the proposal itself is 2 days old)
+        vm.expectRevert(SignetRegistry.TransferExpired.selector);
+        gate.publish(id);
+        assertEq(reg.gateOf(DOMAIN), address(mine));
+        assertEq(reg.pendingGateOf(DOMAIN), address(0));
+    }
+
+    function test_R3L2_cancelTransfer_isTier11_andStopsTheAcceptance() public {
+        ReleaseGate mine = gate;
+        ReleaseGate other = newGate("other.example.org");
+        admin(ReleaseGate.Action.TransferDomain, abi.encode(DOMAIN, address(other)));
+        vm.prank(A0); // not directly, not by one approver
+        vm.expectRevert(SignetRegistry.NotBoundGate.selector);
+        reg.cancelTransfer(DOMAIN);
+        vm.prank(address(other)); // not by the receiving gate
+        vm.expectRevert(SignetRegistry.NotBoundGate.selector);
+        reg.cancelTransfer(DOMAIN);
+        uint64 id = proposeAdmin(ReleaseGate.Action.CancelTransfer, abi.encode(DOMAIN));
+        approveMask(id, 3);
+        vm.warp(block.timestamp + 2 days);
+        assertFalse(tryPublish(id)); // 2 of 3 is not enough
+        approveMask(id, 4);
+        vm.warp(block.timestamp + 24 hours);
+        assertTrue(tryPublish(id));
+        assertEq(reg.pendingGateOf(DOMAIN), address(0));
+        vm.prank(address(other));
+        vm.expectRevert(SignetRegistry.NotBoundGate.selector);
+        reg.acceptTransfer(DOMAIN);
+        assertEq(reg.gateOf(DOMAIN), address(mine));
+    }
+
+    function test_R3info_bindingOf_emptyWhenTheOwnContainerIsNotValidForTheGate() public {
+        (ReleaseGate own, address container) = _ownContainerGate("pro.example.org", 77);
+        (address g, address c, string memory prefix) = reg.bindingOf("pro.example.org"); // circuit 77 doesn't exist yet
+        assertEq(g, address(0));
+        assertEq(c, address(0));
+        assertEq(prefix, "");
+        cpu.setOwner(77, X); // exists, but held by someone else
+        (g, c,) = reg.bindingOf("pro.example.org");
+        assertEq(g, address(0));
+        assertEq(c, address(0));
+        assertEq(reg.gateOf("pro.example.org"), address(own)); // the binding itself is still visible
+        cpu.setOwner(77, address(own));
+        (g, c,) = reg.bindingOf("pro.example.org");
+        assertEq(g, address(own));
+        assertEq(c, container);
+        // an "own" binding that names the shared container is never valid
+        ReleaseGate rogue = newGateWith([A0, A1, A2], P, R, G, "root.example.org", address(cpu), SHARED_ID);
+        cpu.setOwner(SHARED_ID, address(rogue));
+        (g, c,) = reg.bindingOf("root.example.org");
+        assertEq(g, address(0));
+        assertEq(c, address(0));
     }
 
     // ---------------------------------------------------------------- validation
