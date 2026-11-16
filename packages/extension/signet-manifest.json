@@ -1,0 +1,22 @@
+{
+  "v": 0,
+  "note": "Spike C local manifest. Not the real Signet manifest format.",
+  "sites": {
+    "http://localhost:5181": {
+      "files": {
+        "http://localhost:5181/": "c687a3fc08c18e38896935acd7913fefb12b06b2d677c7f6c1c93a2fedef576c",
+        "http://localhost:5181/edge.html": "55d8c19fc9114b1cc89e9d30445ca21eb801aff5b1ade550b0ac55fa94948762",
+        "http://localhost:5181/assets/index-B3tP3rSP.js": "b4d6d3aeeadaf0ab005e523b9f36438f7cebd92ac64269179e68c6220e1f2f5b",
+        "http://localhost:5181/assets/lazy-RrB6q1UJ.js": "da51504c962b449a4959a9709564dac29d19dff399263b805d2b5df4237a3638",
+        "http://localhost:5181/edge/nocache.js": "e705663b6ddd581dc597d3a26487717cf87b846bbd308c76928c01803656da39",
+        "http://localhost:5181/edge/nostore.js": "e1e89ecb05181dea4cf3e3fa54212f753b7109641da7edcd90bc598134e17fda"
+      },
+      "inline": [
+        "f4bb8a0a80fb9862aaee584757483d516043c10cd2efdb7e0e4eaca6071bde7a"
+      ],
+      "origins": [
+        "http://127.0.0.1:5182"
+      ]
+    }
+  }
+}

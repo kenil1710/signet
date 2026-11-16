@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Signet Guard (Spike C)",
+  "version": "0.0.1",
+  "description": "Spike C: hashes the scripts a page actually loaded (from the browser cache) and compares them with a sealed manifest.",
+  "background": { "service_worker": "src/background.js" },
+  "action": { "default_title": "Signet Guard" },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": []
+}

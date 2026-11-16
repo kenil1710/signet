@@ -7,5 +7,12 @@
   "type": "module",
   "dependencies": {
     "@tapekit/kernel": "github:TapeOutProtocol/TapeKit#37c617e7e332787c8a32a81e4d7d05a28a06c156&path:/kernel"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  },
+  "scripts": {
+    "spike:c": "pnpm --filter @signet/demo-dapp build && node spike-c/gen-manifest.mjs && node spike-c/run.mjs",
+    "spike:b:read": "node scripts/spikeB-tapekit-read.mjs"
   }
 }
