@@ -4,5 +4,8 @@
   "private": true,
   "description": "Signet Guard Chrome extension",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@tapekit/kernel": "github:TapeOutProtocol/TapeKit#37c617e7e332787c8a32a81e4d7d05a28a06c156&path:/kernel"
+  }
 }

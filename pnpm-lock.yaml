@@ -189,7 +189,11 @@ importers:
         specifier: ^8.3.8
         version: 8.3.8(@types/node@22.20.5)
 
-  packages/extension: {}
+  packages/extension:
+    dependencies:
+      '@tapekit/kernel':
+        specifier: github:TapeOutProtocol/TapeKit#37c617e7e332787c8a32a81e4d7d05a28a06c156&path:/kernel
+        version: https://codeload.github.com/TapeOutProtocol/TapeKit/tar.gz/37c617e7e332787c8a32a81e4d7d05a28a06c156#path:/kernel
 
   packages/watchtower: {}
 
@@ -317,6 +321,11 @@ packages:
 
   '@rolldown/pluginutils@1.1.1':
     resolution: {integrity: sha512-glFIJDvLNDtJhT9qrMFWLPbvS+skxgt4L0K8Ei2YtnhPysAJnsI7nyxSJxKj4ADeKX0OLjC4ntRkwpLOoS3rwA==}
+
+  '@tapekit/kernel@https://codeload.github.com/TapeOutProtocol/TapeKit/tar.gz/37c617e7e332787c8a32a81e4d7d05a28a06c156#path:/kernel':
+    resolution: {gitHosted: true, integrity: sha512-Ue58Tp8SWktkFJAJx8YYL/AQggURe3IG0E6clCQfuGYtnmLlp/O3roa4s3XlVIdhJmwprnf4CN0Y5DZz7mIPFw==, path: /kernel, tarball: https://codeload.github.com/TapeOutProtocol/TapeKit/tar.gz/37c617e7e332787c8a32a81e4d7d05a28a06c156}
+    version: 0.1.0
+    engines: {node: '>=18'}
 
   '@tybys/wasm-util@0.10.4':
     resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
@@ -579,6 +588,8 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.1.1': {}
+
+  '@tapekit/kernel@https://codeload.github.com/TapeOutProtocol/TapeKit/tar.gz/37c617e7e332787c8a32a81e4d7d05a28a06c156#path:/kernel': {}
 
   '@tybys/wasm-util@0.10.4':
     dependencies:

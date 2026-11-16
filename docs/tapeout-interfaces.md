@@ -171,7 +171,94 @@ The factory (`0x1f09…0761`) **does not appear** in the trace.
 
 **Estimate for the Signet policy circuit (10 inputs, 2 outputs, 60–120 NANDs): about 170,000–305,000 gas per `eval`.** At 0.02 gwei that is about 0.0000034–0.0000061 OKB per call. Inputs and outputs barely matter; gate count dominates. Even 120 gates fits easily inside `propose`/`publish`.
 
-## 8. Open items
+## 8. Containers and SiteRegistry (Spike B; fork-measured and done on mainnet 2026-11-16)
+
+Sources:
+- [TAP-10 Appendix A](https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-10.md#appendix-a-access-layer-contract-interfaces) for the reads, writes and events.
+- [TapeKit issue #6](https://github.com/TapeOutProtocol/TapeKit/issues/6) (a maintainer confirms SiteRegistry/DomainBinding are live on X Layer, with 7 sites).
+- X Layer bytecode.
+- `packages/contracts/test/spike/SpikeB.fork.t.sol`.
+
+**Our circuit's container:** `opener.accountOf(#101 0x7315…8F22, 5)` = **`0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`**. It is not deployed and not opened (2026-11-16).
+
+### Spike B on mainnet: done 2026-11-16
+
+| Item | Value |
+|---|---|
+| Container (ERC-6551 account of circuit #5 on processor #101) | **`0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`**, now deployed (173 bytes) and `isOpened` = true |
+| TapeKit name | `5.2.101` (label `#5@2.101`) |
+| File | `signet/manifest-sample.json`, `application/json`, 422 bytes, 1 chunk, sha256 `0x9159d0b16fa1726067a740567a986494aa1778f465ab7332fb3d717591768dcc` (= `shasum -a 256` of `packages/contracts/spike-data/manifest-sample.json`) |
+
+| # | Tx | Block | Gas used | L2 gas fee (wei) | Value (wei) |
+|---|---|---|---|---|---|
+| 1 | `opener.open(#101, 5)`: [`0x7125a14a…edb2`](https://www.oklink.com/xlayer/tx/0x7125a14ab3eda56b928b6831a0a61db66fbf7b651a6d8cbf8e4be7fe6991edb2) | 76,058,449 | 167,256 | 3,345,120,167,256 | 80,000,000,000,000,000 |
+| 2 | `SiteRegistry.putFile(...)`: [`0xf88b8c67…bcc3`](https://www.oklink.com/xlayer/tx/0xf88b8c679358a6dbf4524fb57fd370ee78f960dd36d7db795875a3b91331bcc3) | 76,058,451 | 398,221 | 7,964,420,398,221 | 0 |
+| | **Total** | | **565,477** | **11,309,540,565,477** (0.0000113 OKB) | **0.08 OKB** |
+
+- Gas price was 20,000,001 wei and the receipts' `l1Fee` was 0.
+- **Total spent: 0.080011309540565477 OKB**, equal to the dev wallet's balance drop between blocks 76,058,448 and 76,058,451 (0.128648573263571819 → 0.048637263723006342).
+- The mainnet `putFile` used 398,221 total gas for 422 bytes, slightly below the fork estimate of ~436k (the fork figure was an upper estimate from calldata pricing).
+
+**Read-back, verified two ways:**
+
+1. `packages/contracts/script/spike/spikeB-verify.sh 0x8E2E…94Ed signet/manifest-sample.json` → size 422 = 422, sha256 matches, `status: ok (verified)`.
+2. **TapeKit's own kernel** (`@tapekit/kernel` from `TapeOutProtocol/TapeKit#37c617e…&path:/kernel`, default config: built-in OKX + dRPC nodes, pinned block, store implementation check): `packages/extension/scripts/spikeB-tapekit-read.mjs`. Result at block 76,058,510:
+   - `resolve("5.2.101")` → network `xlayer`, container `0x8e2e…94ed`, holder = dev wallet, `opened: true`, `paid: false`, stores accepted, status `unpaid`.
+   - `manifest` → paths `["signet/manifest-sample.json"]`.
+   - `getFile` → 422 bytes read, `declaredSha` = `sha256` = `0x9159…8dcc`, **`status: "ok"`, `verified: true`**.
+
+### Container opener `0x536adD8F30f03b69f6fbF29d425A816A0dC50106` (not a proxy; 2,604 bytes)
+
+| Function | Selector | Source | Notes |
+|---|---|---|---|
+| `accountOf(address circuits, uint256 tokenId) view returns (address)` | `0x0c1905e5` | TAP-10 + measured | ERC-6551 `registry.account(impl 0xAC4F…2a57, salt 0, 196, circuits, tokenId)` (trace) |
+| `isOpened(address circuits, uint256 tokenId) view returns (bool)` | `0x8b508494` | TAP-10 + TapeKit `selectors.js` + measured | reads `payments.paid(container)` (trace) |
+| `isDeployed(address, uint256) view returns (bool)` | `0xf13906b8` | Bytecode | |
+| `FEE() view returns (uint256)` | `0xc57981b5` | Bytecode + measured | **8e16 wei = 0.08 OKB**, one time per container |
+| `open(address circuits, uint256 tokenId) payable` | `0x0a0e5c9d` | Bytecode + **measured on fork** | Deploys the container and marks it paid. The circuit holder succeeds with exactly `FEE()` (net cost exactly 0.08 OKB); `FEE() − 1` reverts. Overpayment was not tested. ~177k execution gas |
+| `treasury()`, `registry()`, `payments()`, `implementation()` | — | Bytecode + measured | treasury `0xE2f77062c6060503e0289c6638D1B0A7C76cBB9d`; registry = ERC-6551 registry; payments `0x13b8…4858`; implementation = container impl `0xAC4F…2a57` |
+
+### SiteRegistry `0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6` (UUPS proxy)
+
+- The implementation slot is `0xa85c4143d1D4A77f54b8e4ecC9E6D1418Afea45f`, which equals the TAP-10 accepted implementation.
+- `owner()` = `0xE4fc10592FA8ad7c408B81e99CfC54Ef4B14283d`, so it is upgradeable by that owner.
+- `CHUNK_MAX` = 24,000 bytes, `CHUNKS_MAX` = 350, `OPERATOR_TTL_MAX` = 2,592,000 s (30 days).
+
+| Function | Selector | Source | Notes |
+|---|---|---|---|
+| `fileInfo(address container, string path) view returns (uint32 size, string contentType, bytes32 sha256Hash, uint40 updatedAt, uint256 chunkCount)` | `0x6c609107` | TAP-10 + measured | `chunkCount` 0 = no file |
+| `read(address container, string path) view returns (bytes)` | `0xccaa7afb` | TAP-10 + measured | reverts `NoSuchFile()` |
+| `readRange(address, string, uint256 offset, uint256 len) view returns (bytes)` | `0x15a4cae2` | TAP-10 | |
+| `pathCount(address)`, `pathsRange(address,uint256,uint256)`, `paths(address)`, `fallbackPath(address)` | `0xb554782b`, `0xb056072c`, `0x599e4610`, `0xa76c7713` | TAP-10 + measured | |
+| `isOpenedContainer(address) view returns (bool)` | `0x8951bab2` | TAP-10 + measured | |
+| `canEdit(address container, address account) view returns (bool)` | `0xbcfe519c` | Bytecode + measured | true for the circuit holder only after `open` |
+| `putFile(address container, string path, string contentType, bytes32 sha256Hash, bytes data)` | `0xfab2ed82` | TAP-10 + **measured on fork** | Holder or operator only (a stranger reverts). **Reverts before `open`.** Works without any DomainBinding payment. `sha256Hash` is the hash of the **whole** file, declared up front |
+| `appendChunk(address container, string path, uint256 expectIndex, bytes data)` | `0xe2b51347` | TAP-10 + measured on fork | 2-chunk file read back and verified |
+| `removeFile(address,string)`, `setFallback(address,string)`, `setOperator(address,address,uint256)` | `0x0a9c1871`, `0x4dc21ad0`, `0xc88cb026` | TAP-10 + bytecode | not used yet |
+
+Error seen: `0x30cd7471` = `NotOwner()` (TAP-10 error list) when the caller can't edit.
+
+**Display vs read:** the TapeKit kernel's `resolve` returns status `unpaid` when no DomainBinding is paid, and official shells don't display such sites (TAP-10 §6.3). But `getFile` and `SiteRegistry.read` don't check payment ([kernel.js](https://github.com/TapeOutProtocol/TapeKit/blob/37c617e7e332787c8a32a81e4d7d05a28a06c156/kernel/src/kernel.js)). **Signet's Guard can read manifests from an opened, unpaid container.** The DeWEB failover copy, which users open in a shell, would need DomainBinding paid (`monthlyFee()`, not read yet).
+
+**Verification rule used** (TAP-10 §7.1 step 4, same as the kernel's `getFile`): declared `size` == bytes read, and `sha256(bytes)` == declared `sha256Hash`; an all-zero hash = `no-hash`. `packages/contracts/script/spike/spikeB-verify.sh` implements it. On 2026-11-16 it verified live site `1.2.245` (`index.html`, 12,702 bytes, sha256 `0x41c00f6f…a4d6`, status ok).
+
+### Write cost (fork, 2026-11-16)
+
+"Total" = execution gas + intrinsic (21,000 + calldata at 16 gas per non-zero byte, 4 per zero byte), for random (non-compressible) bytes. Fees assume the 0.02 gwei measured in Spike A, with L1 fee 0.
+
+| Write | Execution gas | Total gas | Fee (OKB) |
+|---|---|---|---|
+| `putFile` 300 B | 378,766 | 407,166 | 0.0000081 |
+| `putFile` 1,024 B | 520,065 | 559,861 | 0.0000112 |
+| `putFile` 4,096 B | 1,192,653 | 1,281,481 | 0.0000256 |
+| `putFile` 12,000 B | 2,923,809 | 3,138,765 | 0.0000628 |
+| `putFile` 24,000 B (1 full chunk) | 5,553,770 | 5,960,162 | 0.0001192 |
+| `appendChunk` 24,000 B | 5,423,134 | ≈ 5,829,500 | 0.0001166 |
+| `putFile` sample manifest (422 B, JSON) | 405,472 | ≈ 435,900 | 0.0000087 |
+
+**Cost per KB: about 241,000 gas per extra KB** (slope 12 KB → 24 KB), i.e. **≈ 0.0000048 OKB per KB** at 0.02 gwei, plus about 330,000 gas (≈ 0.0000066 OKB) fixed per file. A 5 MB full site costs about 1.24 billion gas ≈ 0.025 OKB in gas (spread over ≥ 214 transactions of ≤ 6M gas; the block gas limit is 210M). A few-KB manifest costs well under 0.0001 OKB. **The dominant cost is the one-time 0.08 OKB container opening, not storage.**
+
+## 9. Open items
 
 - **Immutability**: answered in §6. One residual risk: unverified source.
 - `createCPU` arguments and fee unit (only needed if Signet wants its own processor).

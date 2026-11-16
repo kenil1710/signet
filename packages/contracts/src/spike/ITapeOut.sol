@@ -40,3 +40,38 @@ interface ITapeOutFactory {
     function isSealed() external view returns (uint256);
     function circuitBeacon() external view returns (address);
 }
+
+/// Container opener: derives each circuit's ERC-6551 container and opens it (one-time FEE()).
+/// Sources: TAP-10 Appendix A (accountOf, isOpened) + X Layer bytecode (open, FEE, isDeployed).
+interface ITapeOutContainerOpener {
+    function accountOf(address circuits, uint256 tokenId) external view returns (address);
+    function isOpened(address circuits, uint256 tokenId) external view returns (bool);
+    function isDeployed(address circuits, uint256 tokenId) external view returns (bool);
+    function FEE() external view returns (uint256);
+    /// Payment rule and caller rule measured on a fork in test/spike/SpikeB.fork.t.sol.
+    function open(address circuits, uint256 tokenId) external payable;
+}
+
+/// SiteRegistry (site store). Source: TAP-10 Appendix A (reads + writes) + X Layer bytecode.
+interface ISiteRegistry {
+    function fileInfo(address container, string calldata path)
+        external
+        view
+        returns (uint32 size, string memory contentType, bytes32 sha256Hash, uint40 updatedAt, uint256 chunkCount);
+    function read(address container, string calldata path) external view returns (bytes memory);
+    function readRange(address container, string calldata path, uint256 offset, uint256 len)
+        external
+        view
+        returns (bytes memory);
+    function pathCount(address container) external view returns (uint256);
+    function isOpenedContainer(address container) external view returns (bool);
+    function canEdit(address container, address account) external view returns (bool);
+    function CHUNK_MAX() external view returns (uint256);
+    function CHUNKS_MAX() external view returns (uint256);
+    /// Writes the first chunk (<= CHUNK_MAX bytes) and replaces an existing file.
+    function putFile(address container, string calldata path, string calldata contentType, bytes32 sha256Hash, bytes calldata data)
+        external;
+    /// Appends a chunk when expectIndex equals the current chunk count.
+    function appendChunk(address container, string calldata path, uint256 expectIndex, bytes calldata data) external;
+    function removeFile(address container, string calldata path) external;
+}
