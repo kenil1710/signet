@@ -39,10 +39,11 @@ Signet has seven parts. Teams touch the CLI, the GitHub Action and the dashboard
 
 | Part | What it does | Who uses it | MVP by Dec 7 |
 | --- | --- | --- | --- |
-| **CLI** (`npx signet`) | `init` sets up the container, approvers and domain binding. `seal` hashes the build and extracts the allowlist. `verify` checks compatibility. | Team dev | Yes |
+| **CLI** (`npx signet`) | `init` sets up the project (a path in Signet's shared container on Free, or the team's own container on Pro/Enterprise), approvers and domain binding. `seal` hashes the build and extracts the allowlist. `verify` checks compatibility. | Team dev | Yes |
 | **GitHub Action** | On every build: seal → propose release → wait for approval → deploy | Team CI | Yes |
-| **ReleaseGate contract + policy circuit** | Holds the container NFT. Publishes a release only when the TapeOut circuit says ALLOW. Handles freeze. | On-chain | Yes |
-| **Domain Registry contract** | Maps domain → container. Changes need M-of-N approval. | On-chain | Yes |
+| **ReleaseGate contract + policy circuit** | One per project. Publishes a release only when the TapeOut circuit says ALLOW. Handles freeze. On Pro/Enterprise it holds the team's own container NFT. | On-chain | Yes |
+| **SignetRegistry contract** | Holds the circuit NFT of Signet's shared container (`0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`). Writes a Free project's files under `projects/<domain>/` only when that project's ReleaseGate approves the release. | On-chain | Yes |
+| **Domain Registry contract** | Maps domain → project (shared container + `projects/<domain>/`, or the team's own container). Changes need M-of-N approval. | On-chain | Yes |
 | **Guard extension** | Hashes the loaded page, enforces the sealed allowlist when the wallet signs, blocks the page, opens the verified copy | End users | Yes (Chrome) |
 | **Watchtower** | Checks every sealed site every minute from 3 regions. Alerts via TapeSend, Telegram and X. Public status page. | Everyone | Yes (basic) |
 | **Dashboard (on DeWEB)** | Diff Guard review, approvals, release history, freeze button, status, "Sealed" badge | Team approvers | Yes |
@@ -61,6 +62,8 @@ Stretch, after the core works: a reproducible-build check (the watchtower rebuil
 
 CI can only propose. A release goes live only when the TapeOut circuit says ALLOW, and users are checked against that sealed release at every page load and every signature.
 
+**Where releases are stored.** Free-tier projects share Signet's container (`0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`, circuit #5 on processor #101), each under `projects/<domain>/`. The SignetRegistry contract holds that container's circuit NFT and writes a project's files only when the project's ReleaseGate approves. Pro and Enterprise projects can have their own container, held by their ReleaseGate. Opening a container costs a one-time 0.08 OKB while storage costs about 0.0000048 OKB per KB (Spike B), so sharing keeps the free tier cheap. See `docs/decisions.md`.
+
 ```
 TEAM                              X LAYER · TAPEOUT                      USERS
 GitHub Action ──propose──▶ ReleaseGate contract
@@ -68,7 +71,7 @@ GitHub Action ──propose──▶ ReleaseGate contract
                                    │ ask
 Approvers (2 of 3) ──approve──▶    ▼
 (Diff Guard in DeWEB         Policy circuit (NAND/LATCH, immutable,
- dashboard; approve/freeze)   1,024-case truth table proof)
+ dashboard; approve/freeze)   512-case truth table proof)
         ▲                          │ ALLOW: publish
         │                          ▼
         │                    Container + SiteRegistry ──read via TapeKit──▶ Guard extension
@@ -85,7 +88,7 @@ The watchtower compares live sites with the sealed manifest and alerts the team 
 
 ## Release-lock circuit and approval tiers
 
-The policy is a TapeOut NAND/LATCH circuit that nobody can change. The ReleaseGate contract supplies facts as input bits, and the circuit decides. Because the input is only 10 bits, we test all 1,024 combinations and publish the full truth table: a proof of the policy, not a promise.
+The policy is a TapeOut NAND/LATCH circuit that nobody can change. The ReleaseGate contract supplies facts as input bits, and the circuit decides. Because the input is only 9 bits, we test all 512 combinations and publish the full truth table (`docs/policy-truth-table.md`): a proof of the policy, not a promise.
 
 **No fully automatic tier.** A hacked CI could ship code that only calls allowlisted contracts but swaps to the attacker as recipient. So every release needs at least 1 human approval.
 
@@ -209,7 +212,7 @@ After setup, everything runs on its own. People act only when a new release need
 **1. Team setup (target: 10 minutes)**
 
 1. `npx signet init` → connect a wallet, pick 3 approver addresses and a recovery address
-2. The CLI mints a circuit NFT on X Layer (the container), deploys a ReleaseGate that holds it, and links the shared policy circuit
+2. The CLI deploys the project's ReleaseGate and links the shared policy circuit. Free: the project gets `projects/<domain>/` in Signet's shared container, written by SignetRegistry. Pro/Enterprise: the CLI can instead mint and open the team's own container (one-time 0.08 OKB opening fee), held by its ReleaseGate
 3. Domain proof: add a DNS TXT record, and the CLI binds the domain in the Registry
 4. `signet verify` checks for static build, CDN rewrites and third-party scripts (cross-origin scripts must carry SRI), warns about `no-store` on scripts and HTML, then prints fixes
 5. Paste the GitHub Action (5 lines) and add a `SIGNET_PROPOSER_KEY` secret (a key that can only propose)
@@ -244,9 +247,9 @@ Users never pay. Teams pay because one hijack costs them users, money and reputa
 
 | Plan | Price (proposal) | Includes |
 | --- | --- | --- |
-| Free | $0 | 1 domain, manifest sealing, Guard protection, community alerts, 5-min watchtower |
-| Pro | $49 / month | 3 domains, 1-min watchtower from 3 regions, private alerts (TapeSend, Telegram), Diff Guard, badge, failover copy (storage gas passed through) |
-| Enterprise | Custom | Setup done for you, allowlist review, incident support, SLA, 5-approver circuit, wallet verification API |
+| Free | $0 | 1 domain, manifest sealing in Signet's shared container, Guard protection, community alerts, 5-min watchtower |
+| Pro | $49 / month | 3 domains, optional own container, 1-min watchtower from 3 regions, private alerts (TapeSend, Telegram), Diff Guard, badge, failover copy (storage gas passed through) |
+| Enterprise | Custom | Own container, setup done for you, allowlist review, incident support, SLA, 5-approver circuit, wallet verification API |
 
 **Other revenue:** wallets and exchanges pay per call for the verification API ("is this page sealed and is this tx allowed?"), and an optional per-release fee covers the on-chain gas.
 
@@ -287,7 +290,7 @@ Each criterion has one piece of proof we must show, in the product and in the vi
 | Criterion | Our proof |
 | --- | --- |
 | User value and commercial potential | Incident table ($1.5B+), pricing, 2+ real projects sealed, the observe-mode "no false blocks" promise |
-| Innovation (circuit design, new use cases) | A release-policy circuit with an exhaustive 1,024-case truth table; TapeOut used as a security policy engine (a new use case) |
+| Innovation (circuit design, new use cases) | A release-policy circuit with an exhaustive 512-case truth table (9 input bits); TapeOut used as a security policy engine (a new use case) |
 | Ecosystem integration | A circuit on an X Layer Processor, Circuit Container + SiteRegistry (DeWEB) for manifests and failover, TapeKit for reading and verifying, TapeSend for alerts, dashboard hosted on DeWEB |
 | Product readiness and UX | 10-minute setup, one-click approvals, live demo dApp, Chrome extension installable |
 | Demo video ≤ 3 min | Script below: problem → features → users and business → TapeOut usage |
@@ -317,7 +320,7 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 - [ ] Nov 17: **Spike A**: on X Layer mainnet, mint elements on a cheap Processor, tape out a tiny test circuit, and call it from a contract. Write down the exact interface, gas and costs. Ask in Telegram if stuck.
 - [ ] Nov 17: **Spike B**: write one file to a container via SiteRegistry and read it back with TapeKit; measure cost per KB
 - [ ] Nov 18: **Spike C**: extension reads script bytes via cache (`only-if-cached`) and hashes them; test on a Vite app
-- [ ] Nov 18–19: design the policy circuit in the TapeOut canvas or as a netlist; exhaustive 1,024-case test against a JS reference; tape out → record the Processor address + circuit ID
+- [ ] Nov 18–19: design the policy circuit in the TapeOut canvas or as a netlist; exhaustive 512-case test (9 input bits) against a JS reference; tape out → record the Processor address + circuit ID
 - [ ] Nov 19–21: Foundry contracts: ReleaseGate (propose, approve, tier calc, publish, freeze/unfreeze, recovery) + Registry (bind/unbind domain); tests for every tier and edge case
 - [ ] Nov 22: deploy to X Layer mainnet; CLI `init` + `seal` (hash build, extract allowlist, store SRI hashes of cross-origin scripts)
 - [ ] With the CLI: `signet verify` warns about `Cache-Control: no-store` on scripts/HTML and fails on cross-origin scripts without an SRI `integrity` attribute (from Spike C)
@@ -364,8 +367,8 @@ Five facts are not confirmed yet, and the Week 1 spikes exist to answer them. If
 
 | Open question | Why it matters | Fallback if "no" |
 | --- | --- | --- |
-| Can a contract call a taped-out circuit and read its output on X Layer, at acceptable gas? | The circuit must enforce the policy on-chain | Contract mirrors the circuit's logic, verified equal over all 1,024 inputs; the circuit stays the published, verifiable policy |
-| Can ReleaseGate hold the circuit NFT and write via the container to SiteRegistry? (Q-Tape reports this works on an X Layer fork) | Only the gate should be able to publish | Manifest stored in our own contract; DeWEB used for the dashboard and failover copy |
+| Can a contract call a taped-out circuit and read its output on X Layer, at acceptable gas? | The circuit must enforce the policy on-chain | Contract mirrors the circuit's logic, verified equal over all 512 inputs (9 bits); the circuit stays the published, verifiable policy |
+| Can a contract (SignetRegistry for the shared container, or a Pro/Enterprise ReleaseGate) hold the circuit NFT and write via the container to SiteRegistry? (Q-Tape reports this works on an X Layer fork; Spike B wrote from a wallet only) | Only the gate should be able to publish | Manifest stored in our own contract; DeWEB used for the dashboard and failover copy |
 | Cost per KB for SiteRegistry on X Layer | Pricing of the failover copy | Manifest-only by default (already the plan) |
 | Can the extension read executed bytes reliably (`only-if-cached`, `no-store` files)? | Targeted-attack detection | Re-fetch + hash, documented as a v1 limit; the signing allowlist still protects |
 | Can TapeSend messages be sent by our watchtower service automatically? | Alerts | Telegram + X only; TapeSend for the team inbox in the dashboard |

@@ -30,7 +30,7 @@ docs/
 4. **The CI proposer key can only propose.** Never give it approve or publish rights in code or docs.
 5. **Every release needs at least 1 human approval.** There is no automatic tier.
 6. **Risk tier is computed on-chain** by comparing allowlistHash / originsHash with the current release. Never trust a tier sent by CI.
-7. **Policy circuit:** keep the TypeScript reference function and the netlist in sync. CI runs all 1,024 input combinations; any mismatch fails the build.
+7. **Policy circuit:** keep the TypeScript reference function and the netlist in sync. The circuit has 9 input bits; CI runs all 512 input combinations; any mismatch fails the build. No unused input bits.
 8. **Extension privacy:** never send browsing history. No network calls for unsealed domains (there is a test for this).
 9. **Default to observe mode and fail-open.** Enforcement only when a team turns it on.
 10. **Every ReleaseGate rule has a Foundry test**, including every row of the tier table and the edge cases in the spec.
