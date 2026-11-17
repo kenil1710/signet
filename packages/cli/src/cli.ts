@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import { resolve } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
-import { makeCtx, readConfig, SignetError, CONFIG_NAME } from './chain.ts';
+import { makeCtx, readConfig, SignetError, CONFIG_NAME, statePath, newKeyFile, addressOfKeyFile, showPath } from './chain.ts';
 import { seal } from './seal.ts';
 import { verifyDir, verifyUrl, formatReport } from './verify.ts';
 import * as cmd from './commands.ts';
@@ -35,6 +35,22 @@ program.command('init')
   .option('--wait-seconds <n>', 'how long to wait for the 2 blocks', '120')
   .action(async (o) => {
     await cmd.init(ctx(), { ...o, waitSeconds: Number(o.waitSeconds) }, log);
+  });
+
+program.command('keygen')
+  .description('create a CI proposer key in .signet/proposer.key (private, git-ignored); prints only its address')
+  .action(() => {
+    const dir = resolve(program.opts().project);
+    const file = statePath(dir, 'proposer.key');
+    if (existsSync(file)) {
+      log(`${showPath(file)} already exists, for ${addressOfKeyFile(file)}. Nothing changed.`);
+      return;
+    }
+    const address = newKeyFile(file);
+    log(`CI proposer key created for ${address}`);
+    log(`  saved to ${showPath(file)} (readable only by you, git-ignored; the key is never printed)`);
+    log('  It can propose releases and call publish. It can never approve, unfreeze, revoke or make admin changes.');
+    log(`  Next: put its content in the GitHub secret SIGNET_PROPOSER_KEY, send ${address} a little OKB for gas, then delete the file.`);
   });
 
 program.command('seal <buildDir>')

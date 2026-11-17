@@ -14,5 +14,8 @@
       "types": "./network.d.mts",
       "default": "./network.mjs"
     }
+  },
+  "devDependencies": {
+    "viem": "^2.57.20"
   }
 }

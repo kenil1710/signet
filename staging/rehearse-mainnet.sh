@@ -16,7 +16,7 @@ export SIGNET_DEPLOY_OUT="deployments/rehearsal.json"
 export SIGNET_SITE_DOMAIN="${SIGNET_SITE_DOMAIN:-signet.example}" SIGNET_SITE_SALT=$(cast keccak "rehearsal-$(date +%s)")
 # rehearsal-only role addresses (anvil's well-known test accounts: never use them for real)
 export SIGNET_SITE_APPROVERS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8,0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC,0x90F79bf6EB2c4f870365E785982E1f101E93b906
-export SIGNET_SITE_PROPOSER=0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65 SIGNET_SITE_RECOVERY=0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc SIGNET_SITE_GUARDIAN=0x976EA74026E726554dB657fA54763abd0C3a0aa9
+export SIGNET_SITE_PROPOSER=0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65 SIGNET_SITE_RECOVERY=0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc SIGNET_SITE_GUARDIAN=${REHEARSE_GUARDIAN:-0x976EA74026E726554dB657fA54763abd0C3a0aa9}
 cd "$ROOT/packages/contracts"
 run() { forge script script/MainnetDeploy.s.sol --sig "$1" --rpc-url "$LOCAL" --sender $DEV --unlocked --broadcast --slow --with-gas-price "$GASPRICE" 2>&1; }
 run "step1()" > "$RUN/step1.log" || { tail -30 "$RUN/step1.log"; exit 1; }

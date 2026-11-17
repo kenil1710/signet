@@ -239,7 +239,11 @@ importers:
         specifier: ^2.57.20
         version: 2.57.20(typescript@5.9.3)
 
-  packages/contracts: {}
+  packages/contracts:
+    devDependencies:
+      viem:
+        specifier: ^2.57.20
+        version: 2.57.20(typescript@5.9.3)
 
   packages/dashboard:
     dependencies:

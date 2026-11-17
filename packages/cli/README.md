@@ -7,6 +7,7 @@ Run it from the repo with `pnpm signet <command>` (or `node packages/cli/src/cli
 |---|---|---|
 | `signet init --domain … --approvers a,b,c --recovery … [--guardian …] [--proposer …]` | Commits to the domain, then (2 blocks later) creates the gate through SignetFactory and binds the domain. Writes `signet.config.json`. Safe to rerun. | Anyone (the creator gets no rights) |
 | `signet verify <buildDir \| url> [--build dir] [--strict]` | Checks that Guard can verify the site: static build, SRI on cross-origin scripts, `no-store`, CDN rewrites, SSR. Exit 1 on problems. | Anyone, no key |
+| `signet keygen` | Creates a CI proposer key in `.signet/proposer.key` (mode 600, git-ignored) and prints only its address. | Anyone |
 | `signet seal <buildDir>` | Hashes every file, builds `filesRoot`, extracts the allowlist and the external origins, writes `signet-manifest.json` and `signet/{allowlist,origins,files}.json`. | Anyone, no key |
 | `signet propose <buildDir> [--emergency] [--reuse] [--json]` | Proposes the sealed build. The gate computes the risk tier. `--reuse` sends nothing if the build is already proposed or current. | CI proposer key or an approver |
 | `signet diff <id> [buildDir] [--base dir] [--json]` | **Diff Guard.** What the proposal changes compared with the current release: files, contract addresses and spenders, origins, SRI hashes, approve/permit/transfer calls in the code, and the on-chain risk tier with the reason. The build must hash to the proposal; the current release's lists are read from the chain and hash-checked. | Anyone, no key |
