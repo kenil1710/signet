@@ -262,7 +262,7 @@ Tested on staging with the demo dApp and a test server that plays the hijack: 8 
 **1. The action publishes.** `signet wait <buildDir> --publish` sends `ReleaseGate.publish(id)` once the proposal has its approvals and its timelock is over; the action uses it by default (`publish: false` turns it off).
 - `publish` is open to anyone and the policy circuit decides, so the proposer key gains nothing: with no approvals it publishes nothing (staging test "the key alone publishes nothing"). **The CI key can still only propose; it can never approve.** That sentence stays in the action's docs.
 - A refused call (`PolicyDenied`, `NotLive`, `StaleBase`, `Expired`: an approval withdrawn, a freeze, someone else published first) is not an error; the action keeps watching.
-- Hard rule 4 in `CLAUDE.md` still reads "never give it approve or publish rights". Sending a permissionless call is not a right, but the wording could be read otherwise. *Suggested wording:* "The CI proposer key can only propose. It can never approve. It may send `publish`, which anyone may send and only the circuit grants." I did not edit `CLAUDE.md`.
+- Hard rule 4 in `CLAUDE.md` now reads (decided by Kenil, 2026-11-17): "The CI key can propose and call publish (the circuit decides); it can never approve, unfreeze, revoke or make admin changes."
 
 **2. Token transfers are a per-project setting.** `"transfers": "user" | "allowlist" | "any"` in `signet.config.json` (default `"user"`), sealed into every chain entry of `signet/allowlist.json`.
 - `user`: a `transfer` / `transferFrom` may only send to the user's own address. `allowlist`: also to a sealed contract or spender (what Guard did before today). `any`: to anyone (a send-tokens app).

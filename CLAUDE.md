@@ -27,7 +27,7 @@ docs/
 1. **Never invent TapeOut ABIs, addresses or behaviors.** Use only what is written in `docs/tapeout-interfaces.md`. If something isn't there, stop and tell me what to find out.
 2. **Ask me before any mainnet transaction** (X Layer mainnet, chain id 196) and before spending any funds. Show the exact call and the estimated cost first.
 3. **No secrets in the repo.** Private keys only in `.env` (gitignored). Never print keys in logs.
-4. **The CI proposer key can only propose.** Never give it approve or publish rights in code or docs.
+4. **The CI key can propose and call publish (the circuit decides); it can never approve, unfreeze, revoke or make admin changes.**
 5. **Every release needs at least 1 human approval.** There is no automatic tier.
 6. **Risk tier is computed on-chain** by comparing allowlistHash / originsHash with the current release. Never trust a tier sent by CI.
 7. **Policy circuit:** keep the TypeScript reference function and the netlist in sync. The circuit has 9 input bits; CI runs all 512 input combinations; any mismatch fails the build. No unused input bits.
