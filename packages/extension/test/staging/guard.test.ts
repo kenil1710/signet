@@ -43,8 +43,11 @@ async function light(s: Session, tab: number, want: string): Promise<void> {
 const status = (page: Page) => page.locator('#status').textContent();
 async function click(page: Page, id: string, state: 'ok' | 'error'): Promise<string> {
   await page.click(`#${id}`);
+  if (id === 'swap') await page.click('#confirm-swap'); // the swap has a review step before the wallet is asked
   await page.waitForSelector(`#status[data-state="${state}"]`, { timeout: 10000 });
-  return (await status(page))!;
+  const t = (await status(page))!;
+  await page.evaluate(() => (document.getElementById('status')!.dataset.state = 'idle'));
+  return t;
 }
 async function shot(page: Page, name: string): Promise<void> {
   if (!process.env.SIGNET_SAVE_DEMO) return;

@@ -150,3 +150,7 @@ Last full run: 185 Foundry tests, 58 unit tests, 41 staging end-to-end tests, th
 - **Found while testing it:** the dashboard kept using the first wallet account it saw (it now asks the wallet every time), action results vanished when the page re-rendered (now a toast), and unfreeze decided from a stale approval count (now read at click time).
 - The Diff Guard code (`packages/cli/src/diff.ts`) and address/origin extraction (`extract.ts`, split out of `seal.ts`) no longer use Node APIs, so the dashboard bundles the same code as the CLI.
 - This commit also carries the shared-library half of item 4 (chunk leaves in `seal.ts` and the extension's `sealed.ts`); its contract and staging test follow in the next commit.
+
+## Next phase, item 3: the demo dApp looks like a swap app (2026-11-18)
+
+Token selector (USDT, USDC, WOKB), amount in / estimated amount out, balances, rate and pool fee, Max, flip, an **Approve** step, and a **Review swap → Confirm swap** sheet (you pay, minimum received, rate, router, recipient, fee) before the wallet is asked; a stake card and an activity list. Balances are demo balances kept in the browser (the page says so). The element IDs and the `?spender=` / `?recipient=` hooks stay, so `pnpm try:hack` / `try:clean` and every test still work; the tests now click "Review swap" then "Confirm swap". Guard staging suite 12/12; attack suite again 12/12, 0 false blocks on 16 clean sessions. New screenshots in `docs/demo/`.

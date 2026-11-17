@@ -7,23 +7,55 @@
     <script>window.__demoBoot = Date.now();</script>
   </head>
   <body>
+    <header class="top">
+      <div class="brand"><span class="logo">◆</span> <b>Demo Swap</b> <span class="pill" id="net"></span></div>
+      <div><span id="account" class="mono">not connected</span> <button id="connect" class="ghost">Connect wallet</button></div>
+    </header>
     <main id="app">
       <h1>Demo Swap</h1>
-      <p class="sub">A small X Layer swap and stake page, used to show what Signet Guard does.</p>
-      <p><button id="connect">Connect wallet</button> <span id="account">not connected</span></p>
-      <section>
-        <h2>Swap 10 USDT for OKB</h2>
-        <button id="approve">1. Approve USDT</button>
-        <button id="swap">2. Swap</button>
-        <button id="permit">or sign a Permit2 approval</button>
+      <p class="sub">Swap and stake on X Layer. A demo app for Signet Guard: the tokens are demo tokens on a local chain.</p>
+
+      <section class="card">
+        <div class="row-head"><h2>Swap</h2><span class="dim small">slippage 0.5%</span></div>
+        <div class="field">
+          <div class="label"><span>You pay</span><span class="dim small">Balance <span id="bal-from">–</span> <button class="link" id="max">Max</button></span></div>
+          <div class="inrow"><input id="amount" inputmode="decimal" value="10" aria-label="Amount to pay" /><select id="from" aria-label="Token to pay"></select></div>
+        </div>
+        <button class="flip" id="flip" aria-label="Swap direction">↓</button>
+        <div class="field">
+          <div class="label"><span>You receive (estimated)</span><span class="dim small">Balance <span id="bal-to">–</span></span></div>
+          <div class="inrow"><input id="out" readonly aria-label="Amount you receive" /><select id="to" aria-label="Token to receive"></select></div>
+        </div>
+        <p class="dim small" id="rate"></p>
+        <div class="actions">
+          <button id="approve" class="secondary">Approve USDT</button>
+          <button id="swap" class="primary">Review swap</button>
+        </div>
+        <p class="small"><button class="link" id="permit">or approve with a gasless Permit2 signature</button></p>
       </section>
-      <section>
-        <h2>Stake</h2>
-        <button id="stake">Stake 5 USDT</button>
+
+      <section class="card">
+        <div class="row-head"><h2>Stake</h2><span class="dim small">APR 8.4%</span></div>
+        <div class="inrow"><input id="stake-amount" inputmode="decimal" value="5" aria-label="Amount to stake" /><span class="unit">USDT</span></div>
+        <div class="actions"><button id="stake" class="primary">Stake</button></div>
       </section>
-      <p id="status" data-state="idle">Ready.</p>
-      <p id="net" class="sub"></p>
+
+      <p id="status" data-state="idle" role="status">Ready.</p>
+      <section class="card"><h2>Activity</h2><ul id="activity" class="small"><li class="dim">nothing yet</li></ul></section>
     </main>
+
+    <dialog id="review">
+      <h2>Review swap</h2>
+      <table class="kv">
+        <tr><td>You pay</td><td id="r-pay"></td></tr>
+        <tr><td>You receive at least</td><td id="r-min"></td></tr>
+        <tr><td>Rate</td><td id="r-rate"></td></tr>
+        <tr><td>Route</td><td id="r-route" class="mono"></td></tr>
+        <tr><td>Recipient</td><td id="r-to" class="mono"></td></tr>
+        <tr><td>Network fee</td><td>≈ 0.00001 OKB</td></tr>
+      </table>
+      <div class="actions"><button id="cancel-swap" class="secondary">Cancel</button><button id="confirm-swap" class="primary">Confirm swap</button></div>
+    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

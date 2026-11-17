@@ -132,7 +132,8 @@ async function settle(ms = 2500): Promise<void> {
 async function click(page: Page, id: string): Promise<string> {
   await page.evaluate(() => document.getElementById('signet-guard-notice')?.remove());
   await page.click(`#${id}`);
-  await page.waitForFunction(() => document.getElementById('status')!.dataset.state !== 'idle', null, { timeout: 15000 });
+  if (id === 'swap') await page.click('#confirm-swap'); // the swap has a review step before the wallet is asked
+  await page.waitForFunction(() => !['idle', 'busy'].includes(document.getElementById('status')!.dataset.state ?? ''), null, { timeout: 15000 });
   const t = (await page.locator('#status').textContent())!;
   await page.evaluate(() => (document.getElementById('status')!.dataset.state = 'idle'));
   return t;
