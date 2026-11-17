@@ -2,19 +2,26 @@
   "name": "@signet/extension",
   "version": "0.0.0",
   "private": true,
-  "description": "Signet Guard Chrome extension",
+  "description": "Signet Guard: Chrome MV3 extension",
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@tapekit/kernel": "github:TapeOutProtocol/TapeKit#37c617e7e332787c8a32a81e4d7d05a28a06c156&path:/kernel",
-    "@signet/contracts": "workspace:*"
+    "@signet/contracts": "workspace:*",
+    "@tapekit/kernel": "github:TapeOutProtocol/TapeKit#37c617e7e332787c8a32a81e4d7d05a28a06c156&path:/kernel"
   },
   "devDependencies": {
-    "playwright": "1.56.1"
+    "@signet/cli": "workspace:*",
+    "@types/chrome": "^0.3.7",
+    "playwright": "1.56.1",
+    "typescript": "^7.0.2",
+    "viem": "^2.57.20",
+    "vite": "^8.3.8"
   },
   "scripts": {
-    "spike:c": "pnpm --filter @signet/demo-dapp build && node spike-c/gen-manifest.mjs && node spike-c/run.mjs",
-    "spike:b:read": "node scripts/spikeB-tapekit-read.mjs",
-    "network": "node scripts/write-network.mjs"
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts",
+    "spike:b:read": "node scripts/spikeB-tapekit-read.mjs"
   }
 }

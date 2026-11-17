@@ -10,6 +10,7 @@ pnpm staging:smoke         # one full release on the demo gate (propose, 3 appro
 pnpm staging:time 24h      # jump the clock (90s, 10m, 1h, 7d ...)
 pnpm staging:time blocks 2 # mine blocks (commit-reveal needs 2)
 pnpm staging:fund 0xAddr 5 # give any address OKB
+pnpm staging:renew         # renew the registry's 30-day operator grant (needed after the clock moved >30 days)
 pnpm staging:demo          # the whole CLI flow as a transcript (init, verify, seal, 2 releases, freeze)
 pnpm staging:down          # stop; state is discarded, the next `up` starts fresh
 ```
@@ -21,6 +22,6 @@ pnpm staging:down          # stop; state is discarded, the next `up` starts fres
   in `staging/.run/anvil.log` (test keys from a fixed seed; never use them anywhere else).
 - Circuit #5's holder (the dev wallet) is impersonated once to make the registry the shared container's operator.
 - **Every package uses the staging chain when `SIGNET_NETWORK=local`** (`@signet/contracts/network`):
-  `pnpm --filter @signet/cli network`, `pnpm --filter @signet/extension network`, and the Vite apps
+  `pnpm --filter @signet/cli network`, `SIGNET_NETWORK=local pnpm --filter @signet/extension build`, and the Vite apps
   (`demo-dapp`, `dashboard`) read it in `vite.config.ts`. The default is `mainnet`.
 - In a browser wallet, add a network with the RPC above and chain id 196, and import a test key from the log.

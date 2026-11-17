@@ -37,4 +37,3 @@ packages/extension/*.crx
 staging/.run/
 packages/contracts/deployments/local.json
 packages/contracts/broadcast/Staging.s.sol/
-packages/extension/signet-network.json

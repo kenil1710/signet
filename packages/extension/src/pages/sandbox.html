@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8" /><title>Verified copy</title></head>
+  <body>
+    <script>
+      // Renders the verified copy handed over by copy.html. A sandboxed extension page: an opaque origin with no
+      // extension APIs, no wallet and no access to the real site's storage. The files arrive as bytes that were
+      // already checked against their sealed hashes; here each gets a blob: URL (they must be made in this frame
+      // to be loadable in it) and references between files are pointed at those URLs.
+      addEventListener('message', (e) => {
+        const files = e.data && e.data.files;
+        if (!Array.isArray(files)) return;
+        const isText = (p) => /\.(m?js|css|html?)$/.test(p);
+        const text = new Map(files.filter((f) => isText(f.path)).map((f) => [f.path, new TextDecoder().decode(f.bytes)]));
+        const urls = new Map();
+        const rewrite = (body) => {
+          for (const [p, u] of urls) {
+            const name = p.split('/').pop().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            body = body.replace(new RegExp('(["\'`(])(?:\\.{0,2}/)?(?:[\\w.-]+/)*' + name + '(?=["\'`)])', 'g'), '$1' + u);
+          }
+          return body;
+        };
+        // files that reference others go last: binary first, then text from the shortest up
+        const order = files.filter((f) => f.path !== 'index.html').sort((a, b) => Number(isText(a.path)) - Number(isText(b.path)) || a.bytes.byteLength - b.bytes.byteLength);
+        for (const f of order) urls.set(f.path, URL.createObjectURL(new Blob([isText(f.path) ? rewrite(text.get(f.path)) : f.bytes], { type: f.contentType })));
+        document.open();
+        document.write(rewrite(text.get('index.html') || '<p>No index.html in this release.</p>'));
+        document.close();
+      }, { once: true });
+      parent.postMessage({ ready: true }, '*');
+    </script>
+  </body>
+</html>

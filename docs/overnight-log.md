@@ -24,3 +24,33 @@ Staging only. Nothing was sent to mainnet and ReleaseGate is unchanged.
 5. I also updated the tier-01 row in `CLAUDE.md` and the spec to mention SRI hashes.
 
 **Seen while testing:** the staging suites failed once when started right after the Foundry fork tests with another suite still on the chain (3 publish tests failed, one `init` hung waiting for a receipt). Each suite passes when run on its own; I could not reproduce it alone, so the cause is not confirmed. Run staging suites one at a time.
+
+## Phase 2: Guard extension (2026-11-17)
+
+**Done** (`packages/extension`, TypeScript + Vite, MV3; the Spike C prototype is removed)
+- Finds the domain's gate through SignetRegistry, reads the current release from **2 RPCs at the same block that must agree**, caches it (fresh 60 s, usable 24 h if the RPCs are down). Grey badge and no blocking whenever it can't check.
+- Fetches `allowlist.json`, `origins.json`, `files.json` from the container and **rejects them unless they hash to the on-chain values** (tested with RPCs that serve a forged allowlist).
+- Page check from the browser cache, as in Spike C, now against the real sealed file list; cross-origin scripts by sealed SRI hash. Green / red / grey badge.
+- Wraps `window.ethereum` and every EIP-6963 provider. Refuses `eth_sendTransaction`, typed data and permits for an unsealed target, spender, recipient or verifying contract, or on a tampered page. Decodes approve / transfer / transferFrom / permit / Permit2 / V2-router swaps; recipient ≠ user is refused.
+- Observe and enforce mode from the gate. Full red page for a tampered site, full-page notice for a refused signature, "Report wrong block", "Open verified copy", popup.
+- Privacy test: on an unsealed domain, zero RPC requests, the site sees only its own requests, nothing stored.
+- Demo dApp is now a real swap/stake page (approve, swap, Permit2 signature, stake; `?spender=0x…` simulates a hostile API).
+- Tests: 10 unit + 10 headless scenarios on staging (clean = green; tampered JS = red, blocked, drainer never reaches the wallet; unsealed spender = refused; observe mode = reported, never blocked; RPCs disagreeing or down = grey, nothing blocked; 24 h cache; forged manifest rejected; unsealed domain untouched). Screenshots: `docs/demo/guard-*.png`.
+
+**Not done / limits**
+- **The verified copy is a preview without a wallet.** It reads the release's files from the container, checks each against its sealed hash and renders them in a sandboxed frame. A user can't sign from it. I found no documented way to open a container path as a normal web page (rule 1), so "the app keeps working during the attack" is not delivered yet.
+- Not tested with a real wallet (MetaMask, OKX Wallet): a mock wallet only. Not submitted to the Chrome Web Store.
+- "Report wrong block" copies a report to the clipboard; there is no server to send it to.
+- Top frame only; the other limits are listed in `docs/decisions.md`.
+- **Before mainnet:** the sealed-domain list is read from event logs, which will take hundreds of requests for a late installer. The registry needs an enumerable list (it is not deployed yet, so it can still get one).
+
+**Decisions I made** (all in `docs/decisions.md`, "Guard extension")
+1. Sealed-domain list = union of both RPCs' logs, synced on a timer, never on page load.
+2. Tampered page in enforce mode → the tab goes to an extension page (a hostile page can't remove it), with a way back that keeps signing blocked.
+3. A revoked current release is red and refuses every signature in enforce mode.
+4. A `transfer` to someone who is neither the user nor a sealed contract is refused. Right for a DEX, wrong for a "send tokens" app. Please check this one.
+5. Direct `SiteRegistry.read` calls instead of the TapeKit kernel (the kernel can't point at the staging fork).
+
+**Found while testing (both fixed)**
+- The registry's 30-day operator grant expired because tests moved the staging clock; writes reverted with `NotOwner()`. New command: `pnpm staging:renew`. On mainnet someone must renew it every 30 days.
+- The cause of the Phase 1 hang: viem's `waitForTransactionReceipt` can miss a block on a chain that mines on demand. The CLI now polls the receipt itself.

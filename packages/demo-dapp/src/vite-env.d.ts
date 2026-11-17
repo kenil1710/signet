@@ -1,2 +1,2 @@
 /// <reference types="vite/client" />
-declare const __SIGNET_NETWORK__: import("@signet/contracts/network").SignetNetwork;
+declare const __SIGNET_NETWORK__: { name: string; chainId: number };

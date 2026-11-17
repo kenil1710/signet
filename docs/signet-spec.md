@@ -335,7 +335,7 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 
 - [x] GitHub Action (verify → seal → propose → wait until published on-chain → deploy): built and tested on staging with a local runner, not yet run on GitHub (2026-11-17, `packages/action`)
 - [x] Diff Guard analyzer, `signet diff <id>` (files, addresses and spenders, origins, SRI hashes, approve/permit/transfer calls, tier and why; text + JSON): tested on staging (2026-11-17, `packages/cli`)
-- [ ] Nov 24–26: Guard extension: manifest fetch from 2 RPCs, page hash check, red block page, window.ethereum + EIP-6963 wrap, allowlist + calldata decode, failover button, observe/enforce modes
+- [x] Guard extension: release read from 2 RPCs that must agree, manifest hash-checked, page hash check, red block page, window.ethereum + EIP-6963 wrap, allowlist + calldata decode, observe/enforce modes, verified-copy button (preview without a wallet): tested headless on staging (2026-11-17, `packages/extension`). Not yet tested with a real wallet.
 - [ ] Nov 27: **submit the extension to the Chrome Web Store** (keep an unpacked build for the demo as backup)
 - [ ] Nov 28–29: watchtower (3 regions, 1-min checks, 2-region confirm) + alerts via TapeSend, a Telegram bot and X posts
 

@@ -1,0 +1,27 @@
+:root { color-scheme: light dark; --fg: #111827; --dim: #6b7280; --bg: #fff; --line: #e5e7eb; --green: #15803d; --red: #b91c1c; --grey: #6b7280; }
+@media (prefers-color-scheme: dark) { :root { --fg: #f3f4f6; --dim: #9ca3af; --bg: #111827; --line: #374151; --green: #4ade80; --red: #f87171; --grey: #9ca3af; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+h1 { font-size: 18px; margin: 0; } h2 { font-size: 13px; margin: 16px 0 6px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.dim { color: var(--dim); } .mono { font-family: ui-monospace, monospace; font-size: 12px; overflow-wrap: anywhere; }
+button { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; margin: 6px 6px 0 0; }
+button:hover { border-color: var(--fg); }
+ul { margin: 0; padding: 0; list-style: none; } li { padding: 4px 0; border-top: 1px solid var(--line); }
+.popup { width: 360px; padding: 16px; }
+.light { display: flex; gap: 12px; align-items: center; }
+.dot { width: 14px; height: 14px; border-radius: 50%; flex: none; background: var(--grey); }
+.green .dot { background: var(--green); } .red .dot { background: var(--red); }
+.green h1 { color: var(--green); } .red h1 { color: var(--red); }
+.blocked { min-height: 100vh; background: #7f1d1d; color: #fff; display: grid; place-items: center; padding: 32px; }
+.blocked .card { max-width: 720px; width: 100%; }
+.blocked h1 { font-size: 34px; line-height: 1.2; margin: 6px 0 12px; }
+.blocked .tag { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
+.blocked p { font-size: 17px; }
+.blocked ul { background: #0003; border-radius: 8px; padding: 10px 14px; margin: 16px 0; }
+.blocked li { border: 0; } .blocked .dim { color: #fecaca; }
+.blocked button { border-color: #fff8; color: #fff; padding: 12px 18px; font-size: 16px; }
+.blocked button.main { background: #fff; color: #7f1d1d; font-weight: 600; }
+.copy { max-width: 960px; margin: 0 auto; padding: 24px; }
+table { width: 100%; border-collapse: collapse; } td, th { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+.ok { color: var(--green); } .no { color: var(--grey); }
+iframe { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 8px; background: #fff; margin-top: 8px; }
