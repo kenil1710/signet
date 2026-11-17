@@ -215,6 +215,18 @@ importers:
 
   packages/circuit: {}
 
+  packages/claims:
+    dependencies:
+      '@signet/circuit':
+        specifier: workspace:*
+        version: link:../circuit
+      '@signet/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      viem:
+        specifier: ^2.57.20
+        version: 2.57.20(typescript@5.9.3)
+
   packages/cli:
     dependencies:
       '@signet/contracts':

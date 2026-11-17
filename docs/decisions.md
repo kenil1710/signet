@@ -306,7 +306,7 @@ Limit: the circuit decides on facts the extension computes. A compromised extens
 
 ## 2026-11-17: Attack suite (`packages/attacks`, `pnpm attacks`)
 
-Result: **blocked 12/13 attacks; 0 false blocks on 16 clean sessions** (`docs/attack-report.md`). The one not blocked is the user without Guard (by design; the watchtower alerted).
+Result: **all 12 attacks against Guard users blocked; 0 false blocks on 16 clean sessions** (`docs/attack-report.md`). Reported separately as a known limit: the user without Guard is not protected (the watchtower alerted).
 
 | Decision | Why |
 |---|---|
@@ -315,9 +315,16 @@ Result: **blocked 12/13 attacks; 0 false blocks on 16 clean sessions** (`docs/at
 | **Code from data (eval / new Function) is run with Playwright's `page.evaluate`** in the page's world, on a clean page. | It is the honest model of an XSS or a compromised config API: no file changes, so the page check can't see it; only the signing check can. |
 | **The poisoned-npm drainer's config fetch is answered inside the page.** | Its host doesn't exist on staging. Without that the drainer stopped before asking for a signature, and an earlier run counted that as "blocked": a false success, now removed. |
 | **Rollback inside the grace window is tested for a user whose Guard verified the old release earlier.** For a user who never saw it, the old files simply fail the page check. | That is the case where old files are legitimately accepted; the test shows the *current* allowlist still refuses a spender the new release retired. |
-| **The no-extension case counts in the total, as not blocked.** A compromised extension is documented, not run. | Honest denominator. |
+| **The no-extension case is run and reported in its own "known limits" section, not in the attack count** (changed 2026-11-17 at Kenil's request; it was first counted as 1 of 13 not blocked). A compromised extension is documented, not run. | Counting a case Guard can't act on by design as a failed defense was misleading in the other direction: it read as a gap in Guard. It is stated plainly instead, in the report, `THREAT_MODEL.md` and `CLAIMS.md`. |
 
 Found while building it:
 - **A test artifact, not a Guard bug:** an early version sent its "revoked" signature from Guard's own warning page, where the test's mock wallet is injected but no site code can run. It looked like a leak; the wallet log (no `eth_chainId` lookup, which Guard's wrapper always does) showed the request never went through Guard. The attack now goes through "Go back to the site".
 - **A real race, fixed defensively:** if Guard sends a tab to the warning page while a signature request is waiting, the answer can be lost with the page, and the content script used to fail open. It now refuses when it already knows the page is red (or the release revoked) in enforce mode. Not reproduced by a test.
 - **A known lag:** Guard re-reads a sealed domain from the chain at most once a minute, so a revoke or a new release takes up to 60 s to reach a user who has the site open. The suite waits it out. Recorded in THREAT_MODEL.md.
+
+## 2026-11-17: Judge-verifiable claims, threat model, overclaims removed
+
+- **`pnpm verify:claims`** (`packages/claims/src/verify.ts`): 7 claims checked live on X Layer mainnet (two RPC operators, same block, answers compared key-order-independently), 8 recomputed from the repo or backed by named tests, 2 PENDING until deployment. It sends nothing and needs no key. It fails if `CLAIMS.md` doesn't list a claim it checks. About 2 minutes, mostly the 2 × 512 `eval` calls, throttled because public RPCs rate-limit bursts.
+- **Pending is never shown as passed.** C8 (Signet's contracts) and C9 (Guard circuit) turn into real checks as soon as `deployments/mainnet.json` names them.
+- **Overclaims removed** from the spec, `CLAUDE.md` and the new `README.md`. The pitch now says what is true: protection at signing reaches Guard users only; others get the watchtower's alert to the team. Also qualified: "nobody can change the circuit" (rests on bytecode and on-chain checks; TapeOut has no verified source), "keeps your app running" (verified copy for Guard users, gateway not deployed), "10 minutes" (a target), "no false blocks" (0 on 16 staging sessions, not measured on real sites), "first to ship", "zero-install users" via OKX Wallet (not discussed with them).
+- **`THREAT_MODEL.md`** lists what each layer does, the attack-suite result per threat, and the limits, including the ones that hurt: most users aren't protected at signing; fail-open can be triggered by making a user's RPCs fail; a compromised Guard extension defeats everything; SiteRegistry is upgradeable by its owner.

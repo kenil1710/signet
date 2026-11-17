@@ -1,0 +1,17 @@
+{
+  "name": "@signet/claims",
+  "version": "0.0.0",
+  "private": true,
+  "description": "pnpm verify:claims: checks every claim in CLAIMS.md against X Layer mainnet (read-only) and the repo",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@signet/circuit": "workspace:*",
+    "@signet/contracts": "workspace:*",
+    "viem": "^2.57.20"
+  },
+  "scripts": {
+    "verify": "node src/verify.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}

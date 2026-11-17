@@ -4,13 +4,13 @@ As of Nov 16, 2026
 
 ## Summary
 
-We build Signet for the X Layer TapeOut Accelerate hackathon (deadline Dec 7, 2026, 23:59 UTC = Dec 8, 5:29 AM IST). Signet decides what a dApp's website is allowed to do, and keeps the app usable even when the website is hacked.
+We build Signet for the X Layer TapeOut Accelerate hackathon (deadline Dec 7, 2026, 23:59 UTC = Dec 8, 5:29 AM IST). Signet decides what a dApp's website is allowed to ask a wallet to sign. **That protection reaches users who run the Guard extension (or, later, a wallet that does the same check); everyone else is protected only indirectly, by the watchtower alerting the team.** Guard users can also keep using a verified copy of the app while the real site is hijacked.
 
-**Pitch line:** Others warn you that a website changed. Signet decides what the website is allowed to do, and keeps your app running when it's hacked.
+**Pitch line:** Others warn you that a website changed. Signet decides what the website is allowed to ask you to sign, and, for Guard users, refuses everything else and opens a verified copy when the site is hacked.
 
-**Goal for Dec 7:** a team can protect its app in 10 minutes without knowing anything about TapeOut. At least 2 real projects are sealed. Then a 3-minute demo shows a live hijack being stopped.
+**Goal for Dec 7:** a team can seal its app in about 10 minutes (a target; not yet timed with an outside team) without knowing anything about TapeOut. At least 2 real projects are sealed. Then a 3-minute demo shows a live hijack being stopped.
 
-**Honest position:** "hash on-chain + browser extension" already exists (TEE Shield, Meta Code Verify, Blockaid). We win on what none of them do: a sealed allowlist enforced at signing, behavior-based release review, an immutable TapeOut release-policy circuit, verified failover to DeWEB, and a public watchtower.
+**Honest position:** "hash on-chain + browser extension" already exists (TEE Shield, Meta Code Verify, Blockaid). What we add, which we have not seen combined elsewhere: a sealed allowlist enforced at signing, behavior-based release review, an immutable TapeOut release-policy circuit, verified failover to DeWEB, and a public watchtower.
 
 ## Problem and evidence
 
@@ -44,7 +44,7 @@ Signet has seven parts. Teams touch the CLI, the GitHub Action and the dashboard
 | **ReleaseGate contract + policy circuit** | One per project. Publishes a release only when the TapeOut circuit says ALLOW. Handles freeze. On Pro/Enterprise it holds the team's own container NFT. | On-chain | Yes |
 | **SignetRegistry + SignetFactory contracts** | The factory deploys each project's ReleaseGate and claims its domain in one transaction, using commit-reveal (commit a hash, reveal at least 2 blocks later) so a claim can't be copied from the mempool. The registry binds domains only to factory-made gates. It never holds a circuit NFT: it writes as the SiteRegistry *operator* of a container (a grant of at most 30 days, renewed by the holder). It writes only files the bound gate's current release approves. Signet's container (`0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`) holds Signet's own site under `signet/<domain>/` and Free projects under `projects/<domain>/`; a Pro/Enterprise gate can instead hold its own container's NFT and get files at that container's root. The registry has no owner, no migration switch and nothing configurable after deployment: its factory and Signet's site gate are fixed in its constructor. | On-chain | Yes |
 | **Domain Registry contract** | Maps domain → project (shared container + `projects/<domain>/`, or the team's own container). Changes need M-of-N approval. | On-chain | Yes |
-| **Guard extension** | Hashes the loaded page, enforces the sealed allowlist when the wallet signs, blocks the page, opens the verified copy | End users | Yes (Chrome) |
+| **Guard extension** | Hashes the loaded page, enforces the sealed allowlist when the wallet signs (the decision comes from a second TapeOut circuit), blocks the page in enforce mode, opens the verified copy. **Only users who install it get this.** | End users | Yes (Chrome) |
 | **Watchtower** | Checks every sealed site every minute from 3 regions. Alerts via TapeSend, Telegram and X. Public status page. | Everyone | Yes (basic) |
 | **Dashboard (on DeWEB)** | Diff Guard review, approvals, release history, freeze button, status, "Sealed" badge | Team approvers | Yes |
 
@@ -60,7 +60,7 @@ Stretch, after the core works: a reproducible-build check (the watchtower rebuil
 
 ## Architecture
 
-CI can only propose. A release goes live only when the TapeOut circuit says ALLOW, and users are checked against that sealed release at every page load and every signature.
+CI can propose and call publish, but never approve. A release goes live only when the TapeOut circuit says ALLOW, and users **who run Guard** are checked against that sealed release at every page load and every signature.
 
 **Where releases are stored.** One Signet container, circuit #5's container `0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed` on processor #101, holds both Signet's own site under `signet/<domain>/` (the dashboard uses hash routing, so it needs no fallback path) and every free-tier project under `projects/<domain>/`. The two prefixes can't overlap, and tests prove neither side can write into the other. SignetRegistry writes there as the container's SiteRegistry operator, and only files a project's ReleaseGate has published. Circuit #5 stays with Signet (the dev wallet now, a multisig after the hackathon). Pro and Enterprise projects can have their own container, held by their ReleaseGate. Opening a container costs a one-time 0.08 OKB while storage costs about 0.0000048 OKB per KB (Spike B), so sharing keeps the free tier cheap. See `docs/decisions.md`.
 
@@ -90,7 +90,7 @@ The watchtower compares live sites with the sealed manifest and alerts the team 
 
 ## Release-lock circuit and approval tiers
 
-The policy is a TapeOut NAND/LATCH circuit that nobody can change. The ReleaseGate contract supplies facts as input bits, and the circuit decides. Because the input is only 9 bits, we test all 512 combinations and publish the full truth table (`docs/policy-truth-table.md`): a proof of the policy, not a promise.
+The policy is a TapeOut circuit (NAND gates only) whose netlist can't be changed after tape-out: it is stored as contract code and the circuit beacon's owner is `0x0`. TapeOut's source isn't verified, so this rests on bytecode and on-chain checks (`pnpm verify:claims`, C5), not on audited source. The ReleaseGate contract supplies facts as input bits, and the circuit decides. Because the input is only 9 bits, we test all 512 combinations and publish the full truth table (`docs/policy-truth-table.md`): a proof of the policy, not a promise.
 
 **No fully automatic tier.** A hacked CI could ship code that only calls allowlisted contracts but swaps to the attacker as recipient. So every release needs at least 1 human approval.
 
@@ -188,7 +188,7 @@ The biggest product risk is not missing an attack. It's **blocking real users by
 
 | Case | Handling |
 | --- | --- |
-| Mobile (no Chrome extensions) | Watchtower alerts protect everyone; the wallet SDK is the long-term answer (OKX Wallet in-app browser) |
+| Mobile (no Chrome extensions) | **Not protected at signing.** The watchtower alerts the team (not the user), who can freeze and warn. A wallet that adopts the same check is the long-term answer; none has yet. |
 | WalletConnect / QR signing to a phone wallet | The extension can't stop the phone's signature but still blocks the tampered page before connecting |
 | Several wallets installed (EIP-6963) | Guard wraps every announced provider |
 | X Layer RPC down | Use the cached manifest (24 h expiry). With no data, show "unverified" and don't block (fail-open by default; teams can choose fail-closed). |
@@ -264,28 +264,28 @@ Users never pay. Teams pay because one hijack costs them users, money and reputa
 1. TapeOut and X Layer builders first: they already use DeWEB, so pitch in the TapeOut and X Layer Telegram groups and livestreams. Free Pro for the first 50 projects.
 2. Incident-driven outreach: every public frontend hijack → a same-day post ("here's how Signet would have stopped it") and a DM to similar protocols.
 3. The badge is viral: every sealed site shows "Sealed by Signet" with a link.
-4. Partnerships: OKX Wallet (built-in check = zero-install users), launchpads, and audit firms (offer Signet with every audit).
+4. Partnerships: OKX Wallet (a built-in check would reach users without an extension; not discussed with them yet), launchpads, and audit firms (offer Signet with every audit).
 
 **Target users, in order:** X Layer and TapeOut dApps → DeFi protocols with large TVL → multisig and treasury UIs → launchpads and NFT mint sites → Web2 fintech pages later.
 
 ## Competition and differentiation
 
-No competitor combines a sealed allowlist, signing-time blocking, an immutable release policy and failover. That combination is our story; the hash check alone is not.
+We have not found a competitor that combines a sealed allowlist, signing-time blocking, a release policy one key can't bypass, and failover. That combination is our story; the hash check alone is not.
 
 | Capability | [TEE Shield](https://ethglobal.com/showcase/tee-shield-6fx8p) | [Blockaid](https://blockaid.io/view-on-security) | Meta Code Verify / WEBCAT | IPFS + ENS | **Signet** |
 | --- | --- | --- | --- | --- | --- |
 | Exact check against the team's real release | Yes | No (heuristics) | Yes | Yes | **Yes** |
 | Works on the normal https domain | Yes | Yes | Yes | No | **Yes** |
 | Sealed allowlist of contracts and spenders | No | No | No | No | **Yes** |
-| Blocks at signing | No | Inside partner wallets | No | No | **Yes** |
+| Blocks at signing | No | Inside partner wallets | No | No | **Yes, for Guard users** |
 | Behavior diff before release | No | No | No | No | **Yes** |
 | Release policy that one key can't bypass | No (admin key) | — | Signing key | ENS owner key | **Yes (TapeOut circuit)** |
-| App keeps working during an attack | No | No | No | Partly | **Yes (DeWEB copy)** |
-| Public watchtower and alerts | No | Private to customers | No | No | **Yes** |
+| App keeps working during an attack | No | No | No | Partly | **Partly: a verified copy for Guard users, through the Signet gateway (built, not deployed)** |
+| Public watchtower and alerts | No | Private to customers | No | No | **Basic: 1 region, Telegram** |
 
 Inside TapeOut: HashPort, TapeNow and Q-Tape publish to DeWEB, and TapeKit verifies tape:// sites. Signet builds on them instead of competing, which also scores on "building on existing ecosystem tools".
 
-**How we talk about competitors:** we credit them openly. The [Ethereum Foundation's call for verifiable frontends](https://notes.ethereum.org/I0oM7rM4TUe-E3EXchCvbg) shows the need is real, and we are the first to ship the full loop on X Layer.
+**How we talk about competitors:** we credit them openly. The [Ethereum Foundation's call for verifiable frontends](https://notes.ethereum.org/I0oM7rM4TUe-E3EXchCvbg) shows the need is real, and we aim to ship the full loop on X Layer.
 
 ## Judging criteria and submission checklist
 
@@ -293,7 +293,7 @@ Each criterion has one piece of proof we must show, in the product and in the vi
 
 | Criterion | Our proof |
 | --- | --- |
-| User value and commercial potential | Incident table ($1.5B+), pricing, 2+ real projects sealed, the observe-mode "no false blocks" promise |
+| User value and commercial potential | Incident table ($1.5B+), pricing, 2+ real projects sealed, observe mode, and 0 false blocks on 16 clean sessions in the staging attack suite (not yet measured on real sites) |
 | Innovation (circuit design, new use cases) | A release-policy circuit with an exhaustive 512-case truth table (9 input bits); TapeOut used as a security policy engine (a new use case) |
 | Ecosystem integration | A circuit on an X Layer Processor, Circuit Container + SiteRegistry (DeWEB) for manifests and failover, TapeKit for reading and verifying, TapeSend for alerts, dashboard hosted on DeWEB |
 | Product readiness and UX | 10-minute setup, one-click approvals, live demo dApp, Chrome extension installable |
@@ -360,12 +360,12 @@ One story, a live hijack, told in the order the judges score: problem, features,
 | Time | Screen | Voice-over (short) |
 | --- | --- | --- |
 | 0:00–0:20 | Headlines: Bybit $1.5B, CoW Swap, Aerodrome | "The contracts were safe. The website wasn't. Users signed on a page that looked real." |
-| 0:20–0:45 | `npx signet init` + the Action in GitHub | "A team protects its app in 10 minutes. Every build is sealed on X Layer." |
-| 0:45–1:10 | Dashboard: Diff Guard flags "new contract address" → tier 10, needs 2 of 3 + 24 h | "A hacked laptop can only propose. A TapeOut circuit decides, and nobody can change it." Show the truth-table proof. |
+| 0:20–0:45 | `npx signet init` + the Action in GitHub | "A team seals its app in about 10 minutes. Every build is sealed on X Layer." |
+| 0:45–1:10 | Dashboard: Diff Guard flags "new contract address" → tier 10, needs 2 of 3 + 24 h | "A hacked laptop can only propose. A TapeOut circuit decides, and its rule can't be changed after tape-out." Show the truth-table proof. |
 | 1:10–1:50 | **Live attack:** DNS override + swapped JS → Guard turns red → user clicks Swap → signature refused | "Signet doesn't just warn. It refuses the signature to an address the team never sealed." |
 | 1:50–2:10 | Open verified copy (tape://) → user swaps safely; Telegram + TapeSend alert arrives; Freeze pressed | "The app keeps working during the attack, and the team knows in a minute." |
 | 2:10–2:35 | Pricing table + logos of real sealed projects | "Free for users. Teams pay for watchtower, alerts and the badge. Wallets pay for the API." |
-| 2:35–2:50 | Architecture: circuit, Container, SiteRegistry, TapeKit, TapeSend on X Layer | "Built on TapeOut on X Layer. Signet: the website can only do what the team sealed." |
+| 2:35–2:50 | Architecture: circuit, Container, SiteRegistry, TapeKit, TapeSend on X Layer | "Built on TapeOut on X Layer. With Signet Guard, the website can only ask you to sign what the team sealed." |
 
 Record in 1080p with large fonts and no dead air. Subtitles in English. Do a dry run with a friend who doesn't know crypto: if they get the problem in 20 seconds, it works.
 

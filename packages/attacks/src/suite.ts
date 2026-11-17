@@ -75,7 +75,8 @@ const lazyOf = (dist: string) => `assets/${readdirSync(join(dist, 'assets')).fin
 
 // ---------------------------------------------------------------- results
 
-interface Attack { id: string; threat: string; vector: string; blocked: boolean; how: string; note?: string }
+/// limit = true: a known limit run for transparency (Guard can't act there by design), reported apart from the attacks Guard defends against
+interface Attack { id: string; threat: string; vector: string; blocked: boolean; how: string; note?: string; limit?: boolean }
 interface Clean { name: string; falseBlock: boolean; why: string }
 const attacks: Attack[] = [];
 const cleans: Clean[] = [];
@@ -114,11 +115,13 @@ async function record(a: Omit<Attack, 'blocked' | 'how'>, s: Session | null, w: 
   const leaked = harmful(w, ...needles);
   const r: Attack = { ...a, blocked: leaked.length === 0, how: leaked.length ? `reached the wallet: ${leaked[0]!.method}` : await how(), note };
   attacks.push(r);
-  log(`  ${r.blocked ? 'BLOCKED' : 'NOT BLOCKED'}  ${r.id}: ${r.how}`);
+  log(`  ${r.blocked ? 'BLOCKED' : r.limit ? 'NOT PROTECTED (known limit)' : 'NOT BLOCKED'}  ${r.id}: ${r.how}`);
   void s;
 }
 
 // ---------------------------------------------------------------- setup
+
+const closers: (() => void)[] = []; // servers to close at the end, so a test run can exit
 
 async function setup(): Promise<{ p1: Project; p2: Project; p3: Project; gateway: Awaited<ReturnType<typeof startGateway>> }> {
   await anvil('anvil_nodeInfo').catch(() => {
@@ -136,6 +139,7 @@ async function setup(): Promise<{ p1: Project; p2: Project; p3: Project; gateway
   origins = projects.map((p) => `http://${p.domain}:${port}`).join(',');
   const [a, b] = [await rpcProxy(), await rpcProxy()];
   const gateway = await startGateway(a.url, b.url);
+  closers.push(() => a.close(), () => b.close(), () => gateway.close());
   ext = buildExtension(a.url, b.url, gateway);
   // enforce mode on all three (allowed 7 days after each gate was created)
   await anvil('evm_increaseTime', [`0x${(7 * 86400 + 60).toString(16)}`]);
@@ -195,7 +199,7 @@ async function cleanSession(name: string, p: Project, o: { late?: boolean; reloa
 
 // ---------------------------------------------------------------- the attacks
 
-export async function run(): Promise<{ blocked: number; total: number; falseBlocks: number; clean: number }> {
+export async function run(): Promise<{ blocked: number; total: number; falseBlocks: number; clean: number; limitsNotProtected: number }> {
   const { p1, p2, p3, gateway } = await setup();
   const main1 = mainOf(p1.dist);
   const h1 = hosts.get(p1.domain)!;
@@ -420,7 +424,7 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
     const r = await tick({ net: netFromEnv({ SIGNET_NETWORK: 'local' }), alert: consoleAlerter((l) => void lines.push(l)), statePath: join(mkdtempSync(join(tmpdir(), 'atk-tower-')), 's.json'), urlFor: () => urlOf(p1), only: [p1.domain], confirmDelayMs: 500 }, towerBrowser);
     await towerBrowser.close();
     const alerted = r.alerts > 0 && lines.some((l) => /does not match its sealed release/.test(l));
-    await record({ id: 'no-extension', threat: '1', vector: 'the DNS hijack against a user WITHOUT Guard' }, null, w, [lc(DRAINER)], async () => '', `Not blockable without Guard or a wallet that does the same check. The watchtower ${alerted ? `confirmed the mismatch on two loads and alerted the team ${((Date.now() - started) / 1000).toFixed(1)} s into its round (it runs once a minute, so within about a minute of the hijack)` : 'did NOT alert'}; the team can then freeze and warn users.`);
+    await record({ id: 'no-extension', threat: '1', vector: 'the DNS hijack against a user WITHOUT Guard', limit: true }, null, w, [lc(DRAINER)], async () => '', `Not blockable without Guard or a wallet that does the same check. The watchtower ${alerted ? `confirmed the mismatch on two loads and alerted the team ${((Date.now() - started) / 1000).toFixed(1)} s into its round (it runs once a minute, so within about a minute of the hijack)` : 'did NOT alert'}; the team can then freeze and warn users.`);
     h1.patch = undefined;
   }
   // 12. revoked release: the approvers withdraw release 1 (say it turned out to be malicious); users must not sign on it
@@ -460,17 +464,22 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
     await cleanSession('normal use right after a new release (tier 10, release 2)', p2);
   }
 
-  const total = attacks.length;
-  const blocked = attacks.filter((a) => a.blocked).length;
+  const guarded = attacks.filter((a) => !a.limit);
+  const limits = attacks.filter((a) => a.limit);
+  const total = guarded.length;
+  const blocked = guarded.filter((a) => a.blocked).length;
   const falseBlocks = cleans.filter((c) => c.falseBlock).length;
-  const line = `Blocked ${blocked}/${total} attacks; false blocks: ${falseBlocks} on ${cleans.length} clean sessions.`;
+  const line = `Blocked ${blocked}/${total} attacks against Guard users; false blocks: ${falseBlocks} on ${cleans.length} clean sessions.`;
+  const limitLine = `Known limits run for transparency: ${limits.map((a) => `${a.id} ${a.blocked ? 'blocked' : 'not protected'}`).join(', ')}; a compromised extension is documented, not run.`;
+  log(`  ${limitLine}`);
   log(`\n${line}`);
-  if (!ONLY) report(line);
+  if (!ONLY) report(line, limitLine);
   server.close();
-  return { blocked, total, falseBlocks, clean: cleans.length };
+  for (const c of closers) c();
+  return { blocked, total, falseBlocks, clean: cleans.length, limitsNotProtected: limits.filter((a) => !a.blocked).length };
 }
 
-function report(line: string): void {
+function report(line: string, limitLine: string): void {
   const md = `# Attack report
 
 Generated by \`pnpm attacks\` (\`packages/attacks/src/suite.ts\`) on ${new Date().toISOString().slice(0, 10)}, on the local staging chain
@@ -479,16 +488,25 @@ Generated by \`pnpm attacks\` (\`packages/attacks/src/suite.ts\`) on ${new Date(
 
 **${line}**
 
+${limitLine}
+
 An attack is **blocked** only if the attacker's signature request never reached the wallet. A clean session is a
 **false block** if Guard refused any of the user's own actions, showed the warning page or turned the badge red.
 
-## Attacks
+## Attacks against Guard users
 
 | # | Attack | Threat | Result | How |
 |---|---|---|---|---|
-${attacks.map((a, i) => `| ${i + 1} | ${a.vector} | ${a.threat} | ${a.blocked ? '**blocked**' : '**not blocked**'} | ${a.how.replace(/\|/g, '/')}${a.note ? ` *${a.note}*` : ''} |`).join('\n')}
+${attacks.filter((a) => !a.limit).map((a, i) => `| ${i + 1} | ${a.vector} | ${a.threat} | ${a.blocked ? '**blocked**' : '**NOT BLOCKED**'} | ${a.how.replace(/\|/g, '/')}${a.note ? ` *${a.note}*` : ''} |`).join('\n')}
 
-Not run (documented only): **a compromised Guard extension or Chrome Web Store account** (threat 17). See \`THREAT_MODEL.md\`.
+## Known limits (run for transparency, not counted above)
+
+These are cases Guard can't act on by design. They are not failures of the defenses above, and they are not hidden either.
+
+| Case | Threat | Result | What happens instead |
+|---|---|---|---|
+${attacks.filter((a) => a.limit).map((a) => `| ${a.vector} | ${a.threat} | **${a.blocked ? 'blocked' : 'not protected'}** (${a.how}) | ${a.note ?? ''} |`).join('\n')}
+| A compromised Guard extension, build or Chrome Web Store account | 17 | **not run** (can't be tested from outside) | Defeats Guard entirely: it can feed the circuit any facts. Documented in \`THREAT_MODEL.md\`. |
 
 ## Clean sessions
 

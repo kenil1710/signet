@@ -1,7 +1,7 @@
 # Signet — project rules for Claude Code
 
 Signet is our entry for the X Layer TapeOut Accelerate hackathon (deadline Dec 7, 2026, 23:59 UTC; we submit Dec 6).
-It decides what a dApp's website is allowed to do, and keeps the app usable when the website is hacked.
+It decides what a dApp's website may ask a wallet to sign; users who run its Guard extension are refused anything else and can use a verified copy when the site is hacked.
 The full spec is `docs/signet-spec.md`. Read it before starting any task.
 
 ## Repo layout (pnpm monorepo)
