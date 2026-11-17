@@ -23,6 +23,18 @@ export function leafOf(domain: string, path: string, contentType: string, conten
   return sha256Hex(bytesOf(encoded));
 }
 
+/// Files over MAX_FILE_BYTES are stored on-chain one CHUNK_BYTES piece per transaction (SignetRegistry.writeChunk),
+/// so each piece gets its own leaf: leafOf(domain, `${path} ${index}`, CHUNK_TYPE, sha256(piece)). A path with a space
+/// can't be stored and CHUNK_TYPE is no file's type, so a chunk leaf never equals a file leaf.
+export const CHUNK_BYTES = 24_000;
+export const CHUNK_TYPE = 'signet/chunk';
+export const chunkPath = (path: string, i: number) => `${path} ${i}`;
+
+/// Every leaf of a release: one per file, plus one per chunk of a chunked file (files.json lists the chunk hashes).
+export function leavesOf(domain: string, files: { path: string; contentType: string; sha256: Hex; chunks?: Hex[] }[]): Hex[] {
+  return files.flatMap((f) => [leafOf(domain, f.path, f.contentType, f.sha256), ...(f.chunks ?? []).map((c, i) => leafOf(domain, chunkPath(f.path, i), CHUNK_TYPE, c))]);
+}
+
 export function hashPair(a: Hex, b: Hex): Hex {
   const [lo, hi] = BigInt(a) < BigInt(b) ? [a, b] : [b, a];
   return sha256Hex(Buffer.concat([bytesOf(lo), bytesOf(hi)]));

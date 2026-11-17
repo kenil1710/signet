@@ -15,6 +15,12 @@ export function leafOf(domain: string, path: string, contentType: string, conten
   return sha256(encodeAbiParameters([{ type: 'string' }, { type: 'string' }, { type: 'string' }, { type: 'bytes32' }], [domain, path, contentType, contentSha256]));
 }
 
+/// Chunk leaves of files over 48,000 bytes (same rule as packages/cli/src/merkle.ts and SignetRegistry.writeChunk).
+export const CHUNK_TYPE = 'signet/chunk';
+export function leavesOf(domain: string, files: SealedFile[]): Hex[] {
+  return files.flatMap((f) => [leafOf(domain, f.path, f.contentType, f.sha256), ...(f.chunks ?? []).map((c, i) => leafOf(domain, `${f.path} ${i}`, CHUNK_TYPE, c))]);
+}
+
 export function merkleRoot(leaves: Hex[]): Hex {
   if (leaves.length === 0) throw new Error('no files');
   let level = [...leaves].sort((a, b) => (BigInt(a) < BigInt(b) ? -1 : 1));
@@ -38,19 +44,19 @@ export function manifestHashOf(filesRoot: Hex, allowlistHash: Hex, originsHash: 
 
 export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsBytes: Uint8Array, filesBytes: Uint8Array): Sealed {
   const text = (b: Uint8Array) => new TextDecoder().decode(b);
-  const list = JSON.parse(text(filesBytes)) as { domain?: string; files?: SealedFile[] };
+  const list = JSON.parse(text(filesBytes)) as { domain?: string; files?: SealedFile[]; calls?: Record<string, number> };
   if (list.domain !== domain || !Array.isArray(list.files)) throw new Error('the file list is for another domain');
   const o = JSON.parse(text(originsBytes)) as { origins?: string[]; scripts?: Sealed['scripts'] } | string[];
   const origins = Array.isArray(o) ? o : o.origins;
   const scripts = Array.isArray(o) ? [] : o.scripts;
   if (!Array.isArray(origins) || !Array.isArray(scripts)) throw new Error('the origins file is malformed');
   const own = { path: FILES_PATH, contentType: 'application/json', sha256: sha256(filesBytes), size: filesBytes.length };
-  const filesRoot = merkleRoot([...list.files, own].map((f) => leafOf(domain, f.path, f.contentType, f.sha256)));
+  const filesRoot = merkleRoot(leavesOf(domain, [...list.files, own]));
   const allowlistHash = sha256(allowlistBytes);
   const originsHash = sha256(originsBytes);
   return {
     manifestHash: manifestHashOf(filesRoot, allowlistHash, originsHash), filesRoot, allowlistHash, originsHash,
-    allowlist: JSON.parse(text(allowlistBytes)) as Sealed['allowlist'], origins, scripts, files: list.files,
+    allowlist: JSON.parse(text(allowlistBytes)) as Sealed['allowlist'], origins, scripts, files: list.files, calls: list.calls ?? null,
   };
 }
 

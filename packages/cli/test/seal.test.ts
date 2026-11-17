@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { encodeAbiParameters, type Hex } from 'viem';
-import { leafOf, hashPair, merkleRoot, merkleProof, verifyProof, sha256Hex } from '../src/merkle.ts';
+import { leafOf, leavesOf, hashPair, merkleRoot, merkleProof, verifyProof, sha256Hex, CHUNK_BYTES } from '../src/merkle.ts';
 import { seal, loadSealed, extractAddresses, extractOrigins, isValidDomain, isOnchainPath, manifestHashOf, tagsOf } from '../src/seal.ts';
 import { writeBuild, ROUTER, STAKING, NEW_VAULT, PERMIT2, CDN_SCRIPT, CDN_SRI } from './fixtures.ts';
 
@@ -56,7 +56,7 @@ test('seal: hashes, allowlist, origins, SRI and the four files', () => {
   // the three hashes are exactly what the contracts compute
   assert.equal(m.allowlistHash, sha(readFileSync(join(dir, 'signet/allowlist.json'))));
   assert.equal(m.originsHash, sha(readFileSync(join(dir, 'signet/origins.json'))));
-  assert.equal(m.filesRoot, merkleRoot(r.files.map((f) => leafOf(DOMAIN, f.path, f.contentType, f.sha256))));
+  assert.equal(m.filesRoot, merkleRoot(leavesOf(DOMAIN, r.files)));
   assert.equal(m.manifestHash, manifestHashOf(m.filesRoot, m.allowlistHash, m.originsHash));
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'signet-manifest.json'), 'utf8')), m);
 
@@ -73,7 +73,13 @@ test('seal: hashes, allowlist, origins, SRI and the four files', () => {
   const list = JSON.parse(readFileSync(join(dir, 'signet/files.json'), 'utf8'));
   assert.equal(list.externalScripts, undefined);
   assert.deepEqual(list.calls, {}); // the demo build only calls a router
-  assert.ok(r.warnings.some((w) => w.includes('chunk-vendor-') && w.includes('too large')));
+  // the 76 KB vendor chunk is over 48,000 bytes: sealed with one hash per 24,000-byte piece, stored one transaction each
+  const vendor = r.files.find((f) => f.path.startsWith('assets/chunk-vendor-'))!;
+  const vb = readFileSync(join(dir, vendor.path));
+  assert.deepEqual(vendor.chunks, Array.from({ length: Math.ceil(vb.length / CHUNK_BYTES) }, (_, i) => sha(vb.subarray(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES))));
+  assert.equal(vendor.chunks!.length, 4);
+  assert.ok(r.warnings.some((w) => w.includes('chunk-vendor-') && w.includes('stored on-chain in 4 chunks')));
+  assert.ok(r.files.filter((f) => f.size <= 48_000).every((f) => !f.chunks), 'small files are not chunked (their leaves are unchanged)');
 });
 
 test('seal is deterministic and re-sealing a sealed directory changes nothing', () => {
@@ -173,6 +179,7 @@ test('loadSealed refuses a build that changed after sealing', () => {
   seal(dir, cfg);
   const b = loadSealed(dir);
   for (const f of b.files) assert.ok(verifyProof(leafOf(DOMAIN, f.path, f.contentType, f.sha256), b.proof(f.path), b.manifest.filesRoot));
+  for (const f of b.files.filter((x) => x.chunks)) f.chunks!.forEach((c, i) => assert.ok(verifyProof(leafOf(DOMAIN, `${f.path} ${i}`, 'signet/chunk', c), b.chunkProof(f.path, i), b.manifest.filesRoot)));
   writeFileSync(join(dir, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
   assert.throws(() => loadSealed(dir), /robots\.txt changed since the build was sealed/);
   seal(dir, cfg);

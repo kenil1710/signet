@@ -1,0 +1,23 @@
+:root { color-scheme: light dark; --fg: #111827; --dim: #6b7280; --bg: #fff; --line: #e5e7eb; --ok: #15803d; --bad: #b91c1c; }
+@media (prefers-color-scheme: dark) { :root { --fg: #f3f4f6; --dim: #9ca3af; --bg: #0f172a; --line: #334155; --ok: #4ade80; --bad: #f87171; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+#app { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 24px; } h2 { font-size: 16px; margin-top: 28px; }
+a { color: inherit; } .dim { color: var(--dim); } .ok { color: var(--ok); } .bad { color: var(--bad); }
+code, pre { font: 12.5px ui-monospace, monospace; overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; background: #8881; padding: 12px; border-radius: 8px; overflow-x: auto; }
+pre.diff { font-size: 12px; }
+table { border-collapse: collapse; width: 100%; } td { border-top: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+table.kv td:first-child { color: var(--dim); width: 160px; }
+button, .btn, input { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; } .btn { display: inline-block; text-decoration: none; }
+input { min-width: 260px; cursor: text; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); vertical-align: middle; }
+.pill.ok { color: var(--ok); border-color: var(--ok); } .pill.bad { color: var(--bad); border-color: var(--bad); }
+#toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(720px, 92vw); padding: 10px 16px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 4px 16px #0003; font-size: 14px; display: none; overflow-wrap: anywhere; }
+#toast.show { display: block; } #toast.ok { border-color: var(--ok); color: var(--ok); } #toast.bad { border-color: var(--bad); color: var(--bad); }
+td.st { font-weight: 700; width: 90px; } td.PASS { color: var(--ok); } td.FAIL { color: var(--bad); } td.PENDING { color: var(--dim); } td.STALE { color: #b45309; }
+.badge { display: inline-flex; gap: 10px; align-items: center; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; }
+.badge .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--dim); } .badge.ok .dot { background: var(--ok); } .badge.no .dot { background: var(--bad); }
+body.embed #app { padding: 4px; }

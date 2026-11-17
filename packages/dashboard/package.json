@@ -6,15 +6,23 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@signet/contracts": "workspace:*"
+    "@signet/circuit": "workspace:*",
+    "@signet/cli": "workspace:*",
+    "@signet/contracts": "workspace:*",
+    "@signet/extension": "workspace:*",
+    "viem": "^2.57.20"
   },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts"
   },
   "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "playwright": "1.56.1",
+    "typescript": "^5.6.3",
     "vite": "^8.3.8"
   }
 }

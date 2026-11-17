@@ -16,7 +16,7 @@ export interface Net {
   guardCircuit?: { processor: Hex; id: number; netlistSha256: Hex; beacon: Hex; implementation: Hex } | null;
 }
 
-export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number }
+export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number; chunks?: Hex[] }
 export interface Allowlist { [chainId: string]: { targets: string[]; spenders: string[]; eip712: string[]; transfers?: 'user' | 'allowlist' | 'any' } }
 export interface Sealed {
   manifestHash: Hex;
@@ -27,6 +27,7 @@ export interface Sealed {
   origins: string[];
   scripts: { url: string; integrity: string | null }[];
   files: SealedFile[];
+  calls?: Record<string, number> | null; // signing-call counts sealed in files.json (Diff Guard); null = sealed before they existed
 }
 
 /// What Guard knows about one sealed domain.

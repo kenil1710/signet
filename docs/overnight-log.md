@@ -138,3 +138,15 @@ Last full run: 185 Foundry tests, 58 unit tests, 41 staging end-to-end tests, th
 - **The hash-only column is an ablation**, not TEE Shield itself: Guard built with `GUARD_MODE=hash-only` (page check on, signing-time allowlist off). It isolates what the signing check adds: eval/new Function code, a malicious router recipient, permit phishing, a poisoned package and rollback inside the grace window.
 - **SRI gets its best case:** an integrity attribute on every script and stylesheet in the HTML.
 - **Two fixes in my own harness before the numbers were right:** in SRI mode the server first dropped the integrity attributes on unmodified pages (SRI then looked like it blocked nothing), and the after-grace rollback never asked for a signature when the page wasn't blocked (SRI got a free "blocked"; corrected 3/12 → 2/12). The other two columns were blocked at the page there, so the fix doesn't change them.
+
+## Next phase, item 2: dashboard (2026-11-18)
+
+`packages/dashboard`: static, hash routing (`base: './'`), viem, no framework; works on staging. 6 headless scenarios on staging, where every click is a real transaction on the fork (`test/staging/dashboard.test.ts`).
+- **Project page** (`#/p/<domain>`): release, manifest, gate, container, approvers, CI proposer, recovery, guardian, timelocks, observe/enforce, active/frozen/revoked.
+- **Proposals:** status in words, approvals per approver, a live timelock countdown, Approve / Withdraw / Cancel / Publish through the connected wallet (simulated first, so a refusal names the contract's reason). Freeze, unfreeze (2 of 3), revoke.
+- **Diff Guard in the browser** (`#/p/<domain>/proposal/<id>`): the reviewer picks the build folder CI proposed. The dashboard checks it hashes to the proposal's on-chain values and every file to its sealed hash, reads the current release's lists from the chain (hash-checked), and shows the same plain-words report as `signet diff`. A different folder is refused.
+- **`#/prove`, no wallet:** both circuits re-checked on all 512 inputs through `eval`, the beacon, and the last 10 sealed projects' releases recomputed in the browser. A project whose current release's files were never uploaded shows **STALE** (its container still holds an earlier release's files), not FAIL; FAIL is kept for files that match no release.
+- **Badge** (`#/badge/<domain>`): a live card, a static link snippet (recommended; no script) and an iframe snippet. The page says plainly that a badge proves nothing on its own.
+- **Found while testing it:** the dashboard kept using the first wallet account it saw (it now asks the wallet every time), action results vanished when the page re-rendered (now a toast), and unfreeze decided from a stale approval count (now read at click time).
+- The Diff Guard code (`packages/cli/src/diff.ts`) and address/origin extraction (`extract.ts`, split out of `seal.ts`) no longer use Node APIs, so the dashboard bundles the same code as the CLI.
+- This commit also carries the shared-library half of item 4 (chunk leaves in `seal.ts` and the extension's `sealed.ts`); its contract and staging test follow in the next commit.

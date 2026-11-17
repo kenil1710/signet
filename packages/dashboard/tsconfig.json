@@ -3,10 +3,23 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vite/client",
+      "node",
+      "chrome"
+    ],
     "noEmit": true,
-    "declaration": false
+    "declaration": false,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "test"
+  ]
 }

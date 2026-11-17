@@ -1,9 +1,11 @@
 // Diff Guard: what a proposed release changes, compared with the release it would replace, in plain words.
-// Pure functions here (no chain access); `signet diff` in commands.ts feeds them with hash-checked inputs.
+// Pure functions here (no chain access, no Node APIs: the dashboard bundles this file); `signet diff` in commands.ts feeds them with hash-checked inputs.
 // The JSON form (`DiffReport`) is what the dashboard renders.
-import { extname } from 'node:path';
 import { CALL_KINDS, findCalls, isCode, snippetAt, type CallSite } from './calls.ts';
-import { extractAddresses, extractOrigins, type SealedLists, type SealedFile, type SealedScript } from './seal.ts';
+import { extractAddresses, extractOrigins } from './extract.ts';
+import type { SealedLists, SealedFile, SealedScript } from './seal.ts';
+
+const extname = (p: string) => (/\.[^./]+$/.exec(p)?.[0] ?? '');
 
 export interface Where { file: string; snippet: string }
 export interface AddressChange { chainId: string; address: string; roles: string[]; where: Where[] }

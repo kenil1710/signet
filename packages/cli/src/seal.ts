@@ -7,8 +7,10 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { encodeAbiParameters, getAddress, type Hex } from 'viem';
-import { sha256Hex, leafOf, merkleRoot, merkleProof } from './merkle.ts';
+import { sha256Hex, leafOf, leavesOf, merkleRoot, merkleProof, chunkPath, CHUNK_BYTES, CHUNK_TYPE } from './merkle.ts';
 import { findCalls, countCalls, isCode, type CallCounts } from './calls.ts';
+import { extractAddresses, extractOrigins, DOC_HOSTS, PERMIT2 } from './extract.ts';
+export { extractAddresses, extractOrigins, DOC_HOSTS } from './extract.ts';
 
 export const ALLOWLIST_PATH = 'signet/allowlist.json';
 export const ORIGINS_PATH = 'signet/origins.json';
@@ -43,7 +45,10 @@ export function isOnchainPath(p: string): boolean {
   return p.split('/').every((s) => s !== '' && s !== '.' && s !== '..');
 }
 
-export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number }
+/// chunks: for a file over MAX_ONCHAIN_BYTES, the SHA-256 of each CHUNK_BYTES piece (stored one per transaction)
+export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number; chunks?: Hex[] }
+/// Chunk count limit of SiteRegistry (CHUNKS_MAX, docs/tapeout-interfaces.md §8): 350 × 24,000 bytes.
+export const MAX_CHUNKS = 350;
 export interface ExternalScript { url: string; integrity: string | null; page: string }
 export interface SealedScript { url: string; integrity: string | null }
 /// Who a token transfer / transferFrom may send to: only the user's own address, also the sealed contracts, or
@@ -99,45 +104,7 @@ export function walk(dir: string, base = ''): string[] {
   return out;
 }
 
-// ---------------------------------------------------------------- allowlist
-
-const PERMIT2 = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
-const ADDRESS_RE = /(?<![0-9a-zA-Z])0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/g;
-
-/// Not contracts an app calls: the zero address, precompiles, the 0xEeee... native-token placeholder, burn addresses.
-function isNoiseAddress(a: string): boolean {
-  const x = a.toLowerCase();
-  return BigInt(x) <= 0xffffn || /^0x(e{40}|f{40}|0{36}dead|dead0{36})$/.test(x);
-}
-
-export function extractAddresses(text: string): string[] {
-  const out = new Set<string>();
-  for (const m of text.match(ADDRESS_RE) ?? []) if (!isNoiseAddress(m)) out.add(getAddress(m.toLowerCase()));
-  return [...out];
-}
-
-// ---------------------------------------------------------------- origins
-
-const URL_RE = /\b(?:https?|wss?):\/\/[a-zA-Z0-9.-]+(?::\d{1,5})?/g;
-/// Documentation links that bundlers leave in error strings and license headers. Never fetched by the app.
-export const DOC_HOSTS = new Set([
-  'www.w3.org', 'reactjs.org', 'react.dev', 'fb.me', 'vitejs.dev', 'vite.dev', 'nextjs.org', 'developer.mozilla.org',
-  'tc39.es', 'eips.ethereum.org', 'github.com', 'viem.sh', 'wagmi.sh', 'docs.ethers.org', 'links.ethers.org',
-  'example.com', 'www.example.com', 'feross.org', 'mths.be', 'npms.io', 'opensource.org', 'creativecommons.org',
-]);
-
-export function extractOrigins(text: string): string[] {
-  const out = new Set<string>();
-  for (const m of text.match(URL_RE) ?? []) {
-    try {
-      const u = new URL(m);
-      const local = u.hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname);
-      if (!local && !/\.[a-z]{2,}$/i.test(u.hostname)) continue; // "http://a" fragments in minified code
-      out.add(`${u.protocol}//${u.host}`.toLowerCase());
-    } catch { /* not a URL */ }
-  }
-  return [...out];
-}
+// allowlist and origin extraction: extract.ts (shared with the dashboard)
 
 // ---------------------------------------------------------------- HTML
 
@@ -197,7 +164,12 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
   const callSites = [];
   for (const path of paths) {
     const bytes = readFileSync(join(buildDir, path));
-    files.push({ path, contentType: contentTypeOf(path), sha256: sha256Hex(bytes), size: bytes.length });
+    const entry: SealedFile = { path, contentType: contentTypeOf(path), sha256: sha256Hex(bytes), size: bytes.length };
+    if (bytes.length > MAX_ONCHAIN_BYTES && bytes.length <= MAX_CHUNKS * CHUNK_BYTES && isOnchainPath(path)) {
+      entry.chunks = [];
+      for (let off = 0; off < bytes.length; off += CHUNK_BYTES) entry.chunks.push(sha256Hex(bytes.subarray(off, off + CHUNK_BYTES)));
+    }
+    files.push(entry);
     if (!isOnchainPath(path)) warnings.push(`${path}: sealed by hash, but this path can't be stored on-chain (printable ASCII without spaces, at most 200 bytes)`);
     const ext = extname(path).toLowerCase();
     if (!TEXT.has(ext)) continue;
@@ -263,9 +235,12 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
   const filesBytes = canonical({ version: 1, domain: cfg.domain, files, calls } satisfies FilesFile);
   const listEntry: SealedFile = { path: FILES_PATH, contentType: JSON_TYPE, sha256: sha256Hex(filesBytes), size: filesBytes.length };
   const sealed = [...files, listEntry];
-  for (const f of sealed) if (f.size > MAX_ONCHAIN_BYTES) warnings.push(`${f.path}: ${f.size} bytes, sealed by hash but too large to store on-chain (limit ${MAX_ONCHAIN_BYTES})`);
+  for (const f of sealed) {
+    if (f.chunks) warnings.push(`${f.path}: ${f.size} bytes, over ${MAX_ONCHAIN_BYTES}: stored on-chain in ${f.chunks.length} chunks, one transaction each`);
+    else if (f.size > MAX_ONCHAIN_BYTES) warnings.push(`${f.path}: ${f.size} bytes, sealed by hash but too large to store on-chain (limit ${MAX_CHUNKS} chunks of ${CHUNK_BYTES} bytes)`);
+  }
 
-  const filesRoot = merkleRoot(sealed.map((f) => leafOf(cfg.domain, f.path, f.contentType, f.sha256)));
+  const filesRoot = merkleRoot(leavesOf(cfg.domain, sealed));
   const allowlistHash = sha256Hex(allowlistBytes);
   const originsHash = sha256Hex(originsBytes);
   const manifest: Manifest = {
@@ -300,6 +275,8 @@ export interface SealedBuild {
   sealed: SealedLists;
   bytes(path: string): Buffer;
   proof(path: string): Hex[];
+  /// Merkle proof of chunk `index` of a chunked file
+  chunkProof(path: string, index: number): Hex[];
 }
 
 export function loadSealed(buildDir: string): SealedBuild {
@@ -314,7 +291,7 @@ export function loadSealed(buildDir: string): SealedBuild {
   for (const f of list.files) if (!existsSync(join(buildDir, f.path)) || sha256Hex(bytes(f.path)) !== f.sha256) throw stale(f.path);
   const onDisk = walk(buildDir).filter((p) => !RESERVED.has(p));
   if (onDisk.length !== list.files.length) throw stale('The set of files');
-  const leaves = files.map((f) => leafOf(manifest.domain, f.path, f.contentType, f.sha256));
+  const leaves = leavesOf(manifest.domain, files);
   if (list.domain !== manifest.domain || merkleRoot(leaves) !== manifest.filesRoot) throw stale(FILES_PATH);
   if (sha256Hex(bytes(ALLOWLIST_PATH)) !== manifest.allowlistHash) throw stale(ALLOWLIST_PATH);
   if (sha256Hex(bytes(ORIGINS_PATH)) !== manifest.originsHash) throw stale(ORIGINS_PATH);
@@ -331,7 +308,12 @@ export function loadSealed(buildDir: string): SealedBuild {
     proof(path) {
       const i = files.findIndex((f) => f.path === path);
       if (i < 0) throw new Error(`${path} is not a sealed file`);
-      return merkleProof(leaves, leaves[i]!);
+      return merkleProof(leaves, leafOf(manifest.domain, files[i]!.path, files[i]!.contentType, files[i]!.sha256));
+    },
+    chunkProof(path, index) {
+      const f = files.find((x) => x.path === path);
+      if (!f?.chunks?.[index]) throw new Error(`${path} has no chunk ${index}`);
+      return merkleProof(leaves, leafOf(manifest.domain, chunkPath(path, index), CHUNK_TYPE, f.chunks[index]!));
     },
   };
 }
@@ -358,7 +340,7 @@ export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsB
   const of: OriginsFile = Array.isArray(o) ? { origins: o, scripts: [] } : o; // a bare list: sealed before SRI hashes moved here
   if (!Array.isArray(of.origins) || !Array.isArray(of.scripts)) throw new Error(`${ORIGINS_PATH} is not an origins file`);
   const own: SealedFile = { path: FILES_PATH, contentType: JSON_TYPE, sha256: sha256Hex(filesBytes), size: filesBytes.length };
-  const filesRoot = merkleRoot([...list.files, own].map((f) => leafOf(domain, f.path, f.contentType, f.sha256)));
+  const filesRoot = merkleRoot(leavesOf(domain, [...list.files, own]));
   const allowlistHash = sha256Hex(allowlistBytes);
   const originsHash = sha256Hex(originsBytes);
   return {
