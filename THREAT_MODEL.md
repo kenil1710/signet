@@ -20,7 +20,7 @@ That last row is most users today. Signet does not change what they sign.
 
 ## Layers
 
-1. **Release policy (on-chain).** CI can only propose; a TapeOut circuit (#6 on mainnet) decides publication from approvals, timelocks and a risk tier the contract computes. Stops a stolen CI key or laptop from shipping alone.
+1. **Release policy (on-chain).** CI can propose and call publish but never approve; a TapeOut circuit (#6 on mainnet) decides publication from approvals, timelocks and a risk tier the contract computes. Stops a stolen CI key or laptop from shipping alone.
 2. **Diff Guard (review).** Shows approvers new addresses, spenders, origins, SRI hashes and approve/permit/transfer calls before they approve.
 3. **Page check (Guard).** The bytes the browser ran, read from its cache, against the sealed file hashes. *Detection*, after the code ran.
 4. **Signing check (Guard).** Every signature request against the sealed allowlist; the Guard decision circuit says ALLOW, WARN or BLOCK. *Prevention*, before the wallet sees the request.

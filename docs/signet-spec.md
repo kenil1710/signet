@@ -134,7 +134,7 @@ The truth is the release sealed on X Layer. The signing-time allowlist is the la
 | 4 | Targeted attack: bad code only for some wallets or only once, then removed after 2 min | The check runs in *the user's own* browser on bytes from the browser cache, so a targeted user sees the mismatch. The signing check doesn't depend on the hash. | v1 cache-read may miss `no-store` files (see Open questions) |
 | 5 | Poisoned npm package at build time (Ledger Connect Kit) | Hashes match (it's in the build), but Diff Guard flags new origins and addresses at review, and the signing allowlist blocks unknown targets | A poisoned package that only calls allowlisted contracts with bad calldata (see 6) |
 | 6 | Allowlisted router, attacker as recipient | Guard decodes common calls (ERC-20 approve/transfer, Permit/Permit2, top routers) and blocks if recipient ≠ user or spender ≠ allowlist | Unknown calldata formats → shown as "unverified call" warning, not blocked |
-| 7 | Stolen CI token / hacked dev laptop | CI can only propose. Every release needs ≥1 human approval, and changed contracts need 2 signers and 24 h. | A tier-00 release with 1 approver who doesn't read the diff |
+| 7 | Stolen CI token / hacked dev laptop | CI can propose and call publish (the circuit decides) but never approve. Every release needs ≥1 human approval, and changed contracts need 2 signers and 24 h. | A tier-00 release with 1 approver who doesn't read the diff |
 | 8 | One approver key stolen | Can't reach 2-of-3, and can't self-approve: an approver's approval doesn't count on a release they proposed themselves, so one key can't propose and publish even a tier-00 release. Others see the proposal in Diff Guard and cancel it, freeze, or revoke. | One approver key **plus** the CI proposer key: CI proposes a tier-00 (code-only) release and the stolen approver approves it; it publishes after the 1 h timelock unless someone cancels or freezes. Changed contracts or origins still need a second approver. |
 | 9 | M approver keys stolen | Timelock gives watchers 24 h. Watchtower posts every pending tier-10/11 change publicly. | Full compromise of the team = out of scope |
 | 10 | Rogue insider approver | Same as 8/9, and Diff Guard makes the change visible to the others | 2 colluding insiders |
@@ -219,7 +219,7 @@ After setup, everything runs on its own. People act only when a new release need
 2. The CLI commits to the domain (a hash), then two blocks later asks SignetFactory to deploy the project's ReleaseGate and claim the domain in one transaction, linked to the shared policy circuit. Free: the project gets `projects/<domain>/` in Signet's container, written by SignetRegistry. Pro/Enterprise: the CLI can instead mint and open the team's own container (one-time 0.08 OKB opening fee), held by its ReleaseGate
 3. Domain proof: add a DNS TXT record, and the CLI binds the domain in the Registry
 4. `signet verify` checks for static build, CDN rewrites and third-party scripts (cross-origin scripts must carry SRI), warns about `no-store` on scripts and HTML, then prints fixes
-5. Paste the GitHub Action (5 lines) and add a `SIGNET_PROPOSER_KEY` secret (a key that can only propose)
+5. Paste the GitHub Action (5 lines) and add a `SIGNET_PROPOSER_KEY` secret (a key that can propose and publish, never approve)
 6. First release: confirm the extracted allowlist once in the dashboard → approve → the project is live in **observe mode** for 7 days, then switches to enforce
 
 **2. Daily release**
@@ -361,7 +361,7 @@ One story, a live hijack, told in the order the judges score: problem, features,
 | --- | --- | --- |
 | 0:00–0:20 | Headlines: Bybit $1.5B, CoW Swap, Aerodrome | "The contracts were safe. The website wasn't. Users signed on a page that looked real." |
 | 0:20–0:45 | `npx signet init` + the Action in GitHub | "A team seals its app in about 10 minutes. Every build is sealed on X Layer." |
-| 0:45–1:10 | Dashboard: Diff Guard flags "new contract address" → tier 10, needs 2 of 3 + 24 h | "A hacked laptop can only propose. A TapeOut circuit decides, and its rule can't be changed after tape-out." Show the truth-table proof. |
+| 0:45–1:10 | Dashboard: Diff Guard flags "new contract address" → tier 10, needs 2 of 3 + 24 h | "A hacked laptop can't approve anything. A TapeOut circuit decides, and its rule can't be changed after tape-out." Show the truth-table proof. |
 | 1:10–1:50 | **Live attack:** DNS override + swapped JS → Guard turns red → user clicks Swap → signature refused | "Signet doesn't just warn. It refuses the signature to an address the team never sealed." |
 | 1:50–2:10 | Open verified copy (tape://) → user swaps safely; Telegram + TapeSend alert arrives; Freeze pressed | "The app keeps working during the attack, and the team knows in a minute." |
 | 2:10–2:35 | Pricing table + logos of real sealed projects | "Free for users. Teams pay for watchtower, alerts and the badge. Wallets pay for the API." |
@@ -413,4 +413,4 @@ Give Claude Code this doc as the spec, and work one package at a time in the ord
 - The circuit's truth table is generated and checked in CI; any mismatch fails the build.
 - The extension never sends browsing history; there is a test that it makes no network calls for unsealed domains.
 - Default to observe mode and fail-open; enforcement only when a team turns it on.
-- Keep keys out of the repo; the proposer key in CI can only propose.
+- Keep keys out of the repo; the proposer key in CI can propose and call publish, never approve, unfreeze, revoke or make admin changes.

@@ -164,3 +164,7 @@ Token selector (USDT, USDC, WOKB), amount in / estimated amount out, balances, r
 - **README**: the first lines say what Signet is, the benchmark number (2 / 7 / 12 of 12, 0 false blocks), `pnpm verify:claims`, placeholders for the live dashboard URL and the mainnet addresses (only circuit #6 is real), and the honest limit.
 - **`llms.txt`**: a summary with the status and links, in the llmstxt.org shape.
 - **`claims.json`**: written by `pnpm verify:claims --write-json`, so it is the result of a real run (block, RPCs, PASS/PENDING per claim), not a hand-written file. Two new claims: R9 (benchmark), R10 (300 KB chunked upload). Last run: 7 mainnet claims PASS, 10 repo claims PASS, 2 PENDING (contracts and Guard circuit not on mainnet).
+
+## Next phase, item 6: strict AI review (2026-11-18)
+
+`docs/ai-review-1.md`. Scores: User Value & Commercial Potential **3**, Innovation **5**, Ecosystem Integration **3**, Product Readiness & UX **2**, Demo Video **1** (none yet). The biggest finding: **the repository has no git remote**, and the submission needs a public GitHub link. Top 5: publish the repo, run the mainnet plan, put the dashboard (`/prove`) and the gateway online, test with MetaMask/OKX + Web Store + one real sealed project (and the attack suite in CI), record the video. While reading as a reviewer I also fixed leftover "CI can only propose" wording (now: propose and publish, never approve) in JUDGES.md, THREAT_MODEL.md, llms.txt and the spec, and a stale test count.

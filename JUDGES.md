@@ -2,7 +2,7 @@
 
 **What it is.** A dApp team seals each release of its website on X Layer: the hash of every file, the contracts and
 spenders the site may ask a wallet to sign for, and the outside origins it may talk to. A TapeOut circuit decides
-when a release may go live (CI can only propose; humans approve; risky changes wait). Users who run the **Guard**
+when a release may go live (CI can propose and publish but never approve; humans approve; risky changes wait). Users who run the **Guard**
 extension get their pages checked against the sealed release, and every signature request checked against the
 sealed allowlist by a second TapeOut circuit. **Users without Guard are not protected at signing**; for them the
 watchtower alerts the team.
@@ -18,7 +18,7 @@ pnpm verify:claims
 
 It checks, on two independent RPC operators that must agree, that the release-policy circuit #6 is on processor
 #101, is the reviewed netlist, and gives the published truth table on all 512 inputs. It also checks who taped it
-out, that its behavior can't be upgraded, and that Signet's container stores what we say. Claims about things not
+out, that it can't be upgraded through its beacon, and that Signet's container stores what we say. Claims about things not
 on mainnet yet print **PENDING**. Every claim and its evidence: [`CLAIMS.md`](CLAIMS.md).
 
 Two rows by hand, from [`docs/policy-truth-table.md`](docs/policy-truth-table.md). Row 0x00b (approvers 1 and 2,
@@ -34,7 +34,7 @@ cast call 0x73153e5fd2Acac604D49d6ca9fea27b750718F22 "eval(uint256,bytes)(bytes)
 [`docs/attack-report.md`](docs/attack-report.md): **all 12 attacks against Guard users blocked, 0 false blocks
 on 16 clean sessions**, run on a fork of X Layer with Guard in enforce mode. Shown separately, as a limit: the same
 hijack against a user **without** Guard is not stopped (the drainer reaches the wallet; the watchtower alerts the
-team). Screenshots in [`docs/demo/`](docs/demo/):
+team). Against the same attacks, SRI alone blocks 2 and a hash-only checker 7 ([`docs/benchmark.md`](docs/benchmark.md)). Screenshots in [`docs/demo/`](docs/demo/):
 
 | | |
 |---|---|
@@ -58,7 +58,7 @@ Needs Foundry and an X Layer RPC URL in `.env` (`XLAYER_RPC_URL`, read-only):
 ```bash
 pnpm staging:up          # an anvil fork of X Layer with Signet deployed and the Guard circuit taped out
 pnpm attacks             # the attack suite; rewrites docs/attack-report.md
-pnpm test                # 185 Foundry tests, 512-row circuit tests, unit tests
+pnpm test                # 189 Foundry tests, 512-row circuit tests, unit tests
 ```
 
 | Where | What |
