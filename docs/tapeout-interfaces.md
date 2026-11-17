@@ -296,3 +296,12 @@ Error seen: `0x30cd7471` = `NotOwner()` (TAP-10 error list) when the caller can'
 - `createCPU` arguments and fee unit (only needed if Signet wants its own processor).
 - `eval` gas per gate on X Layer for the real ~1,024-row policy circuit (TAP-02 measured ~2,317 gas/gate on BSC).
 - Sources not available: `trytotapeout/awesome-tapeout` returns 404 (2026-11-16); "Forgeout" not found by search; [tapeout.pro](https://tapeout.pro) is a read-only BSC verifier with no X Layer addresses.
+
+## 11. TapeKit's service-worker gateway (read 2026-11-17)
+
+Source: [TapeKit `sw-gateway/`](https://github.com/TapeOutProtocol/TapeKit/tree/main/sw-gateway) (README, `sw.js`, `serve.js`, `boot.js`, `wrangler.toml`), and the live gateway.
+
+- **What it is.** One subdomain per on-chain name: `https://<circuitId>-<area>-<cpu>.tapekit.org/` (X Layer is area 2; BNB names omit the area). The server returns the same boot page for every host and path, plus `/sw.js` and `/.tape/*`. The boot page installs a service worker and reloads; from then on the worker reads every file from the chain in the visitor's browser (several public RPCs must agree) and checks it against the SHA-256 stored in SiteRegistry. Each site is a real origin, so storage works and wallet extensions inject. A `-open` subdomain is a server-side fallback for browsers without service workers.
+- **Measured.** `https://tapekit.org/` and `https://5-2-101.tapekit.org/` answer 200. Opened in headless Chromium, `5-2-101.tapekit.org` shows: *"This on-chain name is not activated. No valid payment was found for 5.2.101.tape … the gateway does not display it. To activate: the circuit holder calls `DomainBinding.bind("5.2.101.tape", container, months)` on X Layer"*. So Signet's container is **not displayed** by the official gateway today (same rule as §8, "Display vs read").
+- **Why Signet can't simply use it for sealed projects.** (1) It serves a container from its root; free-tier projects live under `projects/<domain>/` in one shared container, so their absolute asset paths break and every project would share one origin (storage and wallet permissions). (2) It checks a file against the hash stored beside it in SiteRegistry, not against the release the project's gate published. (3) It needs a paid DomainBinding per name. A Pro project with its own container, files at the root and a paid binding could be opened there as it is; that is not tested.
+- **Not read:** `DomainBinding.bind`'s fee and ABI (only named on the gateway's page).

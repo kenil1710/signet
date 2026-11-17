@@ -1,0 +1,21 @@
+# .github/workflows/release.yml
+# The Signet part is the last step (5 lines). Your deploy command runs only after the release is published
+# on-chain: approved by your approvers and allowed by the policy circuit.
+name: Release
+on:
+  push:
+    branches: [main]
+concurrency: signet-release # one release at a time: a proposal goes stale when another release publishes first
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npm run build
+
+      - uses: kenil1710/signet/packages/action@main
+        with:
+          build-dir: dist
+          proposer-key: ${{ secrets.SIGNET_PROPOSER_KEY }}
+          deploy: npx wrangler pages deploy dist # your own deploy command

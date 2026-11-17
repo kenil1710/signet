@@ -9,11 +9,12 @@ import {
   read, send, errorName, chainTime, fmtTime, fmtSpan, showPath, type Ctx, type ProjectConfig, type Signer,
 } from './chain.ts';
 import { sha256Hex } from './merkle.ts';
-import { loadSealed, isValidDomain, isOnchainPath, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH, MAX_ONCHAIN_BYTES, type SealedBuild } from './seal.ts';
+import { loadSealed, parseSealed, isValidDomain, isOnchainPath, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH, MAX_ONCHAIN_BYTES, type SealedBuild, type SealedLists } from './seal.ts';
+import { diffSealed, formatDiff, type DiffReport } from './diff.ts';
 
 type Log = (line?: string) => void;
 const KEYS = ['SIGNET_PRIVATE_KEY'];
-const TIERS = ['00 code only', '01 new external origin', '10 allowlist changed', '11 admin change'];
+const TIERS = ['00 code only', '01 new external origin', '10 allowlist changed', '11 admin change']; // 01 also covers a changed SRI hash
 const NEED = [1, 2, 2, 3];
 const popcount = (m: number) => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1);
 
@@ -191,11 +192,45 @@ function checkBuild(build: SealedBuild, cfg: ProjectConfig): void {
 
 // ---------------------------------------------------------------- propose / approve / cancel
 
-export async function propose(ctx: Ctx, buildDir: string, o: { emergency?: boolean }, log: Log): Promise<bigint> {
+export interface ProposeResult { id: bigint | null; reused: boolean; current: boolean; tier: number | null; manifestHash: Hex }
+
+const sameHashes = (a: { filesRoot: Hex; allowlistHash: Hex; originsHash: Hex }, b: { filesRoot: Hex; allowlistHash: Hex; originsHash: Hex }) =>
+  a.filesRoot === b.filesRoot && a.allowlistHash === b.allowlistHash && a.originsHash === b.originsHash;
+
+/// The newest open release proposal for exactly these three hashes, if any (looks at the last 25 proposals).
+async function findOpenProposal(ctx: Ctx, gate: Address, m: { filesRoot: Hex; allowlistHash: Hex; originsHash: Hex }): Promise<{ id: bigint; p: Proposal } | null> {
+  const [s, now] = [await gateState(ctx, gate), await chainTime(ctx)];
+  for (let id = s.proposalCount; id >= 1n && id > s.proposalCount - 25n; id--) {
+    const p = await getProposal(ctx, gate, id);
+    if (p.kind === 1 && sameHashes(p, m) && describeProposal(p, s, now).open) return { id, p };
+  }
+  return null;
+}
+
+async function isCurrentRelease(ctx: Ctx, gate: Address, m: { filesRoot: Hex; allowlistHash: Hex; originsHash: Hex }): Promise<boolean> {
+  const [filesRoot, allowlistHash, originsHash, ok] = await read<[Hex, Hex, Hex, boolean]>(ctx, { address: gate, abi: gateAbi, functionName: 'activeRelease' });
+  return ok && sameHashes({ filesRoot, allowlistHash, originsHash }, m);
+}
+
+/// `reuse` (what CI uses, so a re-run job doesn't propose twice): if this exact build is already the current
+/// release, or already has an open proposal, nothing is sent.
+export async function propose(ctx: Ctx, buildDir: string, o: { emergency?: boolean; reuse?: boolean }, log: Log): Promise<ProposeResult> {
   const cfg = needProject(ctx);
   const build = loadSealed(buildDir);
   checkBuild(build, cfg);
   const m = build.manifest;
+  if (o.reuse) {
+    if (await isCurrentRelease(ctx, cfg.gate, m)) {
+      log(`This build is already the current release of ${cfg.domain} (manifest ${m.manifestHash}). Nothing to propose.`);
+      return { id: null, reused: false, current: true, tier: null, manifestHash: m.manifestHash };
+    }
+    const open = await findOpenProposal(ctx, cfg.gate, m);
+    if (open) {
+      const d = describeProposal(open.p, await gateState(ctx, cfg.gate), await chainTime(ctx));
+      log(`This build is already proposed as #${open.id} (tier ${TIERS[open.p.tier]}): ${d.text}`);
+      return { id: open.id, reused: true, current: false, tier: open.p.tier, manifestHash: m.manifestHash };
+    }
+  }
   const signer = await signerFor(ctx, ['SIGNET_PROPOSER_KEY', ...KEYS], statePath(ctx.dir, 'proposer.key'));
   const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'proposeRelease', args: [m.filesRoot, m.allowlistHash, m.originsHash, !!o.emergency] });
   const ev = parseEventLogs({ abi: gateAbi, logs: receipt.logs, eventName: 'Proposed' })[0]!;
@@ -205,8 +240,153 @@ export async function propose(ctx: Ctx, buildDir: string, o: { emergency?: boole
   log(`  risk tier  ${TIERS[ev.args.tier]} (computed on-chain from the allowlist and origins hashes)`);
   log(`  needs      ${ruleOf(ev.args.tier, s, ev.args.emergency)}`);
   log(`  tx         ${receipt.transactionHash} (gas ${receipt.gasUsed})`);
-  log(`Next: an approver runs  signet approve ${ev.args.id}`);
-  return ev.args.id;
+  log(`Next: an approver runs  signet diff ${ev.args.id} ${buildDir}  and then  signet approve ${ev.args.id}`);
+  return { id: ev.args.id, reused: false, current: false, tier: ev.args.tier, manifestHash: m.manifestHash };
+}
+
+// ---------------------------------------------------------------- wait (CI)
+
+export const WAIT_TIMEOUT = 3; // exit code: not published in time (the proposal may still be open)
+
+/// Polls until this exact build is the gate's current release. Throws when the proposal can't publish any more
+/// (cancelled, expired, stale) or on timeout. Without `publish` it sends nothing and needs no key.
+/// With `publish` (what the GitHub Action uses) it also sends the `publish` call as soon as the approvals and
+/// the timelock are there. Anyone may send that call and the policy circuit decides: it gives the key no say
+/// over what gets published, and a call sent too early is simply refused.
+export async function wait(ctx: Ctx, buildDir: string, o: { timeout: number; interval: number; publish?: boolean }, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const build = loadSealed(buildDir);
+  checkBuild(build, cfg);
+  const m = build.manifest;
+  const started = Date.now();
+  let last = '';
+  const say = (line: string) => {
+    if (line !== last) log(line);
+    last = line;
+  };
+  for (;;) {
+    if (await isCurrentRelease(ctx, cfg.gate, m)) {
+      log(`Published: this build is the current release of ${cfg.domain} (manifest ${m.manifestHash}).`);
+      return;
+    }
+    const s = await gateState(ctx, cfg.gate);
+    let mine: { id: bigint; p: Proposal } | null = null;
+    for (let id = s.proposalCount; id >= 1n && id > s.proposalCount - 25n && !mine; id--) {
+      const p = await getProposal(ctx, cfg.gate, id);
+      if (p.kind === 1 && sameHashes(p, m)) mine = { id, p };
+    }
+    if (!mine) throw new SignetError('NotProposed', `this build has not been proposed. Run: signet propose ${buildDir}`);
+    const d = describeProposal(mine.p, s, await chainTime(ctx));
+    if (mine.p.executed) throw new SignetError('NotCurrent', `#${mine.id} was published, but it is not the gate's valid current release (revoked, or replaced by a newer release). Not deploying.`);
+    if (!d.open) throw new SignetError('Closed', `#${mine.id} can't be published any more: ${d.text}. Not deploying.`);
+    say(`waiting for #${mine.id} (tier ${TIERS[mine.p.tier]}): ${d.text}`);
+    if (o.publish && d.publishable) {
+      const signer = await signerFor(ctx, ['SIGNET_PROPOSER_KEY', ...KEYS], statePath(ctx.dir, 'proposer.key'));
+      try {
+        const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'publish', args: [mine.id] }, { pad: true });
+        log(`Published release #${mine.id} as ${signer.label} (tx ${receipt.transactionHash}, gas ${receipt.gasUsed})`);
+        fallbackNote(receipt, log);
+        continue; // the next look at the chain confirms it
+      } catch (e) {
+        // refused (someone withdrew an approval, froze, or published first): keep watching; anything else is a real error
+        if (!(e instanceof SignetError) || !['PolicyDenied', 'NotLive', 'StaleBase', 'Expired'].includes(e.code)) throw e;
+        say(`publish was refused just now (${e.code}); still watching #${mine.id}`);
+      }
+    }
+    if (Date.now() - started > o.timeout * 1000) {
+      const e = new SignetError('timeout', `#${mine.id} was not published within ${fmtSpan(o.timeout)}. It is still open: ${d.text}\n  Not deploying. Run this again (re-run the CI job) once it is published; the same proposal is picked up.`);
+      (e as SignetError & { exitCode?: number }).exitCode = WAIT_TIMEOUT;
+      throw e;
+    }
+    await new Promise((r) => setTimeout(r, o.interval * 1000));
+  }
+}
+
+// ---------------------------------------------------------------- diff (Diff Guard)
+
+async function siteBytes(ctx: Ctx, container: Address, path: string): Promise<Buffer | null> {
+  try {
+    const hex = await ctx.pub.readContract({ address: ctx.net.tapeout.siteRegistry as Address, abi: siteReadAbi, functionName: 'read', args: [container, path] });
+    return hex === '0x' ? null : Buffer.from(hex.slice(2), 'hex');
+  } catch {
+    return null; // NoSuchFile
+  }
+}
+
+export interface DiffResult extends DiffReport {
+  gate: Address;
+  proposalId: string;
+  onchain: { tier: number; tierName: string; matchesExpected: boolean; emergency: boolean; rule: string; status: string; open: boolean; publishable: boolean; proposedAt: number; expiresAt: number };
+  checked: string[];
+}
+
+/// Compares proposal #id with the release its tier was computed against. Nothing here is taken on trust:
+/// the build must hash to the proposal's on-chain values, and the base release's lists (read from the chain, or
+/// from --base <sealed dir>) must hash to that release's on-chain values.
+export async function diff(ctx: Ctx, id: bigint, buildDir: string, o: { base?: string; json?: boolean }, log: Log): Promise<DiffResult> {
+  const cfg = needProject(ctx);
+  const { registry } = needDeployed(ctx);
+  const p = await getProposal(ctx, cfg.gate, id);
+  if (p.kind !== 1) throw new SignetError('admin', `#${id} is an admin change (tier 11), not a release: there are no files to compare`);
+  const build = loadSealed(buildDir);
+  checkBuild(build, cfg);
+  if (!sameHashes(p, build.manifest)) {
+    throw new SignetError('build', `${buildDir} is not the build that was proposed as #${id}.\n  proposal  filesRoot ${p.filesRoot}\n  this dir  filesRoot ${build.manifest.filesRoot}\n  Review the exact bytes CI proposed (its build artifact), or rebuild the same commit.`);
+  }
+  const checked = [`${buildDir} hashes to proposal #${id}'s filesRoot, allowlistHash and originsHash on-chain`];
+
+  let base: (SealedLists & { release: string }) | null = null;
+  if (p.baseline !== 0n) {
+    const [manifestHash, filesRoot, allowlistHash, originsHash] = await read<[Hex, Hex, Hex, Hex, number, bigint]>(ctx, { address: cfg.gate, abi: gateAbi, functionName: 'releases', args: [p.baseline] });
+    let lists: SealedLists;
+    let source: string;
+    if (o.base) {
+      lists = loadSealed(o.base).sealed;
+      source = o.base;
+    } else {
+      const [, container, prefix] = await read<[Address, Address, string]>(ctx, { address: registry, abi: registryAbi, functionName: 'bindingOf', args: [cfg.domain] });
+      const got = await Promise.all([ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH].map((f) => siteBytes(ctx, container, prefix + f)));
+      if (got.some((b) => b === null)) throw new SignetError('base', `release #${p.baseline}'s sealed lists are not on-chain (was "signet upload" run for it?). Pass --base <its sealed build dir>.`);
+      lists = parseSealed(cfg.domain, got[0]!, got[1]!, got[2]!);
+      source = 'read from the chain';
+    }
+    if (lists.manifestHash !== manifestHash || !sameHashes(lists, { filesRoot, allowlistHash, originsHash })) {
+      throw new SignetError('base', `the sealed lists ${o.base ? `in ${o.base}` : 'stored on-chain'} do not hash to release #${p.baseline} (the files of a different release?). ${o.base ? '' : 'Pass --base <the sealed build dir of that release>.'}`);
+    }
+    checked.push(`release #${p.baseline}'s allowlist, origins and file list (${source}) hash to its on-chain values`);
+    base = { ...lists, release: String(p.baseline) };
+  }
+
+  const report = diffSealed(cfg.domain, base, build.sealed, (path) => build.bytes(path).toString('utf8'));
+  const [s, now] = [await gateState(ctx, cfg.gate), await chainTime(ctx)];
+  const d = describeProposal(p, s, now);
+  const result: DiffResult = {
+    ...report,
+    gate: cfg.gate,
+    proposalId: String(id),
+    onchain: {
+      tier: p.tier, tierName: TIERS[p.tier]!, matchesExpected: p.tier === report.tier.expected, emergency: p.emergency, rule: ruleOf(p.tier, s, p.emergency),
+      status: d.text, open: d.open, publishable: d.publishable, proposedAt: p.proposedAt, expiresAt: p.proposedAt + 7 * 86400,
+    },
+    checked,
+  };
+  if (!result.onchain.matchesExpected) result.flags.unshift(`The chain says tier ${TIERS[p.tier]}, but these files give tier ${report.tier.name}. Do not approve; report this.`);
+  if (o.json) log(JSON.stringify(result, null, 2));
+  else {
+    const head = [
+      `Diff Guard: proposal #${id} for ${cfg.domain}, compared with ${base ? `release #${base.release}` : 'nothing (first release)'}`,
+      ...checked.map((c) => `  checked: ${c}`),
+    ];
+    const tail = [
+      `  The tier was computed on-chain${result.onchain.matchesExpected ? ' and matches these files' : `: ${TIERS[p.tier]}. IT DOES NOT MATCH THESE FILES`}.`,
+      `  To publish: ${result.onchain.rule}`,
+      `  Now: ${d.text}`,
+    ];
+    if (result.flags.length) head.push('', 'LOOK AT THESE FIRST', ...result.flags.map((f) => `  ! ${f}`));
+    else head.push('', 'Nothing new that a wallet could be asked to sign, and no new place the site talks to.');
+    log(formatDiff(report, head, tail));
+  }
+  return result;
 }
 
 export async function approve(ctx: Ctx, id: bigint, log: Log): Promise<void> {
@@ -280,7 +460,8 @@ export async function upload(ctx: Ctx, buildDir: string, o: { full?: boolean }, 
   const [, container, prefix] = await read<[Address, Address, string]>(ctx, { address: registry, abi: registryAbi, functionName: 'bindingOf', args: [cfg.domain] });
   if (container === zeroAddress) throw new SignetError('NotBoundGate', `${cfg.domain} has no valid container binding`);
   const sites = ctx.net.tapeout.siteRegistry as Address;
-  const signer = await signerFor(ctx, KEYS);
+  // anyone may relay these bytes (the registry checks them against the current release), so CI's key works too
+  const signer = await signerFor(ctx, [...KEYS, 'SIGNET_PROPOSER_KEY']);
 
   const wanted: { path: string; contentType: string; proof: Hex[] }[] = [
     { path: ALLOWLIST_PATH, contentType: 'application/json', proof: [] },

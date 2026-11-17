@@ -16,6 +16,7 @@
     "staging:time": "staging/time.sh",
     "staging:fund": "staging/fund.sh",
     "staging:smoke": "staging/smoke.sh",
+    "staging:renew": "staging/renew-operator.sh",
     "staging:demo": "staging/demo-cli.sh",
     "signet": "node packages/cli/src/cli.ts"
   },

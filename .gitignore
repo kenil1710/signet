@@ -34,7 +34,7 @@ packages/extension/*.crx
 .idea/
 
 # local staging chain
+packages/watchtower/.state/
 staging/.run/
 packages/contracts/deployments/local.json
 packages/contracts/broadcast/Staging.s.sol/
-packages/extension/signet-network.json

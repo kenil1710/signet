@@ -4,7 +4,7 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, statSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,7 @@ import { createPublicClient, http, type Address, type Hex } from 'viem';
 import { loadNetwork } from '@signet/contracts/network';
 import { gateAbi, registryAbi, siteReadAbi } from '../../src/abi.ts';
 import { loadSealed } from '../../src/seal.ts';
-import { writeBuild } from '../fixtures.ts';
+import { writeBuild, CDN_SRI, DRAINER } from '../fixtures.ts';
 
 const net = loadNetwork('local');
 const pub = createPublicClient({ transport: http(net.rpcUrl) });
@@ -127,7 +127,7 @@ test('first release: tier 10, 3 of 3 on the fast lane, every file written with i
   const pubOut = ok(['publish', id, dist, '--full'], 'user2');
   assert.match(pubOut, /Published release #/);
   assert.match(pubOut, /decided by the TapeOut policy circuit/);
-  assert.match(pubOut, /skipped assets\/chunk-vendor\.js/);
+  assert.match(pubOut, /skipped assets\/chunk-vendor-51b0e7d4\.js/);
   assert.match(pubOut, /read back .*signet\/files\.json: matches/);
 
   // on-chain: the gate's release is this manifest, and SiteRegistry holds the exact bytes
@@ -188,6 +188,65 @@ test('the tier is computed on-chain: a new address is tier 10, a new origin tier
   writeFileSync(join(dist, 'assets/injected.js'), 'fetch("https://evil.example.net")');
   fails(['propose', dist], undefined, /changed since the build was sealed/);
   assert.match(ok(['status']), /No open proposals/);
+});
+
+test('a changed SRI hash is tier 01 on-chain; Diff Guard shows the old and the new hash', async () => {
+  writeBuild(dist, 'v2');
+  const OTHER = 'sha384-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+  writeFileSync(join(dist, 'index.html'), readFileSync(join(dist, 'index.html'), 'utf8').replace(CDN_SRI, OTHER));
+  assert.match(ok(['seal', dist]), /changed SRI hash counts as an origins change/);
+  const out = ok(['propose', dist]);
+  assert.match(out, /risk tier {2}01 new external origin/);
+  assert.match(out, /needs {6}2 approvals \+ 1h timelock/);
+  const d = ok(['diff', idOf(out), dist]);
+  assert.match(d, /compared with release #2/);
+  assert.match(d, /checked: release #2's allowlist, origins and file list \(read from the chain\) hash to its on-chain values/);
+  assert.match(d, /RISK TIER 01 NEW EXTERNAL ORIGIN[\s\S]*computed on-chain and matches these files/);
+  assert.match(d, new RegExp(`~ CHANGED SRI {2}\\S+\\n\\s+was ${CDN_SRI.replace(/[+/]/g, '\\$&')}\\n\\s+now ${OTHER}`));
+  ok(['cancel', idOf(out)], 'approver2');
+});
+
+test('Diff Guard on a build with a poisoned npm package: new address, new origin, new approve call, tier 10', async () => {
+  writeBuild(dist, 'poisoned');
+  ok(['seal', dist]);
+  fails(['propose', dist, '--emergency'], undefined, /FastLaneNotAllowed/); // allowlist + origins changed: no fast lane
+  const out = ok(['propose', dist]);
+  assert.match(out, /risk tier {2}10 allowlist changed/);
+  const id = idOf(out);
+  // --reuse: the same build is not proposed twice
+  const again = JSON.parse(signet(['propose', dist, '--reuse', '--json']).out.split('\n').filter((l) => l.startsWith('{')).pop()!);
+  assert.deepEqual([again.id, again.reused, again.current], [id, true, false]);
+
+  const text = ok(['diff', id, dist]);
+  assert.match(text, /LOOK AT THESE FIRST/);
+  assert.match(text, new RegExp(`! NEW contract ${DRAINER} on chain 196, found in assets/chunk-vendor-`));
+  assert.match(text, /! NEW external origin https:\/\/cdn\.connect-kit-assets\.example\.net/);
+  assert.match(text, /! NEW ERC-20 approve in the code: 1 \(was 0\)/);
+  assert.match(text, /RISK TIER 10 ALLOWLIST CHANGED/);
+  assert.match(text, /To publish: 2 approvals \+ 1d timelock/);
+  assert.match(text, /Now: 0 of 3 approvals: needs 2 more approvals\./);
+  assert.match(text, /Files: 1 changed, 0 added, 0 removed, 5 unchanged/);
+
+  const j = JSON.parse(ok(['diff', id, dist, '--json']));
+  assert.equal(j.proposalId, id);
+  assert.deepEqual([j.onchain.tier, j.tier.expected, j.onchain.matchesExpected], [2, 2, true]);
+  assert.deepEqual(j.allowlist.added.map((a: { address: string }) => a.address), [DRAINER]);
+  assert.deepEqual(j.origins.added.map((o: { origin: string }) => o.origin), ['https://cdn.connect-kit-assets.example.net']);
+  assert.deepEqual(j.calls.added.map((c: { kind: string }) => c.kind), ['approve', 'transferFrom']);
+  assert.equal(j.base.release, '2');
+  if (process.env.SIGNET_SAVE_DEMO) {
+    const demo = fileURLToPath(new URL('../../../../docs/demo/', import.meta.url));
+    mkdirSync(demo, { recursive: true });
+    writeFileSync(join(demo, "diff-guard-poisoned.txt"), `$ signet diff ${id} dist\n${text.replaceAll(dist, "dist")}`);
+    writeFileSync(join(demo, 'diff-guard-poisoned.json'), JSON.stringify(j, null, 2) + '\n');
+  }
+
+  // a different build than the one proposed is refused, and so is a base that is not the release on-chain
+  const other = writeBuild(join(proj, 'other'), 'v3');
+  ok(['seal', other]);
+  fails(['diff', id, other], undefined, /is not the build that was proposed as #/);
+  fails(['diff', id, dist, '--base', other], undefined, /do not hash to release #2/);
+  ok(['cancel', id], 'approver1');
 });
 
 test('freeze stops publishing; 2 approvers unfreeze', async () => {

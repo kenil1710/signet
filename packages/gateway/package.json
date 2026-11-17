@@ -1,0 +1,26 @@
+{
+  "name": "@signet/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Signet gateway: the verified copy of a sealed site as a normal web page (service worker reads the container and checks every file)",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@signet/contracts": "workspace:*",
+    "@signet/extension": "workspace:*"
+  },
+  "devDependencies": {
+    "@signet/cli": "workspace:*",
+    "@types/chrome": "^0.3.7",
+    "playwright": "1.56.1",
+    "viem": "^2.57.20",
+    "vite": "^8.3.8"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test test/*.test.ts",
+    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}

@@ -8,7 +8,7 @@ import {
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { loadNetwork } from './network.ts';
 import { gateAbi, factoryAbi, registryAbi } from './abi.ts';
-import type { AllowlistRules } from './seal.ts';
+import type { AllowlistRules, Transfers } from './seal.ts';
 
 export class SignetError extends Error {
   code: string;
@@ -24,6 +24,7 @@ export interface ProjectConfig {
   domain: string;
   gate: Address;
   allowlist?: Record<string, AllowlistRules>;
+  transfers?: Transfers;
   origins?: { include?: string[]; exclude?: string[] };
 }
 
@@ -216,12 +217,24 @@ export async function send(ctx: Ctx, signer: Signer, call: Call, opts: { pad?: b
     const { request } = await ctx.pub.simulateContract({ ...call, abi, account: signer.wallet.account ?? signer.address } as never);
     const gas = await ctx.pub.estimateContractGas({ ...call, abi, account: signer.address } as never);
     const hash = await signer.wallet.writeContract({ ...(request as object), gas: opts.pad ? (gas * 3n) / 2n + 400_000n : (gas * 6n) / 5n } as never);
-    const receipt = await ctx.pub.waitForTransactionReceipt({ hash });
+    const receipt = await receiptOf(ctx, hash);
     if (receipt.status !== 'success') throw new SignetError('reverted', `${call.functionName} reverted on-chain (tx ${hash})`);
     return receipt;
   } catch (e) {
     if (e instanceof SignetError) throw e;
     wrap(e, call.functionName);
+  }
+}
+
+/// Polls for the receipt itself. viem's waitForTransactionReceipt re-checks only when the block number changes;
+/// on a chain that mines one block per transaction (the staging chain) it can miss that block and wait forever.
+export async function receiptOf(ctx: Ctx, hash: Hex, timeoutMs = 180_000): Promise<TransactionReceipt> {
+  const every = ctx.net.name === 'local' ? 100 : 1000;
+  for (const end = Date.now() + timeoutMs; ; ) {
+    const r = (await ctx.pub.request({ method: 'eth_getTransactionReceipt', params: [hash] })) as { blockNumber: Hex | null } | null;
+    if (r?.blockNumber) return ctx.pub.getTransactionReceipt({ hash });
+    if (Date.now() > end) throw new SignetError('timeout', `transaction ${hash} was sent but not mined within ${Math.round(timeoutMs / 1000)}s. Check it before sending again.`);
+    await new Promise((res) => setTimeout(res, every));
   }
 }
 

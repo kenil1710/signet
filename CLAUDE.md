@@ -48,7 +48,7 @@ docs/
 | Tier | When | Rule to publish |
 | --- | --- | --- |
 | 00 | Code only | ≥1 approval + 1 h timelock, or 3 of 3 with emergency flag |
-| 01 | New external origin | ≥2 approvals + 1 h |
+| 01 | New external origin, or a changed SRI hash of a cross-origin script | ≥2 approvals + 1 h |
 | 10 | New contract / spender | ≥2 approvals + 24 h, or 3 of 3 with emergency flag |
 | 11 | Admin change (approvers, domain binding, timelocks, circuit swap) | 3 of 3 + 24 h, no fast lane |
 
