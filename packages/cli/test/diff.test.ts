@@ -78,6 +78,18 @@ test('new address (tier 10), new origin (tier 01), removed address, a new spende
   assert.match(formatDiff(spender), /\+ NEW spender/);
 });
 
+test('a loosened token-transfer rule is an allowlist change: tier 10 and flagged', () => {
+  const r = diff(sealed('v2'), sealed('v2', undefined, { ...cfg, transfers: 'any' } as never));
+  assert.equal(r.tier.expected, 2);
+  assert.deepEqual(r.transfers, [{ chainId: '196', from: 'user', to: 'any' }]);
+  assert.deepEqual(r.allowlist.added, []);
+  assert.match(r.flags[0]!, /CHANGED token-transfer rule on chain 196: to ANY address \(was: only to the user's own address\)/);
+  const text = formatDiff(r);
+  assert.match(text, /The allowlist changed: the token-transfer rule changed \(user -> any\)/);
+  assert.match(text, /~ CHANGED token transfers \(chain 196\): now to ANY address; before only to the user's own address/);
+  assert.deepEqual(diff(sealed('v2'), sealed('v2')).transfers, []);
+});
+
 test('first release: tier 10, everything is listed as new', () => {
   const r = diff(null, sealed('v1'));
   assert.equal(r.base, null);

@@ -19,6 +19,7 @@ export interface DiffReport {
     unchanged: number;
   };
   allowlist: { added: AddressChange[]; removed: AddressChange[] };
+  transfers: { chainId: string; from: string; to: string }[]; // who token transfers may go to: "user" | "allowlist" | "any"
   origins: { added: { origin: string; where: Where[] }[]; removed: string[] };
   scripts: { added: SealedScript[]; removed: SealedScript[]; sriChanged: { url: string; from: string | null; to: string | null }[] };
   calls: {
@@ -31,6 +32,7 @@ export interface DiffReport {
 }
 
 export const TIER_NAMES = ['00 code only', '01 new external origin', '10 allowlist changed', '11 admin change'];
+export const TRANSFER_WORDS: Record<string, string> = { user: "only to the user's own address", allowlist: "to the user or a sealed contract", any: 'to ANY address' };
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /// "assets/app-3f9a1c2b.js" and "assets/app-77aa01de.js" are the same file with a new content hash.
@@ -107,6 +109,14 @@ export function diffSealed(domain: string, base: (SealedLists & { release: strin
   };
   const allowlist = { added: change(before, after, true), removed: change(after, before, false) };
 
+  // the transfer rule per chain (a release sealed before the setting existed counts as "user")
+  const transfers: DiffReport['transfers'] = [];
+  if (base) for (const [chainId, a] of Object.entries(next.allowlist)) {
+    const from = base.allowlist[chainId]?.transfers ?? 'user';
+    const to = a.transfers ?? 'user';
+    if (from !== to) transfers.push({ chainId, from, to });
+  }
+
   const baseOrigins = new Set(base?.origins ?? []);
   const origins = {
     added: next.origins.filter((o) => !baseOrigins.has(o)).map((origin) => ({ origin, where: locate(origin, (t) => extractOrigins(t).includes(origin)) })),
@@ -141,6 +151,7 @@ export function diffSealed(domain: string, base: (SealedLists & { release: strin
   const allowWords = [
     allowlist.added.length ? `${plural(allowlist.added.length, 'new address', 'new addresses')} (${allowlist.added.map((a) => a.roles.join(' + ')).join(', ')})` : '',
     allowlist.removed.length ? `${plural(allowlist.removed.length, 'address', 'addresses')} removed` : '',
+    transfers.length ? `the token-transfer rule changed (${transfers.map((t) => `${t.from} -> ${t.to}`).join(', ')})` : '',
   ].filter(Boolean).join(', ');
   const originWords = [
     origins.added.length ? plural(origins.added.length, 'new external origin') : '',
@@ -158,6 +169,7 @@ export function diffSealed(domain: string, base: (SealedLists & { release: strin
 
   const flags: string[] = [];
   for (const a of allowlist.added) flags.push(`NEW ${a.roles.join(' + ')} ${a.address} on chain ${a.chainId}${a.where[0] ? `, found in ${a.where[0].file}` : ' (from signet.config.json, not found in the code)'}`);
+  for (const t of transfers) flags.push(`CHANGED token-transfer rule on chain ${t.chainId}: ${TRANSFER_WORDS[t.to] ?? t.to} (was: ${TRANSFER_WORDS[t.from] ?? t.from})`);
   for (const o of origins.added) flags.push(`NEW external origin ${o.origin}${o.where[0] ? `, found in ${o.where[0].file}` : ''}`);
   for (const s of scripts.sriChanged) flags.push(`CHANGED SRI hash for ${s.url}: the script's bytes are different`);
   for (const s of scripts.added) flags.push(`NEW cross-origin script ${s.url}${s.integrity ? '' : ' WITHOUT an SRI hash'}`);
@@ -167,7 +179,7 @@ export function diffSealed(domain: string, base: (SealedLists & { release: strin
     version: 1, domain,
     base: base ? { release: base.release, manifestHash: base.manifestHash } : null,
     proposal: { manifestHash: next.manifestHash, filesRoot: next.filesRoot, allowlistHash: next.allowlistHash, originsHash: next.originsHash },
-    files, allowlist, origins, scripts, calls,
+    files, allowlist, transfers, origins, scripts, calls,
     tier: { expected, name: TIER_NAMES[expected]!, allowlistChanged, originsChanged, why },
     flags,
   };
@@ -183,7 +195,8 @@ export function formatDiff(r: DiffReport, head: string[] = [], tail: string[] = 
   L.push(...tail);
 
   L.push('', 'Contract addresses and spenders');
-  if (r.allowlist.added.length + r.allowlist.removed.length === 0) L.push('  no change');
+  if (r.allowlist.added.length + r.allowlist.removed.length + r.transfers.length === 0) L.push('  no change');
+  for (const t of r.transfers) L.push(`  ~ CHANGED token transfers (chain ${t.chainId}): now ${TRANSFER_WORDS[t.to] ?? t.to}; before ${TRANSFER_WORDS[t.from] ?? t.from}`);
   for (const a of r.allowlist.added) L.push(`  + NEW ${a.roles.join(' + ')}  ${a.address}  (chain ${a.chainId})`, ...(a.where.length ? at(a.where) : ['        not found in the code: added in signet.config.json']));
   for (const a of r.allowlist.removed) L.push(`  - removed ${a.roles.join(' + ')}  ${a.address}  (chain ${a.chainId})`);
 

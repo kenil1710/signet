@@ -8,7 +8,7 @@ import {
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { loadNetwork } from './network.ts';
 import { gateAbi, factoryAbi, registryAbi } from './abi.ts';
-import type { AllowlistRules } from './seal.ts';
+import type { AllowlistRules, Transfers } from './seal.ts';
 
 export class SignetError extends Error {
   code: string;
@@ -24,6 +24,7 @@ export interface ProjectConfig {
   domain: string;
   gate: Address;
   allowlist?: Record<string, AllowlistRules>;
+  transfers?: Transfers;
   origins?: { include?: string[]; exclude?: string[] };
 }
 

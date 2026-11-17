@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The action's main step: verify -> seal -> propose -> Diff Guard -> wait until published on-chain.
-# The proposer key is handed only to the two commands that send a transaction (propose, and the optional
-# manifest upload). It can only propose: approving and publishing are done by the team's approvers.
+# The proposer key is handed only to the commands that send a transaction: propose, the publish call once the
+# approvers and the timelock allow it, and the manifest upload. The key can only propose: it can never approve.
+# publish and the upload are open to anyone (the policy circuit and the registry decide), so they add no power.
 # Exit code 0 means "this exact build is the gate's current release": only then may the deploy step run.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -63,8 +64,13 @@ else
   } >> "$SUMMARY"
   endgroup
 
-  group "Waiting until release #$ID is published on-chain"
-  signet wait "$BUILD" --timeout "${INPUT_WAIT_TIMEOUT:-19800}" --interval "${INPUT_POLL_INTERVAL:-30}"
+  group "Waiting for approvals and the timelock, then publishing release #$ID"
+  if [ "${INPUT_PUBLISH:-true}" = "true" ]; then
+    # publish is open to anyone and the policy circuit decides; the key adds nothing but the gas
+    SIGNET_PROPOSER_KEY="$KEY" signet wait "$BUILD" --publish --timeout "${INPUT_WAIT_TIMEOUT:-19800}" --interval "${INPUT_POLL_INTERVAL:-30}"
+  else
+    signet wait "$BUILD" --timeout "${INPUT_WAIT_TIMEOUT:-19800}" --interval "${INPUT_POLL_INTERVAL:-30}"
+  fi
   endgroup
 fi
 

@@ -15,6 +15,7 @@ import { writeBuild } from '@signet/cli/test/fixtures.ts';
 import { anvil, net, pub, sealDemoDapp, serveSite, signet, until, type Project, type Site } from '@signet/extension/test/staging/harness.ts';
 import { allOf, consoleAlerter, telegramAlerter } from '../../src/alerts.ts';
 import { tick, type Config } from '../../src/watchtower.ts';
+import { domainCount } from '../../src/chain.ts';
 import { netFromEnv } from '../../src/cli.ts';
 
 const domain = `tower-${Date.now().toString(36)}.signet.test`;
@@ -27,7 +28,7 @@ let browser: Browser;
 let tg: http.Server;
 let config: Config;
 let tgUrl = '';
-let fromBlock = 0;
+let fromIndex = 0;
 const state = join(mkdtempSync(join(tmpdir(), 'tower-')), 'state.json');
 const round = async () => {
   const before = { lines: lines.length, telegram: telegram.length };
@@ -40,7 +41,7 @@ before(async () => {
   await anvil('anvil_nodeInfo').catch(() => {
     throw new Error(`the staging chain is not running at ${net.rpcUrl}: pnpm staging:up`);
   });
-  fromBlock = Number(await pub.getBlockNumber()) + 1; // only what happens from here on
+  fromIndex = await domainCount(netFromEnv({ SIGNET_NETWORK: 'local' })); // only domains claimed from here on
   project = await sealDemoDapp(domain);
   site = await serveSite(project.dist);
   tg = http.createServer(async (req, res) => {
@@ -55,7 +56,7 @@ before(async () => {
   browser = await chromium.launch({ headless: true, args: ['--host-resolver-rules=MAP *.signet.test 127.0.0.1'] });
   const log = (l: string) => void lines.push(l);
   config = {
-    net: { ...netFromEnv({ SIGNET_NETWORK: 'local' }), fromBlock },
+    net: netFromEnv({ SIGNET_NETWORK: 'local' }), fromIndex,
     alert: allOf(consoleAlerter(log), telegramAlerter({ token: TOKEN, chatId: '-1001', publicChatId: '-1002', apiUrl: tgUrl }, log)),
     statePath: state, urlFor: (d) => `http://${d}:${site.port}/`, confirmDelayMs: 200, log,
   };
@@ -173,7 +174,7 @@ test('the command: one round from the environment; the Telegram token never reac
   const run = (extra: NodeJS.ProcessEnv) => new Promise<{ status: number | null; stdout: string; stderr: string }>((res) => {
     const c = spawn(process.execPath, [cli, '--once'], {
       env: {
-        ...process.env, SIGNET_NETWORK: 'local', WATCHTOWER_ONLY: domain, WATCHTOWER_FROM_BLOCK: String(fromBlock), WATCHTOWER_URL_TEMPLATE: `http://{domain}:${site.port}/`,
+        ...process.env, SIGNET_NETWORK: 'local', WATCHTOWER_ONLY: domain, WATCHTOWER_FROM_INDEX: String(fromIndex), WATCHTOWER_URL_TEMPLATE: `http://{domain}:${site.port}/`,
         WATCHTOWER_HOST_RULES: 'MAP *.signet.test 127.0.0.1', WATCHTOWER_STATE: join(mkdtempSync(join(tmpdir(), 'tower-cli-')), 's.json'), TELEGRAM_API_URL: tgUrl, ...extra,
       },
     });

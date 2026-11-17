@@ -164,11 +164,11 @@ export async function rpcProxy(): Promise<Proxy> {
 
 // ---------------------------------------------------------------- the extension build and the browser
 
-export function buildExtension(rpc1: string, rpc2: string): string {
+export function buildExtension(rpc1: string, rpc2: string, gateway?: { url: string; dist: string }): string {
   const out = mkdtempSync(join(tmpdir(), 'guard-ext-'));
   const r = spawnSync(process.execPath, [join(ROOT, 'packages/extension/scripts/build.mjs')], {
     cwd: join(ROOT, 'packages/extension'), encoding: 'utf8',
-    env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL: rpc1, SIGNET_RPC_URL2: rpc2, GUARD_OUT: out },
+    env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL: rpc1, SIGNET_RPC_URL2: rpc2, GUARD_OUT: out, SIGNET_GATEWAY_URL: gateway?.url ?? '', SIGNET_GATEWAY_DIST: gateway?.dist ?? '' },
   });
   if (r.status !== 0) throw new Error(`extension build failed\n${r.stdout}${r.stderr}`);
   return out;
@@ -177,19 +177,8 @@ export function buildExtension(rpc1: string, rpc2: string): string {
 export interface WalletCall { provider: string; method: string; params: string }
 export interface Session { ctx: BrowserContext; sw: Worker; wallet: WalletCall[]; extId: string; close(): Promise<void> }
 
-/// A fresh browser profile with Guard loaded and a mock wallet on every page (window.ethereum and one
-/// EIP-6963 provider). `late`: the wallet installs itself after the page's first script, as slow wallets do.
-export async function openBrowser(ext: string, o: { origin: string; late?: boolean }): Promise<Session> {
-  const profile = mkdtempSync(join(tmpdir(), 'guard-profile-'));
-  const ctx = await chromium.launchPersistentContext(profile, {
-    channel: 'chromium', headless: true, viewport: { width: 1100, height: 760 },
-    args: [
-      `--disable-extensions-except=${ext}`, `--load-extension=${ext}`,
-      '--host-resolver-rules=MAP *.signet.test 127.0.0.1, MAP *.example.test 127.0.0.1',
-      // the staging site is plain http on a made-up host; real sites are https (crypto.subtle needs a secure context)
-      `--unsafely-treat-insecure-origin-as-secure=${o.origin}`,
-    ],
-  });
+/// A mock wallet on every page of the context: window.ethereum and one EIP-6963 provider. Every call is recorded.
+export async function installMockWallet(ctx: BrowserContext, late = false): Promise<WalletCall[]> {
   const wallet: WalletCall[] = [];
   await ctx.exposeBinding('__walletCall', (_src, provider: string, method: string, params: string) => void wallet.push({ provider, method, params }));
   await ctx.addInitScript(({ account, late }) => {
@@ -216,7 +205,24 @@ export async function openBrowser(ext: string, o: { origin: string; late?: boole
     };
     if (late) setTimeout(install, 0);
     else install();
-  }, { account: USER, late: !!o.late });
+  }, { account: USER, late });
+  return wallet;
+}
+
+/// A fresh browser profile with Guard loaded and a mock wallet on every page (window.ethereum and one
+/// EIP-6963 provider). `late`: the wallet installs itself after the page's first script, as slow wallets do.
+export async function openBrowser(ext: string, o: { origin: string; late?: boolean }): Promise<Session> {
+  const profile = mkdtempSync(join(tmpdir(), 'guard-profile-'));
+  const ctx = await chromium.launchPersistentContext(profile, {
+    channel: 'chromium', headless: true, viewport: { width: 1100, height: 760 },
+    args: [
+      `--disable-extensions-except=${ext}`, `--load-extension=${ext}`,
+      '--host-resolver-rules=MAP *.signet.test 127.0.0.1, MAP *.example.test 127.0.0.1',
+      // the staging site is plain http on a made-up host; real sites are https (crypto.subtle needs a secure context)
+      `--unsafely-treat-insecure-origin-as-secure=${o.origin}`,
+    ],
+  });
+  const wallet = await installMockWallet(ctx, !!o.late);
   const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker'));
   const extId = new URL(sw.url()).host;
   return { ctx, sw, wallet, extId, close: () => ctx.close() };
@@ -244,7 +250,7 @@ export async function tabIdOf(s: Session, page: Page): Promise<number> {
   const host = new URL(url).hostname;
   const found = await s.sw.evaluate(async (h) => {
     const all = await chrome.storage.session.get(null);
-    const key = Object.keys(all).find((k) => k.startsWith('tab:') && (all[k] as { domain?: string }).domain === h);
+    const key = Object.keys(all).find((k) => k.startsWith('tab:') && new URL((all[k] as { url: string }).url).hostname === h);
     return key ? Number(key.slice(4)) : null;
   }, host);
   if (found !== null) return found;
@@ -254,3 +260,13 @@ export const badge = (s: Session, tabId: number) => s.sw.evaluate((t) => chrome.
 export const events = (s: Session) => s.sw.evaluate(async () => ((await chrome.storage.local.get('events')).events ?? []) as { kind: string; refused: boolean; title: string; details: string[] }[]);
 export const siteState = (s: Session, domain: string) => s.sw.evaluate(async (d) => (await chrome.storage.local.get(`site:${d}`))[`site:${d}`] as { status: string; reason: string; enforced: boolean; manifests: Record<string, { allowlist: unknown }> } | undefined, domain);
 export const signed = (s: Session) => s.wallet.filter((c) => /sendTransaction|sign/i.test(c.method));
+
+/// The gateway (packages/gateway) built for these RPCs and served locally: http://<label>.localhost:<port>/
+export async function startGateway(rpc1: string, rpc2: string): Promise<{ url: string; dist: string; port: number; log: string[]; close(): void }> {
+  const dist = mkdtempSync(join(tmpdir(), 'gateway-dist-'));
+  const r = spawnSync(process.execPath, [join(ROOT, 'packages/gateway/scripts/build.mjs')], { cwd: join(ROOT, 'packages/gateway'), encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL: rpc1, SIGNET_RPC_URL2: rpc2, GATEWAY_OUT: dist } });
+  if (r.status !== 0) throw new Error(`gateway build failed\n${r.stdout}${r.stderr}`);
+  const { serveGateway } = (await import(join(ROOT, 'packages/gateway/scripts/serve.mjs'))) as { serveGateway(d: string): Promise<{ port: number; log: string[]; close(): void }> };
+  const g = await serveGateway(dist);
+  return { ...g, dist, url: `http://localhost:${g.port}` };
+}

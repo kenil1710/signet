@@ -3,7 +3,7 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,19 +67,23 @@ before(async () => {
   await rpc('anvil_setBalance', [await gateRead<Address>('proposer'), '0xde0b6b3a7640000']);
 });
 
-test('first release through the action: it proposes, waits while approvers act, uploads the manifest, then deploys', async () => {
+test('first release through the action: it proposes, waits for the approvers, publishes, uploads the manifest, then deploys', async () => {
   writeBuild(dist, 'v1');
   const n = await count();
   const running = action({ emergency: 'true' });
   const id = await nextProposal(n);
   assert.ok(!existsSync(marker), 'no deploy while the release is only proposed');
-  for (const a of ['approver1', 'approver2', 'approver3']) signet(['approve', id], a);
+  signet(['approve', id], 'approver1');
+  signet(['approve', id], 'approver2');
   await new Promise((r) => setTimeout(r, 4000));
-  assert.ok(!existsSync(marker), 'approved is not published: still no deploy');
-  signet(['publish', id], 'user2'); // anyone publishes; the action only watches the chain
+  assert.ok(!existsSync(marker), '2 of 3 on a first release: the 24 h timelock runs, nothing is published or deployed');
+  assert.equal(await gateRead<bigint>('currentRelease'), 0n);
+  signet(['approve', id], 'approver3'); // 3 of 3 with the emergency flag: the circuit now allows it
   const r = await running;
+  assert.match(r.log, new RegExp(`Published release #${id} as 0x[0-9a-fA-F]{40} \\(key from SIGNET_PROPOSER_KEY\\)`));
+  assert.match(r.log, /decided by the TapeOut policy circuit/);
   assert.equal(r.code, 0, r.log);
-  assert.deepEqual(r.ran, ['Install the Signet CLI', 'Verify, seal, propose, wait until published on-chain', 'Deploy (the release is published on-chain)']);
+  assert.deepEqual(r.ran, ['Install the Signet CLI', 'Verify, seal, propose, publish when approved', 'Deploy (the release is published on-chain)']);
   assert.match(r.log, /Result: ready to seal/);
   assert.match(r.log, new RegExp(`Proposed release #${id} for ${domain}`));
   assert.match(r.log, /waiting for #\d+ \(tier 10 allowlist changed\): \d of 3 approvals/);
@@ -111,7 +115,7 @@ test('re-running the job for the same build proposes nothing and deploys at once
   assert.ok(existsSync(marker));
 });
 
-test('code-only release: no deploy during the 1 h timelock; a timed-out job does not deploy and its re-run picks up the same proposal', async () => {
+test('code-only release: nothing is published or deployed during the 1 h timelock; the re-run picks up the same proposal and publishes when the hour is over', async () => {
   rmSync(marker);
   writeBuild(dist, 'v2');
   const n = await count();
@@ -122,7 +126,7 @@ test('code-only release: no deploy during the 1 h timelock; a timed-out job does
   assert.equal(r1.code, 3, r1.log);
   assert.match(r1.log, /timelock running/);
   assert.match(r1.log, /was not published within 3s[\s\S]*Not deploying/);
-  assert.deepEqual(r1.ran.slice(-1), ['Verify, seal, propose, wait until published on-chain']);
+  assert.deepEqual(r1.ran.slice(-1), ['Verify, seal, propose, publish when approved']);
   assert.ok(!existsSync(marker));
   assert.match(r1.summary, /RISK TIER 00 CODE ONLY/);
 
@@ -130,13 +134,42 @@ test('code-only release: no deploy during the 1 h timelock; a timed-out job does
   await new Promise((r) => setTimeout(r, 2500));
   assert.equal(await count(), n + 1, 'the re-run did not propose again');
   assert.ok(!existsSync(marker));
+  assert.equal(await gateRead<bigint>('currentRelease'), 1n, 'not published before the timelock is over');
   await rpc('evm_increaseTime', ['0xe10']);
   await rpc('anvil_mine', ['0x1']);
-  signet(['publish', id], 'user3');
   const r2 = await second;
+  assert.match(r2.log, new RegExp(`Published release #${id} as`));
+  assert.equal(await gateRead<bigint>('currentRelease'), BigInt(id));
   assert.equal(r2.code, 0, r2.log);
   assert.match(r2.log, new RegExp(`already proposed as #${id}`));
   assert.equal(r2.outputs['release-id'], id);
+  assert.ok(existsSync(marker));
+});
+
+test('publish: false leaves publishing to someone else; the key alone (no approvals) publishes nothing', async () => {
+  rmSync(marker);
+  writeBuild(dist, 'v2');
+  writeFileSync(join(dist, 'robots.txt'), 'User-agent: *\nDisallow: /private\n');
+  const n = await count();
+  // with publish on and nobody approving: the action keeps waiting, the gate's release does not move
+  const alone = await action({ 'wait-timeout': '3' });
+  assert.equal(alone.code, 3, alone.log);
+  assert.match(alone.log, /0 of 3 approvals: needs 1 more approval/);
+  assert.ok(!/Published release/.test(alone.log));
+  const id = String(n + 1);
+  const before = await gateRead<bigint>('currentRelease');
+  // with publish off: approved and past the timelock, the action still sends nothing
+  signet(['approve', id], 'approver1');
+  await rpc('evm_increaseTime', ['0xe10']);
+  await rpc('anvil_mine', ['0x1']);
+  const running = action({ publish: 'false' });
+  await new Promise((r) => setTimeout(r, 3000));
+  assert.equal(await gateRead<bigint>('currentRelease'), before);
+  assert.ok(!existsSync(marker));
+  signet(['publish', id], 'user3');
+  const r = await running;
+  assert.equal(r.code, 0, r.log);
+  assert.ok(!/Published release/.test(r.log));
   assert.ok(existsSync(marker));
 });
 

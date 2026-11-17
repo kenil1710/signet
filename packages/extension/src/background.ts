@@ -1,12 +1,13 @@
 // Guard service worker. Holds what the chain says about sealed domains, decides signing requests, sets the
 // badge. Privacy (hard rule 8): the only thing fetched without a sealed domain being involved is the public
-// list of sealed domains (the registry's Claimed events), on a timer. A visited host is compared with that
+// list of sealed domains (the registry's own domain list), on a timer. A visited host is compared with that
 // list locally; for a host that is not on it, nothing is sent anywhere.
-import { decodeEventLog, decodeFunctionResult, encodeFunctionData, encodeEventTopics, hexToBytes, sha256, zeroAddress } from 'viem';
+import { decodeFunctionResult, encodeFunctionData, hexToBytes, sha256, zeroAddress } from 'viem';
 import { gateAbi, registryAbi, siteAbi } from './lib/abi.ts';
-import { agree, either, rpc, RpcError, type Call } from './lib/rpc.ts';
+import { agree, either, RpcError, type Call } from './lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sealed.ts';
 import { decide } from './lib/policy.ts';
+import { domainOfGatewayHost, encodeLabel } from './lib/label.ts';
 import type { Decision, GuardEvent, Hex, Net, PageInfo, PageReport, Sealed, SignRequest, SiteState } from './lib/types.ts';
 
 declare const __NET__: Net;
@@ -14,43 +15,31 @@ const NET = __NET__;
 const FRESH_MS = 60_000; // re-read the chain for a sealed domain at most once a minute
 const STALE_MS = 24 * 3600_000; // RPCs down: the cached release is used for up to 24 h (spec, "X Layer RPC down")
 const SYNC_MINUTES = 5;
-const LOG_CHUNK = 5000;
 const local = chrome.storage.local;
 const session = chrome.storage.session;
 const get = async <T>(area: chrome.storage.StorageArea, key: string): Promise<T | undefined> => (await area.get(key))[key] as T | undefined;
 
 // ---------------------------------------------------------------- the list of sealed domains
 
-interface DomainList { list: string[]; next: number; syncedAt: number }
+interface DomainList { list: string[]; syncedAt: number }
 let syncing: Promise<void> | null = null;
+const PAGE = 100;
 
+/// The registry keeps every claimed domain in an append-only list (domainCount / domainsRange). Only the new
+/// tail is read, and like every chain fact both RPCs must give the same answer; otherwise the list stays as it is.
 async function syncDomains(): Promise<void> {
   if (!NET.registry) return;
-  const state = (await get<DomainList>(local, 'domains')) ?? { list: [], next: NET.fromBlock, syncedAt: 0 };
-  const urls = [NET.rpcUrl, NET.rpcUrl2].filter((u): u is string => !!u);
-  const heads = (await Promise.allSettled(urls.map((u) => rpc<string>(u, 'eth_blockNumber', [])))).flatMap((r) => (r.status === 'fulfilled' ? [parseInt(r.value, 16)] : []));
-  if (heads.length === 0) return;
-  const head = Math.min(...heads);
-  const topics = [[encodeEventTopics({ abi: registryAbi, eventName: 'Claimed' })[0], encodeEventTopics({ abi: registryAbi, eventName: 'Transferred' })[0]]];
-  const found = new Set(state.list);
-  for (let n = 0; n < 20 && state.next <= head; n++) {
-    const to = Math.min(head, state.next + LOG_CHUNK - 1);
-    const filter = { address: NET.registry, topics, fromBlock: `0x${state.next.toString(16)}`, toBlock: `0x${to.toString(16)}` };
-    // The union of both RPCs: a domain either one reports is a candidate, and its binding is then read from both.
-    const got = await Promise.allSettled(urls.map((u) => rpc<{ topics: Hex[]; data: Hex }[]>(u, 'eth_getLogs', [filter])));
-    if (got.every((g) => g.status === 'rejected')) break;
-    for (const g of got) {
-      if (g.status !== 'fulfilled') continue;
-      for (const log of g.value) {
-        try {
-          const ev = decodeEventLog({ abi: registryAbi, topics: log.topics as [Hex, ...Hex[]], data: log.data });
-          found.add(ev.args.domain);
-        } catch { /* not one of ours */ }
-      }
-    }
-    state.next = to + 1;
+  const state = (await get<DomainList>(local, 'domains')) ?? { list: [], syncedAt: 0 };
+  const [c] = await agree(NET, [call(NET.registry, registryAbi, 'domainCount')]);
+  const count = Number(out<bigint>(registryAbi, 'domainCount', c!));
+  const list = [...state.list];
+  while (list.length < count) {
+    const [page] = await agree(NET, [call(NET.registry, registryAbi, 'domainsRange', [BigInt(list.length), BigInt(PAGE)])]);
+    const more = out<string[]>(registryAbi, 'domainsRange', page!);
+    if (more.length === 0) break;
+    list.push(...more);
   }
-  await local.set({ domains: { list: [...found].sort(), next: state.next, syncedAt: Date.now() } satisfies DomainList });
+  await local.set({ domains: { list, syncedAt: Date.now() } satisfies DomainList });
 }
 const sync = () => (syncing ??= syncDomains().catch(() => {}).finally(() => (syncing = null)));
 
@@ -200,26 +189,30 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case 'site': {
       if (tabId === undefined) return null;
       const domains = (await get<DomainList>(local, 'domains'))?.list ?? [];
-      if (!domains.includes(msg.host)) {
+      // the gateway shows a sealed domain's verified copy on <label>.<gateway>: Guard treats it as that domain
+      const viaGateway = NET.gateway ? domainOfGatewayHost(new URL(msg.url).host, new URL(NET.gateway.url).host) : null;
+      const host = viaGateway ?? msg.host;
+      if (!domains.includes(host)) {
         // not a sealed domain: no lookup, no request, nothing kept
         await session.remove(`tab:${tabId}`);
         void paint(tabId, null, null);
         return null;
       }
-      const site = await getSite(msg.host);
+      const site = await getSite(host);
       if (site.status === 'unbound') {
         void paint(tabId, null, null);
         return null;
       }
-      await session.set({ [`tab:${tabId}`]: { domain: msg.host, url: msg.url, report: null } satisfies TabState });
+      await session.set({ [`tab:${tabId}`]: { domain: host, url: msg.url, report: null } satisfies TabState });
       void paint(tabId, site, null);
       const hashes: Record<string, string[]> = {};
       for (const h of site.valid) for (const f of site.manifests[h]!.files) (hashes[f.path] ??= []).push(f.sha256.slice(2));
       const cur = site.current ? site.manifests[site.current] : undefined;
       const info: PageInfo = {
-        domain: msg.host, site: site.status, reason: site.reason, enforce: site.enforced,
-        bypass: !!(await get<boolean>(session, `bypass:${tabId}:${msg.host}`)),
+        domain: host, site: site.status, reason: site.reason, enforce: site.enforced,
+        bypass: !!(await get<boolean>(session, `bypass:${tabId}:${host}`)),
         hashes, origins: cur?.origins ?? [], scripts: site.valid.flatMap((h) => site.manifests[h]!.scripts),
+        gateway: viaGateway ? NET.gateway!.pins : null,
       };
       return info;
     }
@@ -287,7 +280,11 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     }
     case 'open-copy': {
       // opened by the worker: a page can't open an extension page itself (nothing here is web-accessible)
-      await chrome.tabs.create({ url: `${chrome.runtime.getURL('copy.html')}#${new URLSearchParams({ domain: msg.domain })}` });
+      // with a gateway: the copy is a normal page on its own origin, where the wallet works. Without one (or for a
+      // domain too long for a DNS label): the preview inside the extension.
+      const label = NET.gateway ? encodeLabel(msg.domain) : null;
+      const g = NET.gateway ? new URL(NET.gateway.url) : null;
+      await chrome.tabs.create({ url: label && g ? `${g.protocol}//${label}.${g.host}/` : `${chrome.runtime.getURL('copy.html')}#${new URLSearchParams({ domain: msg.domain })}` });
       return true;
     }
     case 'copy': {

@@ -46,17 +46,29 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
 
   async function checkSameOrigin(u: URL, scripty: boolean, isDocument: boolean): Promise<FileResult | null> {
     const path = pathOfUrl(u.pathname);
+    const gw = info!.gateway;
+    let valid: string[] | undefined;
+    if (gw && (path === 'sw.js' || path === '.signet/boot.js')) valid = gw[path] ? [gw[path]!] : undefined; // the gateway's own files, pinned
+    else if (gw && isDocument && path.startsWith('.signet/')) return { url: u.href, status: 'not-cached', note: "a page made by the gateway's worker" };
     // a route of a single-page app (no file extension) is the app's index.html
-    const valid = info!.hashes[path] ?? (isDocument && !/\.[a-z0-9]+$/i.test(path) ? info!.hashes['index.html'] : undefined);
+    else valid = info!.hashes[path] ?? (isDocument && !/\.[a-z0-9]+$/i.test(path) ? info!.hashes['index.html'] : undefined);
+    // on the gateway the document is the pinned boot page until its worker takes over, then the sealed file
+    if (gw && isDocument && gw['index.html']) valid = [...(valid ?? []), gw['index.html']];
     if (!valid) return scripty || isDocument ? { url: u.href, status: 'unknown', note: 'not in the sealed release' } : null;
     if (!globalThis.crypto?.subtle) return { url: u.href, status: 'no-crypto', note: 'not a secure context' };
+    // On the gateway, site files come from its service worker and never enter the HTTP cache, and a content
+    // script's fetch doesn't pass through a page's worker. What Guard can read and pin are the gateway's own
+    // files; when the worker in control is /sw.js (pinned, checked like any script) it has verified the rest.
+    const byWorker = (): FileResult | null =>
+      gw && !(path === 'sw.js' || path === '.signet/boot.js') && navigator.serviceWorker?.controller?.scriptURL === `${location.origin}/sw.js`
+        ? { url: u.href, status: 'ok-gateway', note: "served and verified by the gateway's pinned worker" } : null;
     try {
       const res = await fetch(u.href, { cache: 'only-if-cached', mode: 'same-origin', credentials: 'same-origin' });
-      if (!res.ok) return { url: u.href, status: 'not-cached', note: `cache answered ${res.status}` };
+      if (!res.ok) return byWorker() ?? { url: u.href, status: 'not-cached', note: `cache answered ${res.status}` };
       const h = hex(await crypto.subtle.digest('SHA-256', await res.arrayBuffer()));
       return { url: u.href, sha256: h, status: valid.includes(h) ? 'ok' : 'mismatch' };
     } catch {
-      return { url: u.href, status: 'not-cached', note: 'not in the browser cache (no-store?)' };
+      return byWorker() ?? { url: u.href, status: 'not-cached', note: 'not in the browser cache (no-store?)' };
     }
   }
 
@@ -105,7 +117,7 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     } catch { /* no service workers here */ }
     await Promise.all(jobs);
     const files = [...results.values()];
-    const status = files.some((f) => BAD.includes(f.status)) ? 'tampered' : files.some((f) => f.status !== 'ok' && f.status !== 'ok-sri') ? 'unverified' : 'ok';
+    const status = files.some((f) => BAD.includes(f.status)) ? 'tampered' : files.some((f) => !['ok', 'ok-sri', 'ok-gateway'].includes(f.status)) ? 'unverified' : 'ok';
     last = { url: location.href, status, files };
     const r = await ask<{ redirect: boolean }>({ type: 'report', report: last });
     redirecting = !!r?.redirect;

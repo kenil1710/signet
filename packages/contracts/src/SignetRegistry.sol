@@ -65,6 +65,11 @@ contract SignetRegistry {
     mapping(address => bool) public isGate;
     mapping(bytes32 => Binding) internal bindings; // keccak256(domain)
     mapping(bytes32 => Unbound) public lastUnbound;
+    /// Every domain ever claimed, in the order of its first claim. Append-only, each domain once: Guard and the
+    /// watchtower page through it (domainCount / domainsRange) instead of scanning event logs. Being listed says
+    /// nothing about now: a listed domain may be unbound or moved, and bindingOf is what tells.
+    string[] internal domainList;
+    mapping(bytes32 => bool) internal listed; // keccak256(domain)
 
     event Claimed(string domain, address indexed gate, address circuits, uint256 tokenId);
     event ContainerSet(string domain, address indexed gate, address circuits, uint256 tokenId);
@@ -128,6 +133,10 @@ contract SignetRegistry {
         b.circuits = circuits;
         b.tokenId = tokenId;
         _siteRule(gate, key, circuits);
+        if (!listed[key]) {
+            listed[key] = true;
+            domainList.push(domain);
+        }
         emit Claimed(domain, gate, circuits, tokenId);
     }
 
@@ -206,6 +215,20 @@ contract SignetRegistry {
             return (address(0), address(0), "");
         }
         return (b.gate, container, "");
+    }
+
+    /// How many domains were ever claimed.
+    function domainCount() external view returns (uint256) {
+        return domainList.length;
+    }
+
+    /// Up to `count` listed domains starting at index `start` (fewer at the end of the list, none past it).
+    function domainsRange(uint256 start, uint256 count) external view returns (string[] memory page) {
+        uint256 n = domainList.length;
+        if (start >= n) return new string[](0);
+        if (count > n - start) count = n - start;
+        page = new string[](count);
+        for (uint256 i = 0; i < count; i++) page[i] = domainList[start + i];
     }
 
     /// The gate a domain is bound to, whether or not its container is currently valid.

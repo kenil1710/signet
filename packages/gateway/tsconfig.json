@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["node", "chrome"],
+    "noEmit": true,
+    "declaration": false,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "test", "scripts"]
+}

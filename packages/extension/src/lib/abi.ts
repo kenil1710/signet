@@ -4,8 +4,8 @@ import { parseAbi } from 'viem';
 
 export const registryAbi = parseAbi([
   'function bindingOf(string domain) view returns (address gate, address container, string prefix)',
-  'event Claimed(string domain, address indexed gate, address circuits, uint256 tokenId)',
-  'event Transferred(string domain, address indexed fromGate, address indexed toGate)',
+  'function domainCount() view returns (uint256)',
+  'function domainsRange(uint256 start, uint256 count) view returns (string[])',
 ]);
 export const gateAbi = parseAbi([
   'function activeRelease() view returns (bytes32 filesRoot, bytes32 allowlistHash, bytes32 originsHash, bool ok)',

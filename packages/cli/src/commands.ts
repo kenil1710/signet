@@ -248,9 +248,12 @@ export async function propose(ctx: Ctx, buildDir: string, o: { emergency?: boole
 
 export const WAIT_TIMEOUT = 3; // exit code: not published in time (the proposal may still be open)
 
-/// Polls until this exact build is the gate's current release. Sends nothing and needs no key. Returns
-/// 'published', or throws when the proposal can't publish any more (cancelled, expired, stale) or on timeout.
-export async function wait(ctx: Ctx, buildDir: string, o: { timeout: number; interval: number }, log: Log): Promise<void> {
+/// Polls until this exact build is the gate's current release. Throws when the proposal can't publish any more
+/// (cancelled, expired, stale) or on timeout. Without `publish` it sends nothing and needs no key.
+/// With `publish` (what the GitHub Action uses) it also sends the `publish` call as soon as the approvals and
+/// the timelock are there. Anyone may send that call and the policy circuit decides: it gives the key no say
+/// over what gets published, and a call sent too early is simply refused.
+export async function wait(ctx: Ctx, buildDir: string, o: { timeout: number; interval: number; publish?: boolean }, log: Log): Promise<void> {
   const cfg = needProject(ctx);
   const build = loadSealed(buildDir);
   checkBuild(build, cfg);
@@ -277,6 +280,19 @@ export async function wait(ctx: Ctx, buildDir: string, o: { timeout: number; int
     if (mine.p.executed) throw new SignetError('NotCurrent', `#${mine.id} was published, but it is not the gate's valid current release (revoked, or replaced by a newer release). Not deploying.`);
     if (!d.open) throw new SignetError('Closed', `#${mine.id} can't be published any more: ${d.text}. Not deploying.`);
     say(`waiting for #${mine.id} (tier ${TIERS[mine.p.tier]}): ${d.text}`);
+    if (o.publish && d.publishable) {
+      const signer = await signerFor(ctx, ['SIGNET_PROPOSER_KEY', ...KEYS], statePath(ctx.dir, 'proposer.key'));
+      try {
+        const receipt = await send(ctx, signer, { address: cfg.gate, abi: gateAbi, functionName: 'publish', args: [mine.id] }, { pad: true });
+        log(`Published release #${mine.id} as ${signer.label} (tx ${receipt.transactionHash}, gas ${receipt.gasUsed})`);
+        fallbackNote(receipt, log);
+        continue; // the next look at the chain confirms it
+      } catch (e) {
+        // refused (someone withdrew an approval, froze, or published first): keep watching; anything else is a real error
+        if (!(e instanceof SignetError) || !['PolicyDenied', 'NotLive', 'StaleBase', 'Expired'].includes(e.code)) throw e;
+        say(`publish was refused just now (${e.code}); still watching #${mine.id}`);
+      }
+    }
     if (Date.now() - started > o.timeout * 1000) {
       const e = new SignetError('timeout', `#${mine.id} was not published within ${fmtSpan(o.timeout)}. It is still open: ${d.text}\n  Not deploying. Run this again (re-run the CI job) once it is published; the same proposal is picked up.`);
       (e as SignetError & { exitCode?: number }).exitCode = WAIT_TIMEOUT;

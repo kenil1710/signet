@@ -1,7 +1,8 @@
 // The signing-time check: may this page ask the wallet for this signature? Pure function, no I/O.
 // The sealed allowlist has, per chain: targets (contracts the site may call), spenders (who may be given an
 // allowance) and eip712 (verifying contracts of typed data). Tokens are not listed: approving any token is fine
-// when the spender is sealed (spec, "Allowlist reality").
+// when the spender is sealed (spec, "Allowlist reality"). Token transfers follow the project's sealed "transfers"
+// setting: "user" (default: only to the user's own address), "allowlist" (also to sealed contracts) or "any".
 //   block  the target, spender, recipient or verifying contract is not sealed, or the page is tampered
 //   warn   Guard can't tell what this is (unknown format): it goes through, marked "unverified call"
 //   allow  everything it names is sealed
@@ -21,10 +22,13 @@ const short = (a: string) => (isAddress(a) ? getAddress(a) : a);
 const MAX = (1n << 256n) - 1n;
 const amountText = (n: bigint) => (n >= MAX / 2n ? 'unlimited' : n.toString());
 
-interface Lists { targets: Set<string>; spenders: Set<string>; eip712: Set<string> }
+interface Lists { targets: Set<string>; spenders: Set<string>; eip712: Set<string>; transfers: 'user' | 'allowlist' | 'any' }
 function listsFor(allowlist: Allowlist, chain: string): Lists | null {
   const a = allowlist[chain];
-  return a ? { targets: new Set(a.targets.map(lc)), spenders: new Set(a.spenders.map(lc)), eip712: new Set(a.eip712.map(lc)) } : null;
+  if (!a) return null;
+  // the project's sealed transfer rule; anything else (or a release sealed before the setting existed) is the strict one
+  const transfers = a.transfers === 'allowlist' || a.transfers === 'any' ? a.transfers : 'user';
+  return { targets: new Set(a.targets.map(lc)), spenders: new Set(a.spenders.map(lc)), eip712: new Set(a.eip712.map(lc)), transfers };
 }
 
 const worst = (a: Action, b: Action): Action => (a === 'block' || b === 'block' ? 'block' : a === 'warn' || b === 'warn' ? 'warn' : 'allow');
@@ -90,12 +94,16 @@ export function checkCall(tx: Tx, lists: Lists, user: string): Verdict {
       if (!lists.spenders.has(spender)) return v('block', 'Spender not in the sealed allowlist', `This would let ${short(spender)} spend your tokens. The team never sealed that address as a spender.`, details);
       return v('allow', token.name, 'The spender is in the sealed allowlist.', details);
     }
+    // transfer / transferFrom: who may receive is the project's sealed setting ("transfers" in signet.config.json)
     const recipient = lc(args[token.recipient!]);
     details.push(`recipient ${short(recipient)}`);
-    if (recipient !== me && !lists.targets.has(recipient) && !lists.spenders.has(recipient)) {
-      return v('block', 'Recipient is not you', `This sends your tokens to ${short(recipient)}. That is not your address and not a contract this site sealed.`, details);
-    }
-    return v('allow', token.name, recipient === me ? 'The recipient is you.' : 'The recipient is a sealed contract.', details);
+    const sealedContract = lists.targets.has(recipient) || lists.spenders.has(recipient);
+    if (recipient === me) return v('allow', token.name, 'The recipient is you.', details);
+    if (lists.transfers === 'any') return v('allow', token.name, 'This site sealed that it may send tokens to any address.', details);
+    if (lists.transfers === 'allowlist' && sealedContract) return v('allow', token.name, 'The recipient is a sealed contract.', details);
+    return v('block', 'Recipient is not you', lists.transfers === 'allowlist'
+      ? `This sends your tokens to ${short(recipient)}. That is not your address and not a contract this site sealed.`
+      : `This sends your tokens to ${short(recipient)}, which is not your address. This site sealed that token transfers go only to you.`, details);
   }
   if (!lists.targets.has(to)) {
     return v('block', 'Contract not in the sealed allowlist', `${short(to)} is not a contract this site sealed${value > 0n ? `, and the transaction sends ${value} wei to it` : ''}.`, [`to ${short(to)}`, `call ${sel.length === 10 ? sel : '(no data)'}`]);

@@ -12,7 +12,7 @@ void (async () => {
   }
   const h = headline(i);
   const files = i.tab.report?.files ?? [];
-  const bad = files.filter((f) => !['ok', 'ok-sri'].includes(f.status));
+  const bad = files.filter((f) => !['ok', 'ok-sri', 'ok-gateway'].includes(f.status));
   root.className = `popup ${i.light}`;
   root.innerHTML = `
     <div class="light"><span class="dot"></span><div><h1>${esc(h.title)}</h1><div class="mono">${esc(i.site.domain)}</div></div></div>

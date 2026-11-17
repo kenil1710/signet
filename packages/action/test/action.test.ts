@@ -21,17 +21,18 @@ test('action.yml is a composite action whose deploy step comes last, after the s
   assert.ok(a.inputs['build-dir']!.required && a.inputs['proposer-key']!.required);
 });
 
-test('inputs reach the scripts only through env (no ${{ }} inside shell code), and the key only reaches propose and upload', () => {
+test('inputs reach the scripts only through env (no ${{ }} inside shell code), and the key only reaches propose, publish and upload', () => {
   const a = loadAction();
   const main = a.runs.steps.find((s) => s.id === 'signet')!;
   assert.ok(!/\$\{\{\s*inputs/.test(main.run!));
-  assert.deepEqual(Object.keys(main.env!).sort(), ['INPUT_BUILD_DIR', 'INPUT_EMERGENCY', 'INPUT_POLL_INTERVAL', 'INPUT_PROJECT_DIR', 'INPUT_PROPOSER_KEY', 'INPUT_STRICT', 'INPUT_UPLOAD_MANIFEST', 'INPUT_WAIT_TIMEOUT']);
+  assert.deepEqual(Object.keys(main.env!).sort(), ['INPUT_BUILD_DIR', 'INPUT_EMERGENCY', 'INPUT_POLL_INTERVAL', 'INPUT_PROJECT_DIR', 'INPUT_PROPOSER_KEY', 'INPUT_PUBLISH', 'INPUT_STRICT', 'INPUT_UPLOAD_MANIFEST', 'INPUT_WAIT_TIMEOUT']);
   const sh = read('run.sh');
   const withKey = sh.split('\n').filter((l) => l.includes('SIGNET_PROPOSER_KEY="$KEY"'));
-  assert.equal(withKey.length, 2);
-  assert.ok(withKey.every((l) => /signet (upload|"\$\{ARGS\[@\]\}")/.test(l)));
+  assert.equal(withKey.length, 3); // propose, wait --publish (the permissionless publish call), upload
+  assert.ok(withKey.every((l) => /signet (upload|wait "\$BUILD" --publish|"\$\{ARGS\[@\]\}")/.test(l)));
   assert.match(sh, /ARGS=\(propose /);
-  // hard rules 4 and 5: the action never approves, publishes, unfreezes or cancels
+  // hard rules 4 and 5: the action never approves, unfreezes or cancels. It does send `publish`, which anyone may
+  // send and only the policy circuit can grant.
   const invoked = [...sh.matchAll(/(?:^|[;(]|\$\(|then|else)\s*(?:\w+="[^"]*"\s+)?signet\s+"?(\$\{ARGS|\w+)/gm)].map((m) => m[1]);
   assert.deepEqual([...new Set(invoked)].sort(), ['${ARGS', 'diff', 'seal', 'upload', 'verify', 'wait']);
   assert.match(sh, /unset SIGNET_PRIVATE_KEY SIGNET_PROPOSER_KEY/);

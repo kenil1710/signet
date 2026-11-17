@@ -553,6 +553,52 @@ contract SignetRegistryTest is GateBase {
         assertEq(g, address(other));
     }
 
+    // ---------------------------------------------------------------- the enumerable domain list
+
+    function test_domainList_everyClaimIsListedOnce_inOrder_andPaged() public {
+        uint256 n0 = reg.domainCount();
+        string[] memory before = reg.domainsRange(0, 1000);
+        assertEq(before.length, n0);
+        newGate("a.example.org");
+        newGate("b.example.org");
+        newGate("c.example.org");
+        assertEq(reg.domainCount(), n0 + 3);
+        string[] memory page = reg.domainsRange(n0, 2);
+        assertEq(page.length, 2);
+        assertEq(page[0], "a.example.org");
+        assertEq(page[1], "b.example.org");
+        page = reg.domainsRange(n0 + 2, 50); // a page that runs past the end is cut short
+        assertEq(page.length, 1);
+        assertEq(page[0], "c.example.org");
+        assertEq(reg.domainsRange(n0 + 3, 10).length, 0); // at the end
+        assertEq(reg.domainsRange(n0 + 400, 10).length, 0); // past the end: empty, no revert
+        assertEq(reg.domainsRange(n0, 0).length, 0);
+        assertEq(reg.domainsRange(0, type(uint256).max).length, n0 + 3); // a huge count doesn't overflow
+    }
+
+    function test_domainList_unboundDomainStaysListed_reclaimIsNotListedTwice() public {
+        uint256 n0 = reg.domainCount();
+        admin(ReleaseGate.Action.UnbindDomain, abi.encode(DOMAIN));
+        assertEq(reg.domainCount(), n0, "unbinding removes nothing from the list");
+        (address g,,) = reg.bindingOf(DOMAIN);
+        assertEq(g, address(0), "bindingOf is what says it is no longer protected");
+        bindDomain(DOMAIN, address(0), 0); // the previous gate claims it again
+        assertEq(reg.domainCount(), n0, "a domain is listed once");
+        vm.warp(block.timestamp + 1);
+        admin(ReleaseGate.Action.UnbindDomain, abi.encode(DOMAIN));
+        vm.warp(block.timestamp + 31 days);
+        newGate(DOMAIN); // another gate, after the re-claim window
+        assertEq(reg.domainCount(), n0);
+    }
+
+    function test_domainList_onlyClaimsThroughTheFactoryAreListed() public {
+        uint256 n0 = reg.domainCount();
+        vm.expectRevert(SignetRegistry.NotFactoryGate.selector);
+        reg.claimFor(X, "fake.example.org", address(0), 0);
+        expectCreateRevert(SignetRegistry.BadDomain.selector, "Not_A_Domain");
+        assertEq(reg.domainCount(), n0);
+    }
+
     // ---------------------------------------------------------------- one container: Signet's site + projects
 
     function _signetSite() internal view returns (ReleaseGate) {

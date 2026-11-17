@@ -1,41 +1,43 @@
 # Overnight log
 
-## Final summary (2026-11-17)
+## Summary (updated 2026-11-17, after the follow-up fixes)
 
-All three phases are built and tested on the staging chain. Nothing touched mainnet, no funds were spent, and
-`packages/contracts/src` is unchanged (ReleaseGate included). The work is on the branch **`overnight-phases`**,
-one commit per phase; `main` is where you left it.
+Everything below is merged into `main`: the three overnight phases plus the four follow-up fixes (section at the
+end). Nothing touched mainnet and no funds were spent. **One contract changed:** SignetRegistry gained an
+enumerable domain list (not deployed anywhere but staging). ReleaseGate and SignetFactory are unchanged.
 
-| Phase | State | Tests |
-|---|---|---|
-| 1. SRI in `originsHash`, Diff Guard, GitHub Action | Done. The action has not run on GitHub itself. | 29 CLI unit, 3 action static; staging: 9 CLI + 5 action |
-| 2. Guard extension | Done, except that the verified copy is a preview without a wallet. Not tried with a real wallet. | 10 unit; staging: 10 headless scenarios |
-| 3. Watchtower | Done for one region, console + Telegram. Telegram was tested against a local stand-in, not the real API. | 2 unit; staging: 8 scenarios |
+| Part | State |
+|---|---|
+| SRI in `originsHash`, Diff Guard | Done. |
+| GitHub Action | Done; it now publishes itself once the circuit allows it. Not yet run on GitHub. |
+| Guard extension | Done; per-project transfer rule; opens the gateway for the verified copy. Not tried with a real wallet. |
+| Failover gateway (new, `packages/gateway`) | Done on staging: the verified copy is a normal page where the wallet works. **Not deployed on a public https domain.** |
+| Watchtower | Done for one region, console + Telegram (Telegram tested against a local stand-in). |
 
-Last full run: 182 Foundry tests, 49 unit tests, 32 staging end-to-end tests, all passing; typecheck clean.
-Run the staging suites one at a time (`pnpm --filter @signet/<cli|action|extension|watchtower> test:staging`).
+Last full run on `main`: 185 Foundry tests, 53 unit tests, 40 staging end-to-end tests (9 CLI, 6 action, 11 Guard,
+6 gateway, 8 watchtower), all passing; typecheck clean. Run the staging suites one at a time
+(`pnpm --filter @signet/<cli|action|extension|gateway|watchtower> test:staging`). The staging chain was
+restarted once to deploy the new registry.
 
 **Look at these first** (`docs/demo/`): `diff-guard-poisoned.txt`, `guard-blocked.png`, `guard-signature-refused.png`,
-`guard-verified-copy.png`, `watchtower-hijack.txt`.
+`guard-verified-copy.png` (the gateway copy, opened from the red page, signing an approve), `watchtower-hijack.txt`.
 
-**Decisions waiting for your yes or no**
-1. The action never calls `publish`; it waits for someone else to. (The spec said the action publishes.)
-2. The action writes the three manifest files on-chain after publication, paid by the proposer key.
-3. Guard refuses a token `transfer` to anyone who is neither the user nor a sealed contract. Right for a DEX, wrong for a "send" app.
-4. Guard's list of sealed domains is the union of what the two RPCs report (protection over privacy against a lying RPC).
-5. A revoked current release turns Guard red and refuses every signature in enforce mode.
+**Decisions still waiting for your yes or no**
+1. The action writes the three manifest files on-chain after publication, paid by the proposer key.
+2. A revoked current release turns Guard red and refuses every signature in enforce mode.
+3. Hard rule 4 in `CLAUDE.md` says "never give it approve or publish rights". The action now *sends* the permissionless `publish` call. Suggested wording is in `docs/decisions.md`; I did not edit `CLAUDE.md`.
+4. The default transfer rule is now stricter than overnight: `"user"` refuses a transfer to a sealed staking contract. Projects that need it seal `"allowlist"`.
 
 **What is not done, in order of how much it matters**
-1. **Failover doesn't let users keep using the app.** "Open verified copy" shows the sealed app read from the chain, hash-checked, in a sandboxed frame with no wallet. I found no documented way to open a container path as a normal page.
-2. **The sealed-domain list won't scale on mainnet**: it is read from event logs. The registry needs an enumerable list before it is deployed.
-3. Guard is untested with MetaMask / OKX Wallet and is not submitted to the Chrome Web Store (due Nov 27).
-4. The action is untested on GitHub; its `uses:` path is a guess because the repo has no remote.
-5. Watchtower: one region only, no TapeSend, no X posts, no status page; it does not renew the registry's 30-day operator grant.
+1. **The gateway isn't deployed.** It needs a domain with wildcard DNS and a wildcard certificate, and Guard built with its URL. Until then "Open verified copy" works only on staging.
+2. **Large apps can't be fully copied on-chain**: one file is at most 48,000 bytes; the multi-transaction upload isn't built. The gateway can only show what is stored.
+3. Guard and the gateway are untested with MetaMask / OKX Wallet; Guard is not submitted to the Chrome Web Store (due Nov 27).
+4. The action is untested on GitHub; its `uses:` path is a guess (no remote).
+5. Watchtower: one region, no TapeSend, no X posts, no status page; nobody renews the registry's 30-day operator grant on mainnet.
 6. Not started: the dashboard, mainnet deployment.
 
-**Two things the tests turned up, both fixed**
-- The registry's 30-day operator grant expired on staging (tests move the clock) and file writes reverted. `pnpm staging:renew` renews it. On mainnet this is a recurring duty with no owner yet.
-- The CLI could wait forever for a transaction that had already been mined (viem's receipt wait on a chain that mines on demand). It now polls the receipt itself.
+**Found by the tests, fixed:** the registry's 30-day operator grant expiring on staging (`pnpm staging:renew`), and a
+CLI wait that could hang on an already-mined transaction.
 
 Details per phase follow; every decision is in `docs/decisions.md`.
 
@@ -110,3 +112,12 @@ Details per phase follow; every decision is in `docs/decisions.md`.
 2. The previous release is accepted during its grace window, so a normal deploy right after publish doesn't alert.
 3. A release whose manifest isn't on-chain (or doesn't hash to it) isn't compared; the team is told once.
 4. Public posts go to `TELEGRAM_PUBLIC_CHAT_ID` if set, else to the same chat as alerts.
+
+## Follow-up fixes (2026-11-17, asked for after the overnight run)
+
+1. **The action publishes.** `signet wait --publish` sends `publish` once approvals and timelock allow it; the action does this by default (`publish: false` turns it off). Tested on staging: published by the action after 3 of 3 on a first release; nothing published during a 1 h timelock, then published when it ended; with no approvals the key publishes nothing; `publish: false` sends nothing. The docs still say the CI key can only propose and can never approve.
+2. **Token transfers are per project.** `"transfers": "user" | "allowlist" | "any"` in `signet.config.json`, default `"user"`, sealed into `allowlist.json` (so changing it is tier 10, and Diff Guard flags it). Guard enforces it; approvals and swap recipients are never loosened. Tests: CLI seal, Diff Guard and Guard policy.
+3. **SignetRegistry has `domainCount()` and `domainsRange(start, count)`.** Append-only, each domain once. 3 Foundry tests. Guard reads it on its timer from both RPCs, which must agree; the watchtower reads it each round. No event-log scanning left.
+4. **Failover.** TapeKit's service-worker gateway is the right approach, but its public gateway can't show sealed projects: it serves a container from the root (free projects live under `projects/<domain>/` in a shared container), checks SiteRegistry's hash rather than the sealed release, and refuses unpaid containers (measured: it refuses Signet's). So I built **`packages/gateway` on the same design**: `https://<domain with dots as dashes>.<gateway>/` is a normal origin; a service worker in the visitor's browser reads the sealed lists, rejects them unless they hash to the gate's release, and serves each file only if its SHA-256 is the sealed one. Wallets inject. Guard opens it from "Open verified copy", treats it as the sealed domain, and pins the gateway's own three files. 6 gateway + 1 Guard staging scenarios (copy works and signs; changed file not shown; forged manifest, disagreeing or dead RPCs show nothing; CSP limits it to sealed origins; a changed gateway worker turns Guard red).
+   - **Not possible as asked, in one respect:** an *https* page needs a deployed domain and certificate, which don't exist; it was tested on `http://*.localhost`, which browsers treat as secure. And a gateway always means trusting its three files: Guard's pin check can't read the bytes of an already-registered worker (details and mitigations in `docs/decisions.md`).
+   - Research notes: `docs/tapeout-interfaces.md` §11.

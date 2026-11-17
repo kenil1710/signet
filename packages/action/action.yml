@@ -1,7 +1,7 @@
 name: Signet release gate
 description: >
-  Verify and seal the build, propose it as a release with the CI proposer key, wait until the release is
-  published on-chain (approved by the team's approvers, decided by the policy circuit), and only then deploy.
+  Verify and seal the build, propose it as a release with the CI proposer key, wait for the team's approvers
+  and the timelock, publish (the policy circuit decides), and only then deploy.
 author: Signet
 branding:
   icon: shield
@@ -12,7 +12,7 @@ inputs:
     description: The static build output to seal (for example dist)
     required: true
   proposer-key:
-    description: The CI proposer key (secrets.SIGNET_PROPOSER_KEY). It can only propose releases.
+    description: The CI proposer key (secrets.SIGNET_PROPOSER_KEY). It can only propose releases; it can never approve one.
     required: true
   deploy:
     description: >
@@ -34,6 +34,13 @@ inputs:
     description: Seconds between checks of the chain
     required: false
     default: '30'
+  publish:
+    description: >
+      Send the publish call as soon as the approvals and the timelock are there. Anyone may send it and the
+      policy circuit decides, so this gives the proposer key no power; it only pays the gas. Set to false if
+      someone else publishes.
+    required: false
+    default: 'true'
   upload-manifest:
     description: >
       After the release is published, write its three manifest files (allowlist, origins, file list) on-chain if
@@ -75,7 +82,7 @@ runs:
       shell: bash
       run: '"${{ github.action_path }}/install.sh"'
 
-    - name: Verify, seal, propose, wait until published on-chain
+    - name: Verify, seal, propose, publish when approved
       id: signet
       shell: bash
       env:
@@ -85,6 +92,7 @@ runs:
         INPUT_WAIT_TIMEOUT: ${{ inputs.wait-timeout }}
         INPUT_POLL_INTERVAL: ${{ inputs.poll-interval }}
         INPUT_UPLOAD_MANIFEST: ${{ inputs.upload-manifest }}
+        INPUT_PUBLISH: ${{ inputs.publish }}
         INPUT_EMERGENCY: ${{ inputs.emergency }}
         INPUT_STRICT: ${{ inputs.strict }}
       run: '"${{ github.action_path }}/run.sh"'

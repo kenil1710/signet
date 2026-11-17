@@ -19,7 +19,7 @@ pnpm --filter @signet/watchtower test:staging    # 8 scenarios incl. a simulated
 | `WATCHTOWER_ONLY` | Comma-separated domains (default: every bound domain). |
 | `WATCHTOWER_URL_TEMPLATE` | Default `https://{domain}/`. |
 | `WATCHTOWER_HOST_RULES` | Chromium `--host-resolver-rules`, for staging hosts that aren't in DNS. |
-| `WATCHTOWER_FROM_BLOCK`, `WATCHTOWER_STATE` | Where to start reading the registry's events; the state file (default `.state/<network>.json`). |
+| `WATCHTOWER_FROM_INDEX`, `WATCHTOWER_STATE` | First run only: skip the first N domains of the registry's list; the state file (default `.state/<network>.json`). |
 
 **What counts as a mismatch.** The HTML document, a script or a stylesheet whose SHA-256 isn't the sealed one; a
 same-origin script that isn't in the release; a cross-origin script that isn't sealed or whose `integrity`

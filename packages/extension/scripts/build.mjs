@@ -2,7 +2,7 @@
 //   SIGNET_NETWORK=local node scripts/build.mjs        staging; SIGNET_RPC_URL / SIGNET_RPC_URL2 override the RPCs
 // Content scripts can't be ES modules, so every entry is bundled on its own as one file.
 import { build } from 'vite';
-import { rmSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
+import { rmSync, mkdirSync, copyFileSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadNetwork } from '@signet/contracts/network';
 
@@ -12,8 +12,14 @@ const n = loadNetwork();
 const net = {
   name: n.name, chainId: n.chainId, rpcUrl: n.rpcUrl, rpcUrl2: process.env.SIGNET_RPC_URL2 || n.rpcUrl2 || null,
   registry: n.contracts.registry ?? null, siteRegistry: n.tapeout.siteRegistry,
-  fromBlock: Number(process.env.SIGNET_FROM_BLOCK ?? n.deployBlock ?? n.forkBlock ?? 0),
 };
+// "Open verified copy" goes to the gateway when one is configured: SIGNET_GATEWAY_URL (e.g. http://localhost:8097
+// on staging) and the gateway build whose files Guard pins (SIGNET_GATEWAY_DIST, default ../gateway/dist).
+if (process.env.SIGNET_GATEWAY_URL) {
+  const pins = `${process.env.SIGNET_GATEWAY_DIST || `${root}../gateway/dist`}/.signet/hashes.json`;
+  if (!existsSync(pins)) throw new Error(`SIGNET_GATEWAY_URL is set but ${pins} does not exist. Build the gateway first: pnpm --filter @signet/gateway build`);
+  net.gateway = { url: process.env.SIGNET_GATEWAY_URL.replace(/\/+$/, ''), pins: JSON.parse(readFileSync(pins, 'utf8')) };
+}
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
@@ -52,4 +58,4 @@ const manifest = {
   },
 };
 writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
-console.log(`Guard built for ${net.name}: ${out}\n  RPCs ${net.rpcUrl} + ${net.rpcUrl2 ?? '(none: Guard will not be able to check)'}\n  registry ${net.registry ?? 'not deployed'} from block ${net.fromBlock}`);
+console.log(`Guard built for ${net.name}: ${out}\n  RPCs ${net.rpcUrl} + ${net.rpcUrl2 ?? '(none: Guard will not be able to check)'}\n  registry ${net.registry ?? 'not deployed'}\n  verified copy: ${net.gateway ? `gateway ${net.gateway.url}` : 'preview inside the extension (no gateway configured)'}`);

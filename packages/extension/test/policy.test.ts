@@ -38,14 +38,37 @@ test('approve: any token is fine when the spender is sealed; an unsealed spender
   assert.equal(act(tx(TOKEN, data('permit', [USER, ROUTER, 1n, 1n, 27, Z, Z]))), 'allow');
 });
 
-test('transfer: the recipient must be the user or a sealed contract', () => {
-  assert.equal(act(tx(TOKEN, data('transfer', [USER, 1n]))), 'allow');
-  assert.equal(act(tx(TOKEN, data('transfer', [STAKING, 1n]))), 'allow');
-  const bad = decide(tx(TOKEN, data('transfer', [DRAINER, 1n])), ok);
+test('transfer: who may receive is the project\'s sealed setting (user | allowlist | any)', () => {
+  const withRule = (transfers?: 'user' | 'allowlist' | 'any'): Context => ({ ...ok, allowlist: { '196': { ...allowlist['196'], ...(transfers ? { transfers } : {}) } } });
+  const to = (who: string) => tx(TOKEN, data('transfer', [who, 1n]));
+  const from = (who: string) => tx(TOKEN, data('transferFrom', [USER, who, 1n]));
+  // "user" (and a release sealed before the setting existed): only the user's own address
+  for (const ctx of [withRule(), withRule('user')]) {
+    assert.equal(act(to(USER), ctx), 'allow');
+    assert.equal(act(from(USER), ctx), 'allow');
+    const sealedContract = decide(to(STAKING), ctx);
+    assert.equal(sealedContract.action, 'block');
+    assert.match(sealedContract.reason, /sealed that token transfers go only to you/);
+    assert.equal(act(to(DRAINER), ctx), 'block');
+    assert.equal(act(from(DRAINER), ctx), 'block');
+  }
+  // "allowlist": also contracts the site sealed
+  assert.equal(act(to(USER), withRule('allowlist')), 'allow');
+  assert.equal(act(to(STAKING), withRule('allowlist')), 'allow');
+  assert.equal(act(to(ROUTER), withRule('allowlist')), 'allow');
+  const bad = decide(to(DRAINER), withRule('allowlist'));
   assert.equal(bad.action, 'block');
   assert.match(bad.title, /Recipient is not you/);
-  assert.equal(act(tx(TOKEN, data('transferFrom', [USER, DRAINER, 1n]))), 'block');
-  assert.equal(act(tx(TOKEN, data('transferFrom', [USER, USER, 1n]))), 'allow');
+  assert.match(bad.reason, /not your address and not a contract this site sealed/);
+  assert.equal(act(from(DRAINER), withRule('allowlist')), 'block');
+  // "any": a send-tokens app
+  assert.equal(act(to(DRAINER), withRule('any')), 'allow');
+  assert.equal(act(from(DRAINER), withRule('any')), 'allow');
+  // the setting is about transfers only: approvals and swap recipients stay strict
+  assert.equal(act(tx(TOKEN, data('approve', [DRAINER, 1n])), withRule('any')), 'block');
+  assert.equal(act(tx(ROUTER, data('swapExactTokensForTokens', [1n, 0n, [TOKEN, TOKEN], DRAINER, 1n])), withRule('any')), 'block');
+  // an unknown value is the strict rule
+  assert.equal(act(to(STAKING), { ...ok, allowlist: { '196': { ...allowlist['196'], transfers: 'everyone' as never } } }), 'block');
 });
 
 test('a token-style call that also sends OKB to an unsealed contract is refused', () => {

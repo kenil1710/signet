@@ -61,7 +61,7 @@ test('seal: hashes, allowlist, origins, SRI and the four files', () => {
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'signet-manifest.json'), 'utf8')), m);
 
   // allowlist: addresses from the build; Permit2 is a spender and an EIP-712 verifier; placeholders are dropped
-  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER, STAKING], spenders: [PERMIT2], eip712: [PERMIT2] });
+  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER, STAKING], spenders: [PERMIT2], eip712: [PERMIT2], transfers: 'user' });
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8')), r.allowlist);
 
   // origins: RPC, API and the CDN; documentation links and XML namespaces are left out
@@ -138,9 +138,24 @@ test('config: spenders, extra chains, excluded addresses and origins', () => {
     origins: { include: ['https://reactjs.org/docs'], exclude: ['https://api.demo-swap.example.org'] },
   });
   assert.deepEqual(Object.keys(r.allowlist), ['1', '196']);
-  assert.deepEqual(r.allowlist['1'], { targets: [NEW_VAULT], spenders: [], eip712: [] });
-  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER], spenders: [PERMIT2, ROUTER], eip712: [PERMIT2] });
+  assert.deepEqual(r.allowlist['1'], { targets: [NEW_VAULT], spenders: [], eip712: [], transfers: 'user' });
+  assert.deepEqual(r.allowlist['196'], { targets: [PERMIT2, ROUTER], spenders: [PERMIT2, ROUTER], eip712: [PERMIT2], transfers: 'user' });
   assert.deepEqual(r.origins, ['https://cdn.jsdelivr.net', 'https://reactjs.org', 'https://xlayerrpc.okx.com']);
+});
+
+test('"transfers" in the config is sealed into the allowlist: changing it changes allowlistHash (tier 10), nothing else', () => {
+  const dir = writeBuild(join(tmp(), 'dist'), 'v1');
+  const base = seal(dir, cfg);
+  assert.equal(base.allowlist['196']!.transfers, 'user', 'the default is the strict one');
+  for (const transfers of ['allowlist', 'any'] as const) {
+    const r = seal(dir, { ...cfg, transfers, allowlist: { '1': { targets: [NEW_VAULT] } } });
+    assert.deepEqual([r.allowlist['196']!.transfers, r.allowlist['1']!.transfers], [transfers, transfers]);
+    assert.equal(JSON.parse(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8'))['196'].transfers, transfers);
+    assert.notEqual(r.manifest.allowlistHash, base.manifest.allowlistHash);
+    assert.equal(r.manifest.originsHash, base.manifest.originsHash);
+  }
+  assert.equal(seal(dir, { ...cfg, transfers: 'user' }).manifest.allowlistHash, base.manifest.allowlistHash);
+  assert.throws(() => seal(dir, { ...cfg, transfers: 'everyone' as never }), /"transfers" must be "user", "allowlist" or "any"/);
 });
 
 test('an empty allowlist and empty origins still hash to non-zero values (explicit empty lists)', () => {
@@ -148,9 +163,9 @@ test('an empty allowlist and empty origins still hash to non-zero values (explic
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'index.html'), '<!doctype html><title>plain</title>');
   const r = seal(dir, cfg);
-  assert.equal(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8'), '{"196":{"targets":[],"spenders":[],"eip712":[]}}');
+  assert.equal(readFileSync(join(dir, 'signet/allowlist.json'), 'utf8'), '{"196":{"targets":[],"spenders":[],"eip712":[],"transfers":"user"}}');
   assert.equal(readFileSync(join(dir, 'signet/origins.json'), 'utf8'), '{"origins":[],"scripts":[]}');
-  assert.equal(r.manifest.allowlistHash, sha256Hex('{"196":{"targets":[],"spenders":[],"eip712":[]}}'));
+  assert.equal(r.manifest.allowlistHash, sha256Hex('{"196":{"targets":[],"spenders":[],"eip712":[],"transfers":"user"}}'));
 });
 
 test('loadSealed refuses a build that changed after sealing', () => {

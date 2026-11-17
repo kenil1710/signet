@@ -227,7 +227,7 @@ After setup, everything runs on its own. People act only when a new release need
 1. A dev merges to main → the Action builds, seals and proposes
 2. ReleaseGate computes the tier on-chain; approvers get a TapeSend and Telegram ping
 3. An approver opens Diff Guard: "3 files changed, no new contracts, no new origins → tier 00" → one click
-4. After the 1 h timelock, anyone calls `publish` (`signet publish <id>`; the Action never does, it only proposes) → the Action sees the release on-chain, writes the manifest files and deploys to hosting
+4. After the 1 h timelock, anyone calls `publish` (the Action does it; the circuit decides, and the CI key still can't approve) → the Action writes the manifest files and deploys to hosting
 
 **3. End user**
 
@@ -338,6 +338,7 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 - [x] Guard extension: release read from 2 RPCs that must agree, manifest hash-checked, page hash check, red block page, window.ethereum + EIP-6963 wrap, allowlist + calldata decode, observe/enforce modes, verified-copy button (preview without a wallet): tested headless on staging (2026-11-17, `packages/extension`). Not yet tested with a real wallet.
 - [ ] Nov 27: **submit the extension to the Chrome Web Store** (keep an unpacked build for the demo as backup)
 - [x] Watchtower, basic: 1-min checks in headless Chromium, a mismatch confirmed on two loads, private alert on the console and through a Telegram bot, posts for new bindings and pending tier-10/11 proposals: tested on staging with a simulated hijack (2026-11-17, `packages/watchtower`)
+- [x] Failover gateway (`packages/gateway`, TapeKit's service-worker design): the verified copy as a normal page where wallets inject, every file checked against the sealed hashes; tested on staging at `*.localhost` (2026-11-17). Not deployed on a public https domain.
 - [ ] Watchtower, rest: 3 regions with 2-region confirm, TapeSend, X posts, public status page
 
 **Week 3 (Nov 30–Dec 7): polish, real users, video**

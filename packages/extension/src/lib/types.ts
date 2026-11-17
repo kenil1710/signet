@@ -8,11 +8,13 @@ export interface Net {
   rpcUrl2: string | null;
   registry: Hex | null; // SignetRegistry; null = Signet is not deployed on this network
   siteRegistry: Hex; // TapeOut SiteRegistry (docs/tapeout-interfaces.md §8)
-  fromBlock: number; // where to start reading the registry's Claimed events
+  /// The Signet gateway (packages/gateway) that "Open verified copy" uses, with the SHA-256 of its three own
+  /// files so Guard can tell a changed gateway. Absent: the copy is shown as a preview inside the extension.
+  gateway?: { url: string; pins: Record<string, string> } | null;
 }
 
 export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number }
-export interface Allowlist { [chainId: string]: { targets: string[]; spenders: string[]; eip712: string[] } }
+export interface Allowlist { [chainId: string]: { targets: string[]; spenders: string[]; eip712: string[]; transfers?: 'user' | 'allowlist' | 'any' } }
 export interface Sealed {
   manifestHash: Hex;
   filesRoot: Hex;
@@ -49,7 +51,7 @@ export interface SiteState {
   manifests: Record<string, Sealed>; // by manifest hash; at most the last two
 }
 
-export type FileStatus = 'ok' | 'ok-sri' | 'mismatch' | 'unknown' | 'unknown-origin' | 'sri-mismatch' | 'not-cached' | 'cross-origin' | 'no-crypto';
+export type FileStatus = 'ok' | 'ok-sri' | 'ok-gateway' | 'mismatch' | 'unknown' | 'unknown-origin' | 'sri-mismatch' | 'not-cached' | 'cross-origin' | 'no-crypto';
 export interface FileResult { url: string; status: FileStatus; sha256?: string; note?: string }
 export type PageStatus = 'ok' | 'tampered' | 'unverified';
 export interface PageReport { url: string; status: PageStatus; files: FileResult[] }
@@ -64,6 +66,7 @@ export interface PageInfo {
   hashes: Record<string, string[]>; // sealed path -> the SHA-256 values valid now
   origins: string[];
   scripts: { url: string; integrity: string | null }[];
+  gateway: Record<string, string> | null; // on the gateway's copy of this domain: the pinned hashes of the gateway's own files
 }
 
 export interface SignRequest { method: string; params: unknown; chainId: string | null; accounts: string[] }

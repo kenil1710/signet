@@ -1,5 +1,5 @@
 // One round of the watchtower ("tick"), and the loop that runs it every minute.
-//   1. New domain bindings in the registry are posted.
+//   1. Domains added to the registry's list are posted.
 //   2. For every bound domain: pending tier-10 / tier-11 proposals are posted once.
 //   3. The live site is loaded in headless Chromium and compared with the sealed release. A mismatch is loaded
 //      a second time; only if the second load is wrong too is the team alerted (once per distinct mismatch).
@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium, type Browser } from 'playwright';
-import { gateView, isValidManifest, newBindings, openProposals, sealedLists, type Net, type Sealed } from './chain.ts';
+import { gateView, isValidManifest, newDomains, openProposals, sealedLists, type Net, type Sealed } from './chain.ts';
 import { checkSite, type SiteCheck } from './check.ts';
 import type { Alerter } from './alerts.ts';
 
@@ -17,6 +17,7 @@ export interface Config {
   statePath: string;
   urlFor: (domain: string) => string;
   only?: string[]; // watch only these domains (default: every bound domain)
+  fromIndex?: number; // first run only: skip the registry's first N domains (default 0: watch them all)
   confirmDelayMs?: number; // pause before the confirming load (default 5 s)
   log?: (line: string) => void;
 }
@@ -30,10 +31,10 @@ interface DomainState {
   status: 'new' | 'ok' | 'mismatch' | 'unreachable' | 'unchecked';
   checkedAt: number;
 }
-export interface State { nextBlock: number; domains: Record<string, DomainState> }
+export interface State { nextIndex: number; domains: Record<string, DomainState> } // nextIndex: how far into the registry's domain list we have read
 
-export function loadState(path: string, fromBlock: number): State {
-  return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as State) : { nextBlock: fromBlock, domains: {} };
+export function loadState(path: string, fromIndex: number): State {
+  return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as State) : { nextIndex: fromIndex, domains: {} };
 }
 function saveState(path: string, s: State): void {
   mkdirSync(dirname(path), { recursive: true });
@@ -48,7 +49,7 @@ export interface TickResult { domains: number; checked: number; alerts: number; 
 
 export async function tick(c: Config, browser: Browser): Promise<TickResult> {
   const log = c.log ?? console.log;
-  const state = loadState(c.statePath, c.net.fromBlock);
+  const state = loadState(c.statePath, c.fromIndex ?? 0);
   const out: TickResult = { domains: 0, checked: 0, alerts: 0, posts: 0 };
   const watched = (d: string) => !c.only || c.only.includes(d);
   const post = async (audience: 'private' | 'public', title: string, lines: string[]) => {
@@ -57,19 +58,16 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
     else out.posts++;
   };
 
-  // 1. new bindings
-  const { bindings, next } = await newBindings(c.net, state.nextBlock);
-  for (const b of bindings) {
-    if (!watched(b.domain)) continue;
-    const known = state.domains[b.domain];
-    if (known?.gate === b.gate) continue;
-    state.domains[b.domain] = { gate: b.gate, lastProposal: 0, alerted: null, note: '', manifests: {}, status: 'new', checkedAt: 0 };
-    await post('public', known ? `Domain moved to another gate: ${b.domain}` : `New sealed domain: ${b.domain}`, [
-      `Gate ${b.gate} (block ${b.block}).`,
-      known ? `It was bound to ${known.gate} before.` : 'Signet now watches this site every minute. It starts in observe mode.',
-    ]);
+  // 1. domains added to the registry's list since the last round
+  const { domains, next } = await newDomains(c.net, state.nextIndex);
+  for (const domain of domains) {
+    if (!watched(domain) || state.domains[domain]) continue;
+    const g = await gateView(c.net, domain);
+    if (!g) continue; // claimed and unbound again before we looked
+    state.domains[domain] = { gate: g.gate, lastProposal: 0, alerted: null, note: '', manifests: {}, status: 'new', checkedAt: 0 };
+    await post('public', `New sealed domain: ${domain}`, [`Gate ${g.gate}.`, 'Signet now watches this site every minute. It starts in observe mode.']);
   }
-  state.nextBlock = next;
+  state.nextIndex = next;
 
   for (const [domain, ds] of Object.entries(state.domains)) {
     if (!watched(domain)) continue;
@@ -81,6 +79,12 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
         ds.note = 'unbound';
         continue;
       }
+      if (g.gate.toLowerCase() !== ds.gate.toLowerCase()) {
+        // a domain that was transferred, or unbound and claimed by another gate: its history starts over
+        await post('public', `Domain moved to another gate: ${domain}`, [`Gate ${g.gate}. It was bound to ${ds.gate} before.`]);
+        Object.assign(ds, { gate: g.gate, lastProposal: 0, alerted: null, manifests: {} });
+      }
+      if (ds.note === 'unbound') ds.note = '';
 
       // 2. pending tier-10 / tier-11 proposals: posted once each, so nobody has to watch the chain to see them
       for (const p of await openProposals(c.net, g, ds.lastProposal)) {

@@ -45,7 +45,7 @@ program.command('seal <buildDir>')
     const cfg = readConfig(resolve(program.opts().project));
     const domain = o.domain ?? cfg?.domain;
     if (!domain) throw new SignetError('domain', `no domain: pass --domain or run signet init (writes ${CONFIG_NAME})`);
-    const r = seal(buildDir, { domain, chainId: Number(o.chainId ?? cfg?.chainId ?? 196), allowlist: cfg?.allowlist, origins: cfg?.origins });
+    const r = seal(buildDir, { domain, chainId: Number(o.chainId ?? cfg?.chainId ?? 196), allowlist: cfg?.allowlist, transfers: cfg?.transfers, origins: cfg?.origins });
     const m = r.manifest;
     log(`Sealed ${m.fileCount} files (${m.totalBytes} bytes) for ${m.domain}`);
     log(`  filesRoot      ${m.filesRoot}`);
@@ -64,6 +64,8 @@ program.command('seal <buildDir>')
       for (const x of [...new Set([...a.spenders, ...a.eip712])].filter((x) => !a.targets.includes(x))) log(`    ${x}  [${a.spenders.includes(x) ? 'spender' : 'eip712'}]  from ${CONFIG_NAME}`);
     }
     log(`  To allow an address as a token spender, or to drop one, edit "allowlist" in ${CONFIG_NAME} (spenders, eip712, exclude).`);
+    const t = Object.values(r.allowlist)[0]!.transfers;
+    log(`  Token transfers: ${t === 'user' ? "only to the user's own address" : t === 'allowlist' ? "to the user's own address or a contract listed above" : 'to ANY address'}  ("transfers": "${t}" in ${CONFIG_NAME}; "user" | "allowlist" | "any")`);
     log();
     log(`External origins the site may load from or connect to (${r.origins.length}):`);
     for (const x of r.origins) log(`    ${x}`);
@@ -109,11 +111,12 @@ program.command('diff <id> [buildDir]')
   });
 
 program.command('wait <buildDir>')
-  .description('wait until this exact build is published on-chain (CI runs this before deploying); sends nothing')
+  .description('wait until this exact build is published on-chain (CI runs this before deploying)')
+  .option('--publish', 'send the publish call once approvals and timelock allow it (anyone may; the policy circuit decides)')
   .option('--timeout <seconds>', 'give up after this long (exit code 3; the proposal stays open)', '19800')
   .option('--interval <seconds>', 'time between checks', '30')
-  .action(async (buildDir: string, o: { timeout: string; interval: string }) => {
-    await cmd.wait(ctx(), buildDir, { timeout: Number(o.timeout), interval: Number(o.interval) }, log);
+  .action(async (buildDir: string, o: { timeout: string; interval: string; publish?: boolean }) => {
+    await cmd.wait(ctx(), buildDir, { timeout: Number(o.timeout), interval: Number(o.interval), publish: o.publish }, log);
   });
 
 program.command('approve <id>').description('approve a proposal (approvers only)').action(async (v: string) => cmd.approve(ctx(), id(v), log));

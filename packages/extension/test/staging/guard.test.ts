@@ -3,12 +3,13 @@
 // SIGNET_SAVE_DEMO=1 also writes the screenshots to docs/demo/.
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeFunctionResult, encodeFunctionResult, parseAbi, toHex, hexToString } from 'viem';
 import type { Page } from 'playwright';
+import { encodeLabel } from '../../src/lib/label.ts';
 import {
-  anvil, net, sealDemoDapp, switchToEnforce, serveSite, rpcProxy, buildExtension, openBrowser, until, synced, tabIdOf, badge, events, siteState, signed,
+  anvil, net, sealDemoDapp, switchToEnforce, serveSite, rpcProxy, buildExtension, startGateway, openBrowser, until, synced, tabIdOf, badge, events, siteState, signed,
   DEMO_DIR, DRAINER, DRAIN_DATA, ROUTER, type Project, type Site, type Proxy, type Session,
 } from './harness.ts';
 
@@ -18,6 +19,7 @@ let site: Site;
 let rpcA: Proxy;
 let rpcB: Proxy;
 let ext: string;
+let gateway: Awaited<ReturnType<typeof startGateway>>;
 let origin: string;
 const open: Session[] = [];
 
@@ -68,7 +70,8 @@ before(async () => {
   site = await serveSite(project.dist);
   origin = `http://${domain}:${site.port}`;
   [rpcA, rpcB] = [await rpcProxy(), await rpcProxy()];
-  ext = buildExtension(rpcA.url, rpcB.url);
+  gateway = await startGateway(rpcA.url, rpcB.url);
+  ext = buildExtension(rpcA.url, rpcB.url, gateway);
 });
 beforeEach(() => {
   site.tamper = false;
@@ -78,6 +81,7 @@ beforeEach(() => {
 after(async () => {
   for (const s of open) await s.close().catch(() => {});
   site?.close();
+  gateway?.close();
   rpcA?.close();
   rpcB?.close();
 });
@@ -202,21 +206,26 @@ test('enforce mode, tampered bundle: red badge, full red page, the drainer never
   await shot(page, 'guard-blocked.png');
   assert.deepEqual(signed(s), [], 'nothing reached the wallet');
 
-  // "Open verified copy": the release as stored on-chain, every file checked against its sealed hash
+  // "Open verified copy": the gateway's page for this domain, a normal origin where the wallet works
   const [copy] = await Promise.all([s.ctx.waitForEvent('page'), page.click('#copy')]);
-  const copyErrors: string[] = [];
-  copy.on('console', (m) => copyErrors.push(m.text()));
-  copy.on('pageerror', (e) => copyErrors.push(String(e)));
-  await copy.waitForFunction(() => /files are stored on-chain and match/.test(document.getElementById('sum')?.textContent ?? ''), null, { timeout: 20000 }).catch(async (e: Error) => {
-    throw new Error(`${e.message}\n${copy.url()}\n${(await copy.locator('body').innerText()).slice(0, 600)}\n${copyErrors.join('\n')}`);
+  const copyLog: string[] = [];
+  copy.on('console', (m) => copyLog.push(m.text()));
+  copy.on('pageerror', (e) => copyLog.push(String(e)));
+  await copy.waitForSelector('#app[data-lazy="loaded"]', { timeout: 30000 }).catch(async (e: Error) => {
+    throw new Error(`${e.message}\n${copy.url()}\n${(await copy.locator('body').innerText()).slice(0, 500)}\n${copyLog.join('\n')}`);
   });
-  assert.match((await copy.locator('#sum').textContent())!, /^4 of 4 files are stored on-chain and match their sealed hash\./);
-  const frame = await until('the preview frame', () => copy.frames().find((f) => f.url().includes('sandbox.html')));
-  await frame.waitForSelector('#app[data-lazy="loaded"]', { timeout: 10000 }).catch(async (e: Error) => {
-    throw new Error(`${e.message}\n${copyErrors.join('\n')}\n${(await frame.content()).slice(0, 1200)}`);
-  }); // the app's own JS ran, lazy chunk included
-  assert.equal(await frame.locator('h1').textContent(), 'Demo Swap');
+  assert.equal(new URL(copy.url()).origin, `http://${encodeLabel(domain)}.localhost:${gateway.port}`);
+  const copyTab = await until('Guard to know the copy tab', () => tabIdOf(s, copy));
+  await light(s, copyTab, 'OK'); // Guard checked the copy against the same sealed release, and the gateway's own files against its pins
+  assert.match(await click(copy, 'approve', 'ok'), /Approve: done/); // the user keeps using the app while the real site is hijacked
+  assert.equal(signed(s).length, 1);
+  assert.match(await popupShot(s, copyTab, 'guard-popup-verified-copy.png'), new RegExp(`Sealed ${domain} Release #1`));
   await shot(copy, 'guard-verified-copy.png');
+  // the sealed allowlist is enforced on the copy too
+  await copy.goto(`${copy.url()}?spender=${DRAINER}`);
+  await copy.waitForSelector('#app[data-lazy="loaded"]');
+  assert.match(await click(copy, 'approve', 'error'), /Spender not in the sealed allowlist/);
+  assert.equal(signed(s).length, 1);
   await copy.close();
 
   // "Report wrong block": a local report, nothing sent
@@ -234,10 +243,34 @@ test('enforce mode, tampered bundle: red badge, full red page, the drainer never
   assert.ok(!consoleLines.some((l) => l.startsWith('DRAINER got')));
   await page.evaluate(() => document.getElementById('signet-guard-notice')?.remove());
   assert.match(await click(page, 'approve', 'error'), /refused \[4001\].*doesn't match its sealed release/);
-  assert.deepEqual(signed(s), []);
+  assert.equal(signed(s).length, 1, 'the only signature the wallet ever saw is the sealed approve made on the verified copy');
   assert.equal(await badge(s, await tabIdOf(s, page)), '!');
   await s.close();
   site.tamper = false;
+});
+
+test('a gateway whose worker is not the pinned one is red; without a gateway the copy is the preview inside the extension', async () => {
+  const swFile = join(gateway.dist, 'sw.js');
+  const original = readFileSync(swFile);
+  writeFileSync(swFile, Buffer.concat([original, Buffer.from('\n// changed on the gateway server\n')]));
+  try {
+    const s = await browser();
+    const page = s.ctx.pages()[0]!;
+    await page.goto(`http://${encodeLabel(domain)}.localhost:${gateway.port}/`).catch(() => {});
+    await until('the tab to be taken to the warning page', () => page.url().startsWith('chrome-extension:') && page.url().includes('blocked.html'), 30000); // enforce mode
+    await page.waitForSelector('h1');
+    assert.match(await page.locator('#root').innerText(), /changed · http:\/\/.*\.localhost:\d+\/sw\.js/);
+    await light(s, await tabIdOf(s, page), '!');
+    // the preview page still exists for builds without a gateway
+    const preview = await s.ctx.newPage();
+    await preview.goto(`chrome-extension://${s.extId}/copy.html#domain=${domain}`);
+    await preview.waitForFunction(() => /files are stored on-chain and match/.test(document.getElementById('sum')?.textContent ?? ''), null, { timeout: 20000 });
+    const frame = await until('the preview frame', () => preview.frames().find((f) => f.url().includes('sandbox.html')));
+    await frame.waitForSelector('#app[data-lazy="loaded"]', { timeout: 10000 });
+    await s.close();
+  } finally {
+    writeFileSync(swFile, original);
+  }
 });
 
 test('privacy: on a domain that is not sealed Guard makes no network call and stays out of the way', async () => {

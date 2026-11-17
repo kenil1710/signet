@@ -46,7 +46,12 @@ export function isOnchainPath(p: string): boolean {
 export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number }
 export interface ExternalScript { url: string; integrity: string | null; page: string }
 export interface SealedScript { url: string; integrity: string | null }
-export type Allowlist = Record<string, { targets: string[]; spenders: string[]; eip712: string[] }>;
+/// Who a token transfer / transferFrom may send to: only the user's own address, also the sealed contracts, or
+/// anyone (an app whose purpose is sending tokens). Sealed per chain in allowlist.json, so loosening it is an
+/// allowlist change (tier 10).
+export type Transfers = 'user' | 'allowlist' | 'any';
+export const TRANSFERS: Transfers[] = ['user', 'allowlist', 'any'];
+export type Allowlist = Record<string, { targets: string[]; spenders: string[]; eip712: string[]; transfers: Transfers }>;
 /// signet/origins.json. Its hash is originsHash, so a new origin, a new cross-origin script and a changed SRI
 /// hash all raise the on-chain tier to 01.
 export interface OriginsFile { origins: string[]; scripts: SealedScript[] }
@@ -57,6 +62,7 @@ export interface SealConfig {
   domain: string;
   chainId: number;
   allowlist?: Record<string, AllowlistRules>;
+  transfers?: Transfers; // default "user"
   origins?: { include?: string[]; exclude?: string[] };
 }
 export interface Manifest {
@@ -211,6 +217,8 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
   const rules = cfg.allowlist ?? {};
   const norm = (list: string[] | undefined): string[] => (list ?? []).map((a) => getAddress(a.toLowerCase()));
   const sortAddrs = (s: Set<string>) => [...s].sort((a, b) => (a.toLowerCase() < b.toLowerCase() ? -1 : 1));
+  const transfers = cfg.transfers ?? 'user';
+  if (!TRANSFERS.includes(transfers)) throw new Error(`"transfers" must be "user", "allowlist" or "any" (got ${JSON.stringify(cfg.transfers)})`);
   const allowlist: SealResult['allowlist'] = {};
   for (const id of [...new Set([chain, ...Object.keys(rules)])].sort((a, b) => Number(a) - Number(b))) {
     const r = rules[id] ?? {};
@@ -225,7 +233,7 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
         eip712.add(PERMIT2);
       }
     }
-    allowlist[id] = { targets: sortAddrs(targets), spenders: sortAddrs(spenders), eip712: sortAddrs(eip712) };
+    allowlist[id] = { targets: sortAddrs(targets), spenders: sortAddrs(spenders), eip712: sortAddrs(eip712), transfers };
   }
 
   // origins: every origin found in the build except documentation links and the site itself

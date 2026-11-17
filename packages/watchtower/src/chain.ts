@@ -1,7 +1,7 @@
 // What the watchtower reads from the chain. Same rules as Guard (packages/extension): facts come from two RPCs
 // at the same block when two are configured, and the sealed lists count only if they hash to the on-chain
 // release. Read-only: the watchtower holds no key and sends no transaction.
-import { decodeEventLog, decodeFunctionResult, encodeEventTopics, encodeFunctionData, hexToBytes, zeroAddress, type Abi, type Hex } from 'viem';
+import { decodeFunctionResult, encodeFunctionData, hexToBytes, zeroAddress, type Abi, type Hex } from 'viem';
 import { gateAbi } from '@signet/cli/src/abi.ts';
 import { registryAbi, siteAbi } from '@signet/extension/src/lib/abi.ts';
 import { agree, either, rpc, type Call } from '@signet/extension/src/lib/rpc.ts';
@@ -17,27 +17,24 @@ const dec = <T>(abi: Abi, functionName: string, data: string): T => {
 /// Two RPCs that must agree when two are configured; otherwise the single one (staging).
 const read = (net: Net, calls: Call[]): Promise<string[]> => (net.rpcUrl2 ? agree(net, calls) : Promise.all(calls.map((c) => either(net, c))));
 
-export interface Binding { domain: string; gate: Hex; block: number }
-
-/// Domains claimed in the registry from `fromBlock` on (the union of both RPCs' logs), and the block reached.
-export async function newBindings(net: Net, fromBlock: number): Promise<{ bindings: Binding[]; next: number }> {
+/// Domains added to the registry's list from index `from` on (domainCount / domainsRange), and the new length.
+export async function newDomains(net: Net, from: number): Promise<{ domains: string[]; next: number }> {
   if (!net.registry) throw new Error('Signet is not deployed on this network');
-  const urls = [net.rpcUrl, net.rpcUrl2].filter((u): u is string => !!u);
-  const head = Math.min(...(await Promise.all(urls.map((u) => rpc<string>(u, 'eth_blockNumber', [])))).map((h) => parseInt(h, 16)));
-  const topics = [[encodeEventTopics({ abi: registryAbi, eventName: 'Claimed' })[0], encodeEventTopics({ abi: registryAbi, eventName: 'Transferred' })[0]]];
-  const found = new Map<string, Binding>();
-  let from = fromBlock;
-  for (; from <= head; from += 5000) {
-    const filter = { address: net.registry, topics, fromBlock: `0x${from.toString(16)}`, toBlock: `0x${Math.min(head, from + 4999).toString(16)}` };
-    for (const u of urls) {
-      for (const log of await rpc<{ topics: Hex[]; data: Hex; blockNumber: Hex }[]>(u, 'eth_getLogs', [filter])) {
-        const ev = decodeEventLog({ abi: registryAbi, topics: log.topics as [Hex, ...Hex[]], data: log.data });
-        const gate = ev.eventName === 'Claimed' ? ev.args.gate : ev.args.toGate;
-        found.set(`${ev.args.domain}:${log.blockNumber}`, { domain: ev.args.domain, gate, block: parseInt(log.blockNumber, 16) });
-      }
-    }
+  const [c] = await read(net, [enc(net.registry, registryAbi, 'domainCount')]);
+  const count = Number(dec<bigint>(registryAbi, 'domainCount', c!));
+  const domains: string[] = [];
+  while (from + domains.length < count) {
+    const [page] = await read(net, [enc(net.registry, registryAbi, 'domainsRange', [BigInt(from + domains.length), 100n])]);
+    const more = dec<string[]>(registryAbi, 'domainsRange', page!);
+    if (more.length === 0) break;
+    domains.push(...more);
   }
-  return { bindings: [...found.values()].sort((a, b) => a.block - b.block), next: head + 1 };
+  return { domains, next: from + domains.length };
+}
+
+export async function domainCount(net: Net): Promise<number> {
+  const [c] = await read(net, [enc(net.registry!, registryAbi, 'domainCount')]);
+  return Number(dec<bigint>(registryAbi, 'domainCount', c!));
 }
 
 export interface GateView {

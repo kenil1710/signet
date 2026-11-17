@@ -6,7 +6,8 @@
 //   WATCHTOWER_ONLY           comma-separated domains to watch (default: all bound domains)
 //   WATCHTOWER_URL_TEMPLATE   default https://{domain}/   (staging: http://{domain}:PORT/)
 //   WATCHTOWER_HOST_RULES     Chromium --host-resolver-rules, for staging hosts that don't exist in DNS
-//   WATCHTOWER_FROM_BLOCK, WATCHTOWER_STATE
+//   WATCHTOWER_FROM_INDEX     first run only: skip the registry's first N domains
+//   WATCHTOWER_STATE          the state file
 import { fileURLToPath } from 'node:url';
 import { loadNetwork } from '@signet/contracts/network';
 import { alerterFromEnv } from './alerts.ts';
@@ -14,11 +15,10 @@ import { run } from './watchtower.ts';
 import type { Net } from './chain.ts';
 
 export function netFromEnv(env: NodeJS.ProcessEnv = process.env): Net {
-  const n = loadNetwork(env.SIGNET_NETWORK || 'mainnet') as ReturnType<typeof loadNetwork> & { deployBlock?: number };
+  const n = loadNetwork(env.SIGNET_NETWORK || 'mainnet');
   return {
     name: n.name, chainId: n.chainId, rpcUrl: n.rpcUrl, rpcUrl2: env.SIGNET_RPC_URL2 || n.rpcUrl2 || null,
     registry: (n.contracts.registry as `0x${string}` | undefined) ?? null, siteRegistry: n.tapeout.siteRegistry as `0x${string}`,
-    fromBlock: Number(env.WATCHTOWER_FROM_BLOCK ?? n.deployBlock ?? n.forkBlock ?? 0),
   };
 }
 
@@ -37,6 +37,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       net, alert: alerterFromEnv(env),
       statePath: env.WATCHTOWER_STATE || fileURLToPath(new URL(`../.state/${net.name}.json`, import.meta.url)),
       urlFor: (d) => template.replace('{domain}', d),
+      fromIndex: env.WATCHTOWER_FROM_INDEX ? Number(env.WATCHTOWER_FROM_INDEX) : undefined,
       only: env.WATCHTOWER_ONLY ? env.WATCHTOWER_ONLY.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
     },
     { intervalSec: args.includes('--interval') ? interval : 60, once: args.includes('--once'), chromiumArgs: env.WATCHTOWER_HOST_RULES ? [`--host-resolver-rules=${env.WATCHTOWER_HOST_RULES}`] : [] },
