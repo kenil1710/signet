@@ -17,6 +17,7 @@
   "scripts": {
     "attacks": "node src/suite.ts",
     "test:staging": "node --test --test-concurrency=1 test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "benchmark": "node src/benchmark.ts"
   }
 }

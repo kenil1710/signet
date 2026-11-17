@@ -12,6 +12,9 @@ import { domainOfGatewayHost, encodeLabel } from './lib/label.ts';
 import type { Decision, GuardEvent, Hex, Net, PageInfo, PageReport, Sealed, SignRequest, SiteState } from './lib/types.ts';
 
 declare const __NET__: Net;
+/// Benchmark-only build (packages/attacks, docs/benchmark.md): the page check alone, as a hash-only checker does it.
+/// The signing-time allowlist is off: targets, spenders, recipients and decoding are treated as fine.
+declare const __HASH_ONLY__: boolean;
 const NET = __NET__;
 const FRESH_MS = 60_000; // re-read the chain for a sealed domain at most once a minute
 const STALE_MS = 24 * 3600_000; // RPCs down: the cached release is used for up to 24 h (spec, "X Layer RPC down")
@@ -249,7 +252,9 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const ctx = { site: site.status, page: tab.report?.status ?? 'unknown', allowlist: site.current ? (site.manifests[site.current]?.allowlist ?? null) : null, frozen: site.frozen, enforced: site.enforced } as const;
       const verdict = decide(msg.req, ctx);
       // the policy names the facts; the Guard decision circuit decides
-      const answer = await decideWithCircuit(NET, factsOf(verdict, ctx), {
+      const facts = factsOf(verdict, ctx);
+      if (__HASH_ONLY__) Object.assign(facts, { targetSealed: true, spenderSealed: true, recipientOk: true, decoded: true });
+      const answer = await decideWithCircuit(NET, facts, {
         get: () => get(local, 'guardCircuit'),
         set: (c) => local.set({ guardCircuit: c }),
       });

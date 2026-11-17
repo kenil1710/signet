@@ -1,0 +1,177 @@
+{
+  "defender": "signet",
+  "blocked": 12,
+  "total": 12,
+  "falseBlocks": 0,
+  "clean": 16,
+  "attacks": [
+    {
+      "id": "dns-hijack",
+      "threat": "1",
+      "vector": "DNS / registrar hijack: whole site replaced, drainer on load",
+      "blocked": true,
+      "how": "page blocked (warning page), signature refused"
+    },
+    {
+      "id": "swapped-chunk",
+      "threat": "2",
+      "vector": "one lazy-loaded JS chunk swapped on the CDN/S3",
+      "blocked": true,
+      "how": "chunk hash mismatch: page blocked, signature refused"
+    },
+    {
+      "id": "swap-back",
+      "threat": "4",
+      "vector": "bundle tampered for one request, then swapped back (Bybit)",
+      "blocked": true,
+      "how": "cache read caught the bytes that ran (a re-download now gets clean bytes): page blocked"
+    },
+    {
+      "id": "injected-script",
+      "threat": "3",
+      "vector": "<script> from an unsealed origin injected into the HTML",
+      "blocked": true,
+      "how": "HTML hash mismatch + unsealed origin: page blocked"
+    },
+    {
+      "id": "eval-code",
+      "threat": "3",
+      "vector": "code from data via new Function / eval (no file changed): approve and transfer to the attacker",
+      "blocked": true,
+      "how": "page check stays green (OK): no file changed. The signing check refused both: Spender not in the sealed allowlist; Recipient is not you",
+      "note": "Page integrity can't see code that arrives as data; only the signing-time allowlist stops it."
+    },
+    {
+      "id": "service-worker",
+      "threat": "14",
+      "vector": "malicious service worker that outlives the hijack",
+      "blocked": true,
+      "how": "unsealed service worker script detected on the next visit (registrations: 1): page blocked"
+    },
+    {
+      "id": "router-recipient",
+      "threat": "6",
+      "vector": "swap on the sealed router with the attacker as recipient",
+      "blocked": true,
+      "how": "refused: Recipient is not you"
+    },
+    {
+      "id": "permit-phishing",
+      "threat": "6",
+      "vector": "Permit2 and EIP-2612 permit signatures naming the attacker as spender",
+      "blocked": true,
+      "how": "both refused: spender not sealed (Permit2, EIP-2612)"
+    },
+    {
+      "id": "poisoned-npm",
+      "threat": "5",
+      "vector": "poisoned dependency adds a drainer address, origin and approve/transferFrom calls; approvers publish it anyway",
+      "blocked": true,
+      "how": "Diff Guard flagged it (4 flags) and the chain made it tier 10 (2 approvals + 24 h); once published the page check is green (OK) because the drainer is sealed, but the signing check refused: Spender not in the sealed allowlist",
+      "note": "Stopped because the drainer was not a sealed SPENDER and transfers go only to the user by default. A poisoned package that only calls sealed contracts with a recipient it may use is not stopped (THREAT_MODEL.md)."
+    },
+    {
+      "id": "rollback-in-grace",
+      "threat": "R",
+      "vector": "rollback to release 1 inside the 6 h grace window, for a user whose Guard saw release 1, approving a spender release 2 retired",
+      "blocked": true,
+      "how": "the old files are accepted (grace window), but the CURRENT allowlist refused the retired spender: spender not sealed"
+    },
+    {
+      "id": "rollback",
+      "threat": "R",
+      "vector": "rollback to release 1 after the grace window",
+      "blocked": true,
+      "how": "release 1 is no longer valid on-chain: page blocked"
+    },
+    {
+      "id": "revoked",
+      "threat": "V",
+      "vector": "signing on a release the approvers revoked",
+      "blocked": true,
+      "how": "page blocked; signature refused: This release was revoked"
+    }
+  ],
+  "cleans": [
+    {
+      "name": "normal use #1, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #2, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #3, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #4, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #5, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #1, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #2, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #3, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #4, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use #5, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "reload, files from the browser cache #1",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "reload, files from the browser cache #2",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "reload, files from the browser cache #3",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "verified copy on the gateway #1",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "verified copy on the gateway #2",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    },
+    {
+      "name": "normal use right after a new release (tier 10, release 2)",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through; badge OK"
+    }
+  ]
+}

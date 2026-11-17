@@ -10,6 +10,7 @@ import http from 'node:http';
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Page } from 'playwright';
 import { createWalletClient, encodeFunctionData, http as viemHttp, parseAbi, type Address } from 'viem';
@@ -30,6 +31,13 @@ const gateAbi = parseAbi(['function enforce()', 'function revoke(uint64)']);
 const log = (s: string) => process.stdout.write(`${s}\n`);
 // ATTACKS_ONLY=revoked,poisoned-npm runs only those (and no clean sessions): for debugging, not for the report
 const ONLY = process.env.ATTACKS_ONLY?.split(',');
+/// Which defender the attacks run against (docs/benchmark.md):
+///   signet     the full Guard (default)
+///   hash-only  Guard's page check alone, signing-time allowlist off (the hash-checker approach of TEE Shield / Code Verify)
+///   sri-only   no extension; the site puts an integrity attribute on every script and stylesheet in its HTML
+export type Defender = 'signet' | 'hash-only' | 'sri-only';
+const DEFENDER = (process.env.SIGNET_DEFENDER ?? 'signet') as Defender;
+const hasGuard = DEFENDER !== 'sri-only';
 const want = (id: string) => !ONLY || ONLY.includes(id);
 
 // ---------------------------------------------------------------- the web server: one host per project, plus the attacker's CDN
@@ -54,14 +62,21 @@ const server = http.createServer((req, res) => {
   hits.set(key, n);
   const file = join(h.dist, rel);
   const orig = !rel.includes('..') && existsSync(file) ? readFileSync(file) : null;
-  const patched = h.patch?.(rel, orig, n);
-  const body = patched === undefined ? orig : patched;
+  const base = DEFENDER === 'sri-only' && rel === 'index.html' && orig ? withSri(orig, h.dist) : orig;
+  const patched = h.patch?.(rel, base, n);
+  const body = patched === undefined ? base : patched;
   if (body === null) return void ((res.statusCode = 404), res.end());
   res.setHeader('content-type', TYPES[extname(rel)] ?? 'application/octet-stream');
   res.setHeader('cache-control', rel.endsWith('.html') ? 'no-cache' : 'public, max-age=3600');
   res.end(body);
 });
 let port = 0;
+/// SRI on every same-origin <script src> and <link href> in the HTML (what a careful team can do without Signet).
+function withSri(html: Buffer, dist: string): Buffer {
+  const sri = (p: string) => `sha384-${createHash('sha384').update(readFileSync(join(dist, p))).digest('base64')}`;
+  return Buffer.from(html.toString().replace(/<(script|link)\b([^>]*?)\s(src|href)="\/([^"]+)"([^>]*)>/g, (m, tag, a, attr, p, b) =>
+    existsSync(join(dist, p)) && !/integrity=/.test(m) ? `<${tag}${a} ${attr}="/${p}" integrity="${sri(p)}"${/crossorigin/.test(m) ? '' : ' crossorigin'}${b}>` : m));
+}
 /// What a fresh download of a path gets now (the made-up staging hosts don't resolve outside the browser).
 const download = (host: string, path: string) =>
   new Promise<string>((res, rej) => http.get({ host: '127.0.0.1', port, path, headers: { host: `${host}:${port}` } }, (r) => {
@@ -86,16 +101,28 @@ let origins = '';
 const projects: Project[] = [];
 
 async function guardBrowser(late = false): Promise<Session> {
+  if (!hasGuard) {
+    // no extension: a plain browser with the mock wallet
+    const b = await chromium.launch({ headless: true, args: ['--host-resolver-rules=MAP *.signet.test 127.0.0.1, MAP *.example.test 127.0.0.1'] });
+    const ctx = await b.newContext();
+    const wallet = await installMockWallet(ctx, late);
+    if (process.env.ATTACKS_DEBUG) ctx.on('console', (m) => log(`    [console] ${m.text()}`));
+    if (process.env.ATTACKS_DEBUG) ctx.on('response', (r) => log(`    [response] ${r.status()} ${r.url()}`));
+    await ctx.newPage();
+    return { ctx, sw: null as never, wallet, extId: '', close: () => b.close() };
+  }
   const s = await openBrowser(ext, { origin: origins, late });
   for (const p of projects) await synced(s, p.domain);
   return s;
 }
 const harmful = (w: WalletCall[], ...needles: string[]) => w.filter((c) => /sendTransaction|sign/i.test(c.method) && needles.some((n) => c.params.toLowerCase().includes(n)));
 async function lastRefusal(s: Session): Promise<string> {
+  if (!hasGuard) return 'the drainer never ran: the browser refused a script whose bytes did not match its integrity attribute';
   const e = (await events(s)).find((x) => x.refused);
   return e ? `${e.title} (${e.details.at(-1)})` : 'no refusal recorded';
 }
 async function onWarningPage(page: Page): Promise<boolean> {
+  if (!hasGuard) return false;
   return until('the warning page', () => page.url().startsWith('chrome-extension:') && page.url().includes('blocked.html'), 15000).then(() => true, () => false);
 }
 async function settle(ms = 2500): Promise<void> {
@@ -113,7 +140,7 @@ async function click(page: Page, id: string): Promise<string> {
 
 async function record(a: Omit<Attack, 'blocked' | 'how'>, s: Session | null, w: WalletCall[], needles: string[], how: () => Promise<string>, note?: string): Promise<void> {
   const leaked = harmful(w, ...needles);
-  const r: Attack = { ...a, blocked: leaked.length === 0, how: leaked.length ? `reached the wallet: ${leaked[0]!.method}` : await how(), note };
+  const r: Attack = { ...a, blocked: leaked.length === 0, how: leaked.length ? `reached the wallet: ${leaked[0]!.method}` : hasGuard ? await how() : await lastRefusal(s!), note: hasGuard || leaked.length ? note : undefined };
   attacks.push(r);
   log(`  ${r.blocked ? 'BLOCKED' : r.limit ? 'NOT PROTECTED (known limit)' : 'NOT BLOCKED'}  ${r.id}: ${r.how}`);
   void s;
@@ -183,17 +210,19 @@ async function cleanSession(name: string, p: Project, o: { late?: boolean; reloa
       if (!/done/.test(t)) why ||= `${b}: ${t}`;
     }
     if (page.url().includes('blocked.html')) why ||= 'sent to the warning page';
-    const tab = await tabIdOf(s, page);
-    const light = await until('a badge', async () => (await badge(s, tab)) || null, 15000).catch(() => '');
-    if (light === '!') why ||= 'red badge';
-    const refused = (await events(s)).filter((e) => e.refused);
-    if (refused.length) why ||= `refused: ${refused[0]!.title}`;
+    if (hasGuard) {
+      const tab = await tabIdOf(s, page);
+      const light = await until('a badge', async () => (await badge(s, tab)) || null, 15000).catch(() => '');
+      if (light === '!') why ||= 'red badge';
+      const refused = (await events(s)).filter((e) => e.refused);
+      if (refused.length) why ||= `refused: ${refused[0]!.title}`;
+    }
   } catch (e) {
     why = `error: ${(e as Error).message.split('\n')[0]}`;
   } finally {
     await s.close();
   }
-  cleans.push({ name, falseBlock: !!why, why: why || 'approve, swap, Permit2 and stake all went through; badge OK' });
+  cleans.push({ name, falseBlock: !!why, why: why || `approve, swap, Permit2 and stake all went through${hasGuard ? '; badge OK' : ''}` });
   log(`  ${why ? 'FALSE BLOCK' : 'clean ok'}  ${name}${why ? `: ${why}` : ''}`);
 }
 
@@ -213,7 +242,7 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
   for (let i = 0; i < 5; i++) await cleanSession(`normal use #${i + 1}, wallet installed first`, p1);
   for (let i = 0; i < 5; i++) await cleanSession(`normal use #${i + 1}, wallet installed late`, p1, { late: true });
   for (let i = 0; i < 3; i++) await cleanSession(`reload, files from the browser cache #${i + 1}`, p1, { reload: true });
-  for (let i = 0; i < 2; i++) await cleanSession(`verified copy on the gateway #${i + 1}`, p1, { url: `http://${encodeLabel(p1.domain)}.localhost:${gateway.port}/` });
+  if (hasGuard) for (let i = 0; i < 2; i++) await cleanSession(`verified copy on the gateway #${i + 1}`, p1, { url: `http://${encodeLabel(p1.domain)}.localhost:${gateway.port}/` });
   }
 
   log('\nattacks');
@@ -285,9 +314,9 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
       r.push(await (0, eval)(`__eth.request({method:"eth_sendTransaction",params:[{from:"0x1111111111111111111111111111111111111111",to:"0x1E4a5963aBFD975d8c9021ce480b42188849D41d",data:"${transfer}"}]})`).then(() => 'sent', (e: Error) => e.message));
       return r;
     }, { approve: `0x095ea7b3${word(DRAINER)}${'f'.repeat(64)}`, transfer: `0xa9059cbb${word(DRAINER)}${(5n).toString(16).padStart(64, '0')}` });
-    const tab = await tabIdOf(s, page);
+    const tab = hasGuard ? await tabIdOf(s, page) : 0;
     await record({ id: 'eval-code', threat: '3', vector: 'code from data via new Function / eval (no file changed): approve and transfer to the attacker' }, s, s.wallet, [lc(DRAINER)],
-      async () => `page check stays green (${await badge(s, tab)}): no file changed. The signing check refused both: ${out.map((m) => m.replace(/^Signet Guard refused this signature: /, '').split('.')[0]).join('; ')}`,
+      async () => `page check stays green (${hasGuard ? await badge(s, tab) : 'n/a'}): no file changed. The signing check refused both: ${out.map((m) => m.replace(/^Signet Guard refused this signature: /, '').split('.')[0]).join('; ')}`,
       'Page integrity can\'t see code that arrives as data; only the signing-time allowlist stops it.');
     await s.close();
   }
@@ -352,8 +381,8 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
     const page = s.ctx.pages()[0]!;
     await page.goto(urlOf(p3), { waitUntil: 'load' });
     await page.waitForSelector('#app[data-lazy="loaded"]');
-    const tab = await tabIdOf(s, page);
-    const light = await until('badge OK', async () => ((await badge(s, tab)) === 'OK' ? 'OK' : null)).catch(async () => (await badge(s, tab)) || 'none');
+    const tab = hasGuard ? await tabIdOf(s, page) : 0;
+    const light = hasGuard ? await until('badge OK', async () => ((await badge(s, tab)) === 'OK' ? 'OK' : null)).catch(async () => (await badge(s, tab)) || 'none') : 'n/a';
     const out = await page.evaluate(async ({ token, user }) => {
       // the drainer first fetches its config from the attacker's origin; that host doesn't exist here, so it is answered in the page
       const real = window.fetch;
@@ -377,7 +406,7 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
     const p0 = s0.ctx.pages()[0]!;
     await p0.goto(urlOf(p2), { waitUntil: 'load' });
     await p0.waitForSelector('#app[data-lazy="loaded"]');
-    await until('release 1 verified', async () => (await badge(s0, await tabIdOf(s0, p0))) === 'OK');
+    if (hasGuard) await until('release 1 verified', async () => (await badge(s0, await tabIdOf(s0, p0))) === 'OK');
     const r = await release2(p2, v2, (c) => ((c.allowlist as Record<string, { spenders: string[] }>)['196']!.spenders = [ROUTER]));
     await anvil('evm_increaseTime', [`0x${(86400 + 60).toString(16)}`]);
     await anvil('anvil_mine', ['0x1']);
@@ -402,13 +431,18 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
     const p1b = s1.ctx.pages()[0]!;
     await p1b.goto(urlOf(p2, `?spender=${OLD_ROUTER}`)).catch(() => {});
     const red = await onWarningPage(p1b);
+    // the attacker's page asks for the retired spender (on a blocked page the request can't even be made)
+    if (!red) {
+      await p1b.waitForSelector('#app[data-lazy="loaded"]');
+      await click(p1b, 'approve');
+    }
     await settle();
     await record({ id: 'rollback', threat: 'R', vector: 'rollback to release 1 after the grace window' }, s1, s1.wallet, [lc(OLD_ROUTER)], async () => (red ? 'release 1 is no longer valid on-chain: page blocked' : await lastRefusal(s1)));
     await s1.close();
     hosts.set(p2.domain, { dist: v2 });
   }
   // 11. users without Guard (honest limit): the same DNS hijack, in a browser without the extension
-  if (want('no-extension')) {
+  if (want('no-extension') && DEFENDER === 'signet') {
     fresh();
     h1.patch = (rel) => (rel === 'index.html' ? '<!doctype html><title>Demo Swap</title><h1>Demo Swap</h1><script src="/assets/app.js"></script>' : rel === 'assets/app.js' ? TAMPER : undefined);
     const b = await chromium.launch({ headless: true, args: ['--host-resolver-rules=MAP *.signet.test 127.0.0.1'] });
@@ -440,20 +474,20 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
     await settle();
     // the user insists ("Go back to the site"): the page loads, and even a signature the revoked release allowed
     // (approve the sealed router) is refused
-    let t = 'no warning page';
     if (red) {
       await page.waitForSelector('#back');
       await page.click('#back');
       await page.waitForURL(urlOf(p1));
       await page.waitForLoadState('load');
       await settle(1500);
-      t = await page.evaluate(async (router) => {
+    }
+    {
+      const t = await page.evaluate(async (router) => {
         const eth = (window as unknown as { ethereum: { request(a: unknown): Promise<unknown> } }).ethereum;
         return eth.request({ method: 'eth_sendTransaction', params: [{ from: '0x1111111111111111111111111111111111111111', to: '0x1E4a5963aBFD975d8c9021ce480b42188849D41d', data: `0x095ea7b3${router.toLowerCase().slice(2).padStart(64, '0')}${'1'.padStart(64, '0')}` }] }).then(() => 'sent', (e: Error) => e.message);
       }, ROUTER);
+      await record({ id: 'revoked', threat: 'V', vector: 'signing on a release the approvers revoked' }, s, s.wallet, ['095ea7b3'], async () => `${red ? 'page blocked; ' : ''}signature refused: ${t.replace(/^Signet Guard refused this signature: /, '').split('.')[0]}`);
     }
-    if (process.env.ATTACKS_DEBUG) log(JSON.stringify({ wallet: s.wallet, events: await events(s), pages: s.ctx.pages().map((x) => x.url()) }, null, 1));
-    await record({ id: 'revoked', threat: 'V', vector: 'signing on a release the approvers revoked' }, s, s.wallet, ['095ea7b3'], async () => `${red ? 'page blocked; ' : ''}signature refused: ${t.replace(/^Signet Guard refused this signature: /, '').split('.')[0]}`);
     await s.close();
   }
 
@@ -473,7 +507,8 @@ export async function run(): Promise<{ blocked: number; total: number; falseBloc
   const limitLine = `Known limits run for transparency: ${limits.map((a) => `${a.id} ${a.blocked ? 'blocked' : 'not protected'}`).join(', ')}; a compromised extension is documented, not run.`;
   log(`  ${limitLine}`);
   log(`\n${line}`);
-  if (!ONLY) report(line, limitLine);
+  if (!ONLY && DEFENDER === 'signet') report(line, limitLine);
+  if (!ONLY) writeFileSync(join(ROOT, `docs/demo/benchmark-${DEFENDER}.json`), JSON.stringify({ defender: DEFENDER, blocked, total, falseBlocks, clean: cleans.length, attacks: guarded, cleans }, null, 2) + '\n');
   server.close();
   for (const c of closers) c();
   return { blocked, total, falseBlocks, clean: cleans.length, limitsNotProtected: limits.filter((a) => !a.blocked).length };

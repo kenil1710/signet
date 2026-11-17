@@ -27,7 +27,8 @@
     "try:serve": "node staging/try-it.mjs serve",
     "try:hack": "node staging/try-it.mjs hack",
     "try:clean": "node staging/try-it.mjs clean",
-    "try:build": "node staging/try-it.mjs build"
+    "try:build": "node staging/try-it.mjs build",
+    "benchmark": "pnpm --filter @signet/attacks benchmark"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

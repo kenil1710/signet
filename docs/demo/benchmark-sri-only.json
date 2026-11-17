@@ -1,0 +1,167 @@
+{
+  "defender": "sri-only",
+  "blocked": 2,
+  "total": 12,
+  "falseBlocks": 0,
+  "clean": 14,
+  "attacks": [
+    {
+      "id": "dns-hijack",
+      "threat": "1",
+      "vector": "DNS / registrar hijack: whole site replaced, drainer on load",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction"
+    },
+    {
+      "id": "swapped-chunk",
+      "threat": "2",
+      "vector": "one lazy-loaded JS chunk swapped on the CDN/S3",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction"
+    },
+    {
+      "id": "swap-back",
+      "threat": "4",
+      "vector": "bundle tampered for one request, then swapped back (Bybit)",
+      "blocked": true,
+      "how": "the drainer never ran: the browser refused a script whose bytes did not match its integrity attribute"
+    },
+    {
+      "id": "injected-script",
+      "threat": "3",
+      "vector": "<script> from an unsealed origin injected into the HTML",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction"
+    },
+    {
+      "id": "eval-code",
+      "threat": "3",
+      "vector": "code from data via new Function / eval (no file changed): approve and transfer to the attacker",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction",
+      "note": "Page integrity can't see code that arrives as data; only the signing-time allowlist stops it."
+    },
+    {
+      "id": "service-worker",
+      "threat": "14",
+      "vector": "malicious service worker that outlives the hijack",
+      "blocked": true,
+      "how": "the drainer never ran: the browser refused a script whose bytes did not match its integrity attribute"
+    },
+    {
+      "id": "router-recipient",
+      "threat": "6",
+      "vector": "swap on the sealed router with the attacker as recipient",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction"
+    },
+    {
+      "id": "permit-phishing",
+      "threat": "6",
+      "vector": "Permit2 and EIP-2612 permit signatures naming the attacker as spender",
+      "blocked": false,
+      "how": "reached the wallet: eth_signTypedData_v4"
+    },
+    {
+      "id": "poisoned-npm",
+      "threat": "5",
+      "vector": "poisoned dependency adds a drainer address, origin and approve/transferFrom calls; approvers publish it anyway",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction",
+      "note": "Stopped because the drainer was not a sealed SPENDER and transfers go only to the user by default. A poisoned package that only calls sealed contracts with a recipient it may use is not stopped (THREAT_MODEL.md)."
+    },
+    {
+      "id": "rollback-in-grace",
+      "threat": "R",
+      "vector": "rollback to release 1 inside the 6 h grace window, for a user whose Guard saw release 1, approving a spender release 2 retired",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction"
+    },
+    {
+      "id": "rollback",
+      "threat": "R",
+      "vector": "rollback to release 1 after the grace window",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction"
+    },
+    {
+      "id": "revoked",
+      "threat": "V",
+      "vector": "signing on a release the approvers revoked",
+      "blocked": false,
+      "how": "reached the wallet: eth_sendTransaction"
+    }
+  ],
+  "cleans": [
+    {
+      "name": "normal use #1, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #2, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #3, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #4, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #5, wallet installed first",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #1, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #2, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #3, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #4, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use #5, wallet installed late",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "reload, files from the browser cache #1",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "reload, files from the browser cache #2",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "reload, files from the browser cache #3",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    },
+    {
+      "name": "normal use right after a new release (tier 10, release 2)",
+      "falseBlock": false,
+      "why": "approve, swap, Permit2 and stake all went through"
+    }
+  ]
+}

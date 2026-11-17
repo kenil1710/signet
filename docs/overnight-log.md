@@ -131,3 +131,10 @@ Details per phase follow; every decision is in `docs/decisions.md`.
 5. **`JUDGES.md`, `CLAIMS.md`, `THREAT_MODEL.md`, `README.md`, `pnpm verify:claims`:** 7 mainnet claims pass on both operators, 8 repo claims pass, 2 PENDING (Signet's contracts, the Guard circuit on mainnet). Overclaims removed from the spec, `CLAUDE.md` and the READMEs.
 
 Last full run: 185 Foundry tests, 58 unit tests, 41 staging end-to-end tests, the attack suite and `verify:claims`, all passing; typecheck clean.
+
+## Next phase, item 1: comparison benchmark (2026-11-17)
+
+`pnpm benchmark` runs the whole attack suite against three defenders, each with fresh projects on staging: **SRI only 2/12, a hash-only checker 7/12, Signet 12/12; 0 false blocks for each** (`docs/benchmark.md`).
+- **The hash-only column is an ablation**, not TEE Shield itself: Guard built with `GUARD_MODE=hash-only` (page check on, signing-time allowlist off). It isolates what the signing check adds: eval/new Function code, a malicious router recipient, permit phishing, a poisoned package and rollback inside the grace window.
+- **SRI gets its best case:** an integrity attribute on every script and stylesheet in the HTML.
+- **Two fixes in my own harness before the numbers were right:** in SRI mode the server first dropped the integrity attributes on unmodified pages (SRI then looked like it blocked nothing), and the after-grace rollback never asked for a signature when the page wasn't blocked (SRI got a free "blocked"; corrected 3/12 → 2/12). The other two columns were blocked at the page there, so the fix doesn't change them.

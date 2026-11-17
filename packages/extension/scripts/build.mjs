@@ -32,7 +32,7 @@ const entries = { background: 'src/background.ts', content: 'src/content.ts', in
 for (const [name, entry] of Object.entries(entries)) {
   await build({
     root, configFile: false, logLevel: 'warn',
-    define: { __NET__: JSON.stringify(net) },
+    define: { __NET__: JSON.stringify(net), __HASH_ONLY__: JSON.stringify(process.env.GUARD_MODE === 'hash-only') },
     build: {
       outDir: out, emptyOutDir: false, minify: false, target: 'chrome120', sourcemap: false,
       lib: { entry: `${root}${entry}`, formats: [name === 'background' ? 'es' : 'iife'], name: `signetGuard_${name}`, fileName: () => `${name}.js` },
@@ -63,4 +63,4 @@ const manifest = {
   },
 };
 writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
-console.log(`Guard built for ${net.name}: ${out}\n  RPCs ${net.rpcUrl} + ${net.rpcUrl2 ?? '(none: Guard will not be able to check)'}\n  registry ${net.registry ?? 'not deployed'}\n  Guard circuit: ${net.guardCircuit ? `processor ${net.guardCircuit.processor} circuit ${net.guardCircuit.id}` : 'none: the local mirror decides'}\n  verified copy: ${net.gateway ? `gateway ${net.gateway.url}` : 'preview inside the extension (no gateway configured)'}`);
+console.log(`Guard built for ${net.name}${process.env.GUARD_MODE === 'hash-only' ? ' (HASH-ONLY benchmark build: signing-time allowlist OFF)' : ''}: ${out}\n  RPCs ${net.rpcUrl} + ${net.rpcUrl2 ?? '(none: Guard will not be able to check)'}\n  registry ${net.registry ?? 'not deployed'}\n  Guard circuit: ${net.guardCircuit ? `processor ${net.guardCircuit.processor} circuit ${net.guardCircuit.id}` : 'none: the local mirror decides'}\n  verified copy: ${net.gateway ? `gateway ${net.gateway.url}` : 'preview inside the extension (no gateway configured)'}`);
