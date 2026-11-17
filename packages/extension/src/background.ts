@@ -6,7 +6,8 @@ import { decodeFunctionResult, encodeFunctionData, hexToBytes, sha256, zeroAddre
 import { gateAbi, registryAbi, siteAbi } from './lib/abi.ts';
 import { agree, either, RpcError, type Call } from './lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sealed.ts';
-import { decide } from './lib/policy.ts';
+import { decide, factsOf } from './lib/policy.ts';
+import { decideWithCircuit } from './lib/guard-circuit.ts';
 import { domainOfGatewayHost, encodeLabel } from './lib/label.ts';
 import type { Decision, GuardEvent, Hex, Net, PageInfo, PageReport, Sealed, SignRequest, SiteState } from './lib/types.ts';
 
@@ -242,14 +243,21 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     }
     case 'sign': {
       const tab = tabId === undefined ? undefined : await get<TabState>(session, `tab:${tabId}`);
-      const allow: Decision = { action: 'allow', enforced: false, refused: false, title: '', reason: '', details: [] };
+      const allow: Decision = { by: 'mirror', input: 0, action: 'allow', enforced: false, refused: false, title: '', reason: '', details: [] };
       if (!tab) return allow;
       const site = await getSite(tab.domain);
-      const verdict = decide(msg.req, { site: site.status, page: tab.report?.status ?? 'unknown', allowlist: site.current ? (site.manifests[site.current]?.allowlist ?? null) : null });
-      const enforced = site.enforced && (site.status === 'sealed' || site.status === 'revoked');
-      const d: Decision = { ...verdict, enforced, refused: verdict.action === 'block' && enforced };
-      if (verdict.action !== 'allow') {
-        await logEvent({ at: Date.now(), domain: tab.domain, kind: 'sign', refused: d.refused, url: tab.url, title: verdict.title, reason: verdict.reason, details: [msg.req.method, ...verdict.details] });
+      const ctx = { site: site.status, page: tab.report?.status ?? 'unknown', allowlist: site.current ? (site.manifests[site.current]?.allowlist ?? null) : null, frozen: site.frozen, enforced: site.enforced } as const;
+      const verdict = decide(msg.req, ctx);
+      // the policy names the facts; the Guard decision circuit decides
+      const answer = await decideWithCircuit(NET, factsOf(verdict, ctx), {
+        get: () => get(local, 'guardCircuit'),
+        set: (c) => local.set({ guardCircuit: c }),
+      });
+      const action = answer.out.BLOCK ? 'block' : answer.out.WARN ? 'warn' : 'allow';
+      const d: Decision = { ...verdict, by: answer.by, input: answer.input, action, enforced: site.enforced, refused: action === 'block' };
+      if (action !== 'allow') {
+        const how = `decided by ${answer.by === 'mirror' ? `the local mirror (${answer.why})` : `the Guard circuit, row 0x${answer.input.toString(16).padStart(3, '0')}${answer.by === 'circuit-cached' ? ', cached' : ''}`}`;
+        await logEvent({ at: Date.now(), domain: tab.domain, kind: 'sign', refused: d.refused, url: tab.url, title: verdict.title, reason: verdict.reason, details: [msg.req.method, ...verdict.details, how] });
       }
       return d;
     }

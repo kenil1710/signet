@@ -11,6 +11,9 @@ export interface Net {
   /// The Signet gateway (packages/gateway) that "Open verified copy" uses, with the SHA-256 of its three own
   /// files so Guard can tell a changed gateway. Absent: the copy is shown as a preview inside the extension.
   gateway?: { url: string; pins: Record<string, string> } | null;
+  /// The Guard decision circuit Guard asks before every signature (packages/circuit, docs/guard-truth-table.md).
+  /// Absent: the local mirror of the same truth table decides.
+  guardCircuit?: { processor: Hex; id: number; netlistSha256: Hex; beacon: Hex; implementation: Hex } | null;
 }
 
 export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number }
@@ -72,9 +75,11 @@ export interface PageInfo {
 export interface SignRequest { method: string; params: unknown; chainId: string | null; accounts: string[] }
 export type Action = 'allow' | 'warn' | 'block';
 export interface Decision {
-  action: Action; // what the policy says
-  enforced: boolean; // false in observe mode or when Guard could not check: a "block" is then only recorded
-  refused: boolean; // action === 'block' && enforced
+  by: 'circuit' | 'circuit-cached' | 'mirror'; // who decided: the on-chain circuit, its cached answer, or the local mirror
+  input: number; // the circuit's packed input (docs/guard-truth-table.md row)
+  action: Action; // the circuit's answer: allow / warn / block
+  enforced: boolean; // enforce mode on the gate
+  refused: boolean; // action === 'block'
   title: string;
   reason: string;
   details: string[];

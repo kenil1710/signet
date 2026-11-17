@@ -20,6 +20,11 @@ if (process.env.SIGNET_GATEWAY_URL) {
   if (!existsSync(pins)) throw new Error(`SIGNET_GATEWAY_URL is set but ${pins} does not exist. Build the gateway first: pnpm --filter @signet/gateway build`);
   net.gateway = { url: process.env.SIGNET_GATEWAY_URL.replace(/\/+$/, ''), pins: JSON.parse(readFileSync(pins, 'utf8')) };
 }
+// The Guard decision circuit, when it is taped out on this network (deployments/<network>.json tapeout.guardCircuitId)
+if (n.tapeout.guardCircuitId !== undefined) {
+  const art = JSON.parse(readFileSync(`${root}../circuit/artifacts/guard.json`, 'utf8'));
+  net.guardCircuit = { processor: n.tapeout.processor, id: n.tapeout.guardCircuitId, netlistSha256: art.netlistSha256, beacon: n.tapeout.circuitBeacon, implementation: n.tapeout.circuitImplementation };
+}
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
@@ -58,4 +63,4 @@ const manifest = {
   },
 };
 writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
-console.log(`Guard built for ${net.name}: ${out}\n  RPCs ${net.rpcUrl} + ${net.rpcUrl2 ?? '(none: Guard will not be able to check)'}\n  registry ${net.registry ?? 'not deployed'}\n  verified copy: ${net.gateway ? `gateway ${net.gateway.url}` : 'preview inside the extension (no gateway configured)'}`);
+console.log(`Guard built for ${net.name}: ${out}\n  RPCs ${net.rpcUrl} + ${net.rpcUrl2 ?? '(none: Guard will not be able to check)'}\n  registry ${net.registry ?? 'not deployed'}\n  Guard circuit: ${net.guardCircuit ? `processor ${net.guardCircuit.processor} circuit ${net.guardCircuit.id}` : 'none: the local mirror decides'}\n  verified copy: ${net.gateway ? `gateway ${net.gateway.url}` : 'preview inside the extension (no gateway configured)'}`);

@@ -184,7 +184,19 @@ test('enforce mode, clean code but an unsealed spender: the signature is refused
     assert.match(tries[3]!, /unknown contract: Signet Guard refused.*Contract not in the sealed allowlist/);
     assert.equal(tries[4], 'sealed spender: SENT');
     assert.deepEqual(signed(s).map((c) => c.params.includes(ROUTER.toLowerCase().slice(2))), [true], 'only the sealed approve reached the wallet');
-    assert.ok((await events(s)).filter((e) => e.refused).length >= 5);
+    const refusedEv = (await events(s)).filter((e) => e.refused);
+    assert.ok(refusedEv.length >= 5);
+    // every refusal was decided by the Guard decision circuit on-chain (an eval call), not by extension code
+    assert.ok(refusedEv.every((e) => e.details.some((d) => /^decided by the Guard circuit, row 0x[0-9a-f]{3}/.test(d))), JSON.stringify(refusedEv.map((e) => e.details.at(-1))));
+    if (!late) {
+      // the same kind of request again: the answer comes from the cache, with no new eval call
+      const evals = () => [...rpcA.log, ...rpcB.log].filter((c) => c.method === 'eth_call' && c.body.includes('934d06ea')).length;
+      const before = evals();
+      await page.evaluate(() => document.getElementById('signet-guard-notice')?.remove());
+      await click(page, 'approve', 'error');
+      assert.equal(evals(), before);
+      assert.match((await events(s))[0]!.details.at(-1)!, /, cached$/);
+    }
     await s.close();
   }
 });
@@ -271,6 +283,21 @@ test('a gateway whose worker is not the pinned one is red; without a gateway the
   } finally {
     writeFileSync(swFile, original);
   }
+});
+
+test('a Guard circuit whose stored netlist is not the reviewed one is not trusted: the local mirror decides, and still refuses', async () => {
+  rpcA.lie = rpcB.lie = (method, params, result) => {
+    const data = (params[0] as { data?: string })?.data ?? '';
+    if (method !== 'eth_call' || !data.startsWith('0x3fc4be56')) return result; // netlist(uint256)
+    return (result as string).replace(/(.{140})../, '$1ff'); // one byte of the stored netlist changed
+  };
+  const s = await browser();
+  const { page, tab } = await visit(s, `/?spender=${DRAINER}`);
+  await light(s, tab, 'OK');
+  assert.match(await click(page, 'approve', 'error'), /Spender not in the sealed allowlist/);
+  assert.match((await events(s))[0]!.details.at(-1)!, /decided by the local mirror \(the circuit on-chain is not the reviewed netlist\)/);
+  assert.equal(signed(s).length, 0);
+  await s.close();
 });
 
 test('privacy: on a domain that is not sealed Guard makes no network call and stays out of the way', async () => {

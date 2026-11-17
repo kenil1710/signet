@@ -38,3 +38,7 @@ packages/watchtower/.state/
 staging/.run/
 packages/contracts/deployments/local.json
 packages/contracts/broadcast/Staging.s.sol/
+packages/contracts/deployments/rehearsal.json
+packages/contracts/broadcast/MainnetDeploy.s.sol/
+packages/contracts/broadcast/GuardTapeout.s.sol/
+packages/contracts/deployments/guard-*.json

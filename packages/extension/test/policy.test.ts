@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeFunctionData, parseAbi } from 'viem';
-import { decide, type Context } from '../src/lib/policy.ts';
+import { decide, factsOf, type Context } from '../src/lib/policy.ts';
+import { guard } from '@signet/circuit/src/guard-reference.ts';
 import type { SignRequest } from '../src/lib/types.ts';
 
 const USER = '0x1111111111111111111111111111111111111111';
@@ -122,12 +123,37 @@ test('other methods: login signatures pass, eth_sign is unverified, batches take
   assert.equal(act({ method: 'eth_chainId', params: [], chainId: '0xc4', accounts: [] }), 'allow');
 });
 
-test('page and site state: tampered or revoked refuses everything; could-not-check allows everything (fail-open)', () => {
+test('page and site state: tampered or revoked refuses everything; could-not-check never blocks (fail-open)', () => {
   const login: SignRequest = { method: 'personal_sign', params: ['0x00', USER], chainId: '0xc4', accounts: [USER] };
   assert.equal(act(login, { ...ok, page: 'tampered' }), 'block');
   assert.equal(act(tx(TOKEN, data('approve', [ROUTER, 1n])), { ...ok, page: 'tampered' }), 'block');
   assert.equal(act(login, { site: 'revoked', page: 'ok', allowlist: null }), 'block');
-  for (const site of ['unverified', 'no-release'] as const) assert.equal(act(tx(TOKEN, data('approve', [DRAINER, 1n])), { site, page: 'unknown', allowlist: null }), 'allow');
+  for (const site of ['unverified', 'no-release'] as const) assert.equal(act(tx(TOKEN, data('approve', [DRAINER, 1n])), { site, page: 'unknown', allowlist: null }), 'warn');
   // files that could not be read (grey) do not switch the allowlist off
   assert.equal(act(tx(TOKEN, data('approve', [DRAINER, 1n])), { ...ok, page: 'unverified' }), 'block');
+});
+
+test('the Guard decision circuit gives the same answer as the policy on every request above, and never blocks in observe mode', () => {
+  const reqs: SignRequest[] = [
+    tx(TOKEN, data('approve', [ROUTER, 10n])), tx(TOKEN, data('approve', [DRAINER, 1n])), tx(TOKEN, data('approve', [DRAINER, 0n])),
+    tx(TOKEN, data('transfer', [USER, 1n])), tx(TOKEN, data('transfer', [DRAINER, 1n])), tx(TOKEN, data('transferFrom', [USER, DRAINER, 1n])),
+    tx(STAKING, data('stake', [5n])), tx(DRAINER, data('stake', [5n])), tx(DRAINER, '0x', '0x1'), tx(null, '0x6080'),
+    tx(ROUTER, data('swapExactTokensForTokens', [1n, 0n, [TOKEN, TOKEN], DRAINER, 1n])),
+    typed('PermitSingle', PERMIT2, { spender: ROUTER }), typed('PermitSingle', PERMIT2, { spender: DRAINER }), typed('Mail', undefined, {}),
+    typed('Permit', TOKEN, { owner: USER, spender: DRAINER }), { ...tx(STAKING, data('stake', [1n])), chainId: '0x1' },
+    { method: 'personal_sign', params: ['0x00', USER], chainId: '0xc4', accounts: [USER] }, { method: 'eth_sign', params: [USER, Z], chainId: '0xc4', accounts: [USER] },
+  ];
+  const ctxs: Context[] = [ok, { ...ok, page: 'tampered' }, { ...ok, page: 'unverified' }, { site: 'revoked', page: 'ok', allowlist }, { site: 'unverified', page: 'unknown', allowlist: null }, { ...ok, frozen: true }];
+  let n = 0;
+  for (const r of reqs) for (const c of ctxs) {
+    const verdict = decide(r, c);
+    const enforce = guard(factsOf(verdict, { ...c, enforced: true }));
+    const observe = guard(factsOf(verdict, { ...c, enforced: false }));
+    const circuit = enforce.BLOCK ? 'block' : enforce.WARN ? 'warn' : 'allow';
+    // the circuit adds one rule the policy text doesn't: a frozen gate turns an allow into a warning
+    assert.equal(circuit, c.frozen && verdict.action === 'allow' ? 'warn' : verdict.action, `${r.method} ${verdict.title} in ${JSON.stringify(c).slice(0, 60)}`);
+    assert.equal(observe.BLOCK, false);
+    n++;
+  }
+  assert.equal(n, reqs.length * ctxs.length);
 });

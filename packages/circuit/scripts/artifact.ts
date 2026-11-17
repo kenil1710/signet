@@ -25,3 +25,26 @@ export function artifact() {
     expected: toHex(expected),
   };
 }
+
+import { buildGuard } from '../src/guard.ts';
+import { guard, guardInputsOf, packGuard, GUARD_COMBINATIONS, GUARD_INPUTS, GUARD_OUTPUTS } from '../src/guard-reference.ts';
+
+/// The Guard decision circuit artifact (artifacts/guard.json).
+export function guardArtifact() {
+  const { netlist, builder } = buildGuard();
+  const expected = new Uint8Array(GUARD_COMBINATIONS);
+  for (let n = 0; n < GUARD_COMBINATIONS; n++) expected[n] = packGuard(guard(guardInputsOf(n)));
+  return {
+    name: 'signet-guard-decision',
+    version: 1,
+    inputs: [...GUARD_INPUTS],
+    outputs: [...GUARD_OUTPUTS],
+    nIn: netlist.nIn,
+    nOut: netlist.nOut,
+    gates: builder.gates,
+    netlist: toHex(netlist.bytes),
+    netlistSha256: '0x' + createHash('sha256').update(netlist.bytes).digest('hex'),
+    // expected[n] = packed outputs (bit0 ALLOW, bit1 WARN, bit2 BLOCK) for packed input n (bit i = input i)
+    expected: toHex(expected),
+  };
+}

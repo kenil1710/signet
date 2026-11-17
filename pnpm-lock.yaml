@@ -227,6 +227,9 @@ importers:
 
   packages/extension:
     dependencies:
+      '@signet/circuit':
+        specifier: workspace:*
+        version: link:../circuit
       '@signet/contracts':
         specifier: workspace:*
         version: link:../contracts

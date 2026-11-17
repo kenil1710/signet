@@ -10,6 +10,7 @@ export interface SignetNetwork {
   tapeout: {
     processor: string; policyCircuitId: number; circuitBeacon: string; circuitImplementation: string;
     processorCodehash: string; siteRegistry: string; containerOpener: string; sharedCircuitId: number; sharedContainer: string;
+    guardCircuitId?: number; // the Guard decision circuit (absent until it is taped out on this network)
   };
   accounts?: { deployer: string; approvers: string[]; proposer: string; recovery: string; guardian: string; users: string[] };
 }

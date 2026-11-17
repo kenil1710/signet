@@ -2,11 +2,11 @@
   "name": "@signet/circuit",
   "version": "0.0.0",
   "private": true,
-  "description": "Release-policy circuit and truth-table test",
+  "description": "Release-policy and Guard decision circuits, with exhaustive truth-table tests",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "gen": "node scripts/gen.ts",
+    "gen": "node scripts/gen.ts && node scripts/gen-guard.ts",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   }

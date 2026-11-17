@@ -73,6 +73,7 @@ cast rpc anvil_stopImpersonatingAccount $DEV --rpc-url "$LOCAL" >/dev/null
 cast rpc anvil_mine 0x2 --rpc-url "$LOCAL" >/dev/null   # commit-reveal: reveals need commits 2 blocks old
 echo "creating the Signet site gate and the demo project gate..."
 run "gates()"
+"$ROOT/staging/guard-tapeout.sh"
 [ -n "$(jq -r '.gates.demo.address // empty' "$OUT")" ] || { echo "gate creation failed; see output above"; exit 1; }
 
 echo

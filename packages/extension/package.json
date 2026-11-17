@@ -6,6 +6,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@signet/circuit": "workspace:*",
     "@signet/contracts": "workspace:*",
     "@tapekit/kernel": "github:TapeOutProtocol/TapeKit#37c617e7e332787c8a32a81e4d7d05a28a06c156&path:/kernel"
   },

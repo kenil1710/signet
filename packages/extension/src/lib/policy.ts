@@ -8,6 +8,7 @@
 //   allow  everything it names is sealed
 import { decodeAbiParameters, getAddress, isAddress, parseAbiParameters, type Hex } from 'viem';
 import type { Action, Allowlist, PageStatus, SignRequest, SiteStatus } from './types.ts';
+import type { GuardInputs } from '@signet/circuit/src/guard-reference.ts';
 
 export const SIGN_METHODS = new Set([
   'eth_sendTransaction', 'eth_signTransaction', 'wallet_sendCalls', 'eth_signTypedData', 'eth_signTypedData_v1', 'eth_signTypedData_v3',
@@ -15,7 +16,7 @@ export const SIGN_METHODS = new Set([
 ]);
 
 export interface Verdict { action: Action; title: string; reason: string; details: string[] }
-export interface Context { site: SiteStatus; page: PageStatus | 'unknown'; allowlist: Allowlist | null }
+export interface Context { site: SiteStatus; page: PageStatus | 'unknown'; allowlist: Allowlist | null; frozen?: boolean; enforced?: boolean }
 
 const lc = (a: unknown) => String(a).toLowerCase();
 const short = (a: string) => (isAddress(a) ? getAddress(a) : a);
@@ -161,7 +162,7 @@ export function checkTypedData(raw: unknown, allowlist: Allowlist, chain: string
 export function decide(req: SignRequest, ctx: Context): Verdict {
   if (ctx.site === 'revoked') return v('block', 'This release was revoked', "The team revoked this site's current release. Don't sign anything here until they publish a new one.");
   if (ctx.page === 'tampered') return v('block', "This page doesn't match its sealed release", "The code running on this page is not what the team sealed. Don't sign.");
-  if (ctx.site !== 'sealed' || !ctx.allowlist) return v('allow', 'Not checked', 'Guard could not check this site, so it does not block (fail-open).');
+  if (ctx.site !== 'sealed' || !ctx.allowlist) return v('warn', 'Not checked', 'Guard could not check this site, so it does not block (fail-open).');
   const chain = req.chainId ? BigInt(req.chainId).toString() : null;
   const params = Array.isArray(req.params) ? req.params : [];
   const user = req.accounts[0] ?? '';
@@ -196,4 +197,33 @@ export function decide(req: SignRequest, ctx: Context): Verdict {
     default:
       return v('allow', req.method, 'Not a signing request.');
   }
+}
+
+/// Which circuit input a verdict turns off. Each refusal or warning above names exactly one fact.
+const FACT: Record<string, keyof GuardInputs> = {
+  'Spender not in the sealed allowlist': 'spenderSealed',
+  'Recipient is not you': 'recipientOk',
+  'Contract not in the sealed allowlist': 'targetSealed',
+  'Chain not in the sealed allowlist': 'targetSealed',
+  'Verifying contract not in the sealed allowlist': 'targetSealed',
+  'Payment to an unknown contract': 'targetSealed',
+  "This page doesn't match its sealed release": 'pageMatches',
+  'Unverified call': 'decoded',
+  'Unverified signature': 'decoded',
+};
+
+/// The nine facts the Guard decision circuit decides on (packages/circuit/src/guard-reference.ts), for one request.
+export function factsOf(verdict: Verdict, ctx: Context): GuardInputs {
+  const off = FACT[verdict.title];
+  return {
+    checked: ctx.site === 'sealed' || ctx.site === 'revoked',
+    pageMatches: ctx.page !== 'tampered' && off !== 'pageMatches',
+    targetSealed: off !== 'targetSealed',
+    spenderSealed: off !== 'spenderSealed',
+    recipientOk: off !== 'recipientOk',
+    decoded: off !== 'decoded',
+    frozen: !!ctx.frozen,
+    revoked: ctx.site === 'revoked',
+    enforceMode: !!ctx.enforced,
+  };
 }
