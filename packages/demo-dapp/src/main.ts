@@ -53,7 +53,10 @@ const send = async (to: string, data: string) => wallet().request({ method: 'eth
 
 // The spender normally is the router. "?spender=0x..." stands in for a compromised price API that tells the
 // page to approve someone else: the code is untouched, only the data is hostile.
-const spender = new URLSearchParams(location.search).get('spender') ?? ROUTER;
+const params = new URLSearchParams(location.search);
+const spender = params.get('spender') ?? ROUTER;
+// The same for the swap's recipient: normally the user; "?recipient=0x..." stands in for a hostile quote API.
+const recipient = (me: string) => params.get('recipient') ?? me;
 
 $('connect').onclick = () => run('Connect', connect);
 $('approve').onclick = () => run('Approve', () => send(USDT, `0x095ea7b3${word(spender)}${word(usdt(10))}`));
@@ -62,7 +65,7 @@ $('swap').onclick = () =>
     const me = await connect();
     const deadline = Math.floor(Date.now() / 1000) + 600;
     // swapExactTokensForTokens(amountIn, amountOutMin, path, to, deadline)
-    const data = `0x38ed1739${word(usdt(10))}${word(0)}${word(160)}${word(me)}${word(deadline)}${word(2)}${word(USDT)}${word(WOKB)}`;
+    const data = `0x38ed1739${word(usdt(10))}${word(0)}${word(160)}${word(recipient(me))}${word(deadline)}${word(2)}${word(USDT)}${word(WOKB)}`;
     return send(ROUTER, data);
   });
 $('stake').onclick = () => run('Stake', () => send(STAKING, `0xa694fc3a${word(usdt(5))}`)); // stake(uint256)

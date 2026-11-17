@@ -1,0 +1,22 @@
+{
+  "name": "@signet/attacks",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Attack suite: every threat in THREAT_MODEL.md, run against Guard on the staging chain",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@signet/cli": "workspace:*",
+    "@signet/contracts": "workspace:*",
+    "@signet/extension": "workspace:*",
+    "@signet/watchtower": "workspace:*",
+    "@types/chrome": "^0.3.7",
+    "playwright": "1.56.1",
+    "viem": "^2.57.20"
+  },
+  "scripts": {
+    "attacks": "node src/suite.ts",
+    "test:staging": "node --test --test-concurrency=1 test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}

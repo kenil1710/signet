@@ -119,8 +119,9 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     const files = [...results.values()];
     const status = files.some((f) => BAD.includes(f.status)) ? 'tampered' : files.some((f) => !['ok', 'ok-sri', 'ok-gateway'].includes(f.status)) ? 'unverified' : 'ok';
     last = { url: location.href, status, files };
+    if (info!.enforce && status === 'tampered') redirecting = true; // known before the answer arrives
     const r = await ask<{ redirect: boolean }>({ type: 'report', report: last });
-    redirecting = !!r?.redirect;
+    redirecting = redirecting || !!r?.redirect;
   }
 
   let running: Promise<void> | null = null;
@@ -145,8 +146,14 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     if (!info) return void down({ type: 'decision', id, refused: false });
     await Promise.race([first, new Promise((r) => setTimeout(r, 5000))]);
     const d = await ask<Decision>({ type: 'sign', req });
-    if (d?.refused && !redirecting) showRefusal(d);
-    down({ type: 'decision', id, refused: !!d?.refused, message: d ? `${d.title}. ${d.reason}` : '' });
+    if (!d) {
+      // No answer: the extension is gone, or Guard itself is taking the tab to the warning page and the answer was
+      // lost with the page. Fail-open only if nothing here is known to be wrong.
+      const known = redirecting || (info.enforce && (info.site === 'revoked' || last?.status === 'tampered'));
+      return void down({ type: 'decision', id, refused: known, message: known ? "This page doesn't match its sealed release. Don't sign." : '' });
+    }
+    if (d.refused && !redirecting) showRefusal(d);
+    down({ type: 'decision', id, refused: d.refused, message: `${d.title}. ${d.reason}` });
   }
 
   // ---- the full-page notice for a refused signature

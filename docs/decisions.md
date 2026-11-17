@@ -303,3 +303,21 @@ Limit: the circuit decides on facts the extension computes. A compromised extens
 ## 2026-11-17: Mainnet deployment plan
 
 `docs/mainnet-plan.md`: `script/MainnetDeploy.s.sol` (step1: registry, factory, commit, operator grant; step2: Signet's site gate), rehearsed end to end on a mainnet fork by `staging/rehearse-mainnet.sh`: 8,704,008 gas ≈ 0.00018 OKB. Plus the Guard circuit tape-out ≈ 0.0020 OKB. Total ≈ 0.0022 of the dev wallet's 0.0466 OKB. Not sent.
+
+## 2026-11-17: Attack suite (`packages/attacks`, `pnpm attacks`)
+
+Result: **blocked 12/13 attacks; 0 false blocks on 16 clean sessions** (`docs/attack-report.md`). The one not blocked is the user without Guard (by design; the watchtower alerted).
+
+| Decision | Why |
+|---|---|
+| **"Blocked" means the attacker's signature request never reached the wallet.** Not "the badge turned red". | That is what protects money. Each row also says *how* it was stopped (page check or signing check), so a reader can see which layer did it. |
+| **"False block" means any of the user's own actions refused, the warning page shown, or a red badge**, in enforce mode. | Spec: one false block and a team uninstalls us. |
+| **Code from data (eval / new Function) is run with Playwright's `page.evaluate`** in the page's world, on a clean page. | It is the honest model of an XSS or a compromised config API: no file changes, so the page check can't see it; only the signing check can. |
+| **The poisoned-npm drainer's config fetch is answered inside the page.** | Its host doesn't exist on staging. Without that the drainer stopped before asking for a signature, and an earlier run counted that as "blocked": a false success, now removed. |
+| **Rollback inside the grace window is tested for a user whose Guard verified the old release earlier.** For a user who never saw it, the old files simply fail the page check. | That is the case where old files are legitimately accepted; the test shows the *current* allowlist still refuses a spender the new release retired. |
+| **The no-extension case counts in the total, as not blocked.** A compromised extension is documented, not run. | Honest denominator. |
+
+Found while building it:
+- **A test artifact, not a Guard bug:** an early version sent its "revoked" signature from Guard's own warning page, where the test's mock wallet is injected but no site code can run. It looked like a leak; the wallet log (no `eth_chainId` lookup, which Guard's wrapper always does) showed the request never went through Guard. The attack now goes through "Go back to the site".
+- **A real race, fixed defensively:** if Guard sends a tab to the warning page while a signature request is waiting, the answer can be lost with the page, and the content script used to fail open. It now refuses when it already knows the page is red (or the release revoked) in enforce mode. Not reproduced by a test.
+- **A known lag:** Guard re-reads a sealed domain from the chain at most once a minute, so a revoke or a new release takes up to 60 s to reach a user who has the site open. The suite waits it out. Recorded in THREAT_MODEL.md.

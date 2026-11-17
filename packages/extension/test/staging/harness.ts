@@ -43,7 +43,7 @@ export function signet(dir: string, args: string[], as?: string): string {
 export interface Project { dir: string; dist: string; domain: string; gate: Address }
 
 /// init + first release of the demo dApp, published with a full on-chain copy. The gate starts in observe mode.
-export async function sealDemoDapp(domain: string): Promise<Project> {
+export async function sealDemoDapp(domain: string, o: { spenders?: string[] } = {}): Promise<Project> {
   const dir = mkdtempSync(join(tmpdir(), 'guard-project-'));
   const dist = join(dir, 'dist');
   const b = spawnSync('pnpm', ['--filter', '@signet/demo-dapp', 'build'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'local' } });
@@ -55,7 +55,7 @@ export async function sealDemoDapp(domain: string): Promise<Project> {
   const cfgFile = join(dir, 'signet.config.json');
   const cfg = JSON.parse(readFileSync(cfgFile, 'utf8'));
   // the team declares who may be given an allowance: the router (Permit2 is recognized by the CLI)
-  writeFileSync(cfgFile, JSON.stringify({ ...cfg, allowlist: { '196': { spenders: [ROUTER] } } }, null, 2));
+  writeFileSync(cfgFile, JSON.stringify({ ...cfg, allowlist: { '196': { spenders: [ROUTER, ...(o.spenders ?? [])] } } }, null, 2));
   signet(dir, ['seal', dist]);
   await anvil('anvil_setBalance', [await pub.readContract({ address: cfg.gate, abi: gateAbi, functionName: 'proposer' }), '0xde0b6b3a7640000']);
   const id = signet(dir, ['propose', dist, '--emergency']).match(/Proposed release #(\d+)/)![1]!; // the CI key from init
