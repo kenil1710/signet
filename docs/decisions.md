@@ -237,3 +237,22 @@ Tested headless (Chromium, fresh profile per scenario) on staging with `packages
 
 - **The registry's operator grant ran out during testing.** Tests move the staging clock by days; after 30 days `writeFile` reverted with TapeOut's `NotOwner()` (`0x30cd7471`). This is the "renew at least every 30 days" duty from the first security review, seen for real. Added `pnpm staging:renew`. On mainnet the watchtower (or a cron) must do this, and the CLI should say so when it sees `0x30cd7471`.
 - **`waitForTransactionReceipt` can wait forever on a chain that mines on demand.** viem re-checks only when the block number changes. A transaction was mined (status success) while the CLI still timed out; an earlier `init` hang was the same thing. The CLI now polls `eth_getTransactionReceipt` itself (`receiptOf` in `chain.ts`).
+
+## 2026-11-17: Watchtower (`packages/watchtower`)
+
+Tested on staging with the demo dApp and a test server that plays the hijack: 8 scenarios, `test/staging/watchtower.test.ts`. Output of a round with a hijack: `docs/demo/watchtower-hijack.txt`.
+
+| Decision | Why |
+|---|---|
+| **Playwright's Chromium, not Puppeteer.** | Playwright is already in the repo (Guard's tests); one browser download instead of two. The spec's stack table says Puppeteer. |
+| **The watchtower reads server responses; Guard reads the browser cache.** It hashes the bytes of the document, scripts and stylesheets as they arrive, and also lists every origin the page contacted. | It is its own browser, so it sees the network directly. It also catches a new origin, which Guard doesn't look at. |
+| **"Confirm twice" = two loads in a row from one place**, each in a fresh browser context, 5 s apart. A mismatch seen once and clean on the second load is written to the console and not alerted. | Asked for tonight. The spec's "2 regions confirm" needs the 3-region deployment, which isn't built. *Known gap:* a hijack that serves bad code only once per visitor (the Bybit pattern) passes this rule unnoticed; Guard, which reads the bytes the user actually ran, is the answer to that one. |
+| **One alert per distinct mismatch**, then silence until it changes or clears; one "Recovered" message. A site that can't be loaded twice in a row is alerted too. | An alert every minute gets muted. |
+| **Private vs public.** Site mismatches are private (the team's chat). New bindings and pending tier-10/11 proposals are public facts already on-chain; they go to `TELEGRAM_PUBLIC_CHAT_ID` if set, else to the same chat. Nothing is posted to X. | Spec: private alert first; a public post only after confirmation or when the team acknowledges. Public mismatch posts are not built. |
+| **Pending proposals are posted once, when first seen open**, with tier, approvals, earliest publish time and expiry. Tier 00/01 aren't posted. | "Watchtower posts every pending tier-10/11 change publicly" (threat 9). |
+| **Grace window:** the watchtower keeps the manifests it verified and accepts the previous one while the gate says `isValidManifest`. | The action deploys only after publish, so the site lags the chain for a moment; without this every release would alert. |
+| **No manifest on-chain, or one that doesn't hash to the release → the site isn't compared**, and the team is told once ("run signet upload"). | Same H-1 rule as Guard: never compare against something unverified. |
+| **Two RPCs must agree when two are configured.** Staging has one; it says so at start. | Spec threat 13. |
+| **State in a JSON file.** | Enough for one process; a restart doesn't repeat posts. |
+
+**Not built:** 3 regions, TapeSend, X posts, the public status page, opt-in Guard telemetry, the guardian key (auto-freeze), renewing the registry's 30-day operator grant, a reproducible-build check. The Telegram path was tested against a local stand-in for the Bot API (request shape, chat ids, token never logged), not against Telegram itself: no bot token was available.

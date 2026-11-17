@@ -1,0 +1,22 @@
+watchtower on local (chain 196), registry 0x991125c01a366ca8303A3DBeB21A3E45bB1FC3d2, every 60s, ONE RPC only (set SIGNET_RPC_URL2)
+[2026-11-17T05:33:45.673Z] [public] New sealed domain: demo.signet.test
+    Gate 0xf27DF4a8D0EC8825C375E6656B9706E1e434D97F (block 76075717).
+    Signet now watches this site every minute. It starts in observe mode.
+[2026-11-17T05:33:45.688Z] [public] Pending tier-10 change on demo.signet.test: proposal #3
+    A release that changes the allowlist of contracts and spenders was proposed at 2027-01-27 07:43:37 UTC.
+    1 of 3 approvals so far. It needs 2 of 3 and a 24 h timelock.
+    The timelock has not started yet.
+    Expires 2027-02-03 07:43:37 UTC. Gate 0xf27DF4a8D0EC8825C375E6656B9706E1e434D97F.
+    If you are on this team and did not expect this: signet cancel 3 or signet freeze.
+[2026-11-17T05:33:45.691Z] [public] Pending tier-11 change on demo.signet.test: proposal #4
+    An admin change (approvers, domain binding, timelocks or circuit) was proposed at 2027-01-27 07:43:39 UTC.
+    0 of 3 approvals so far. It needs 3 of 3 and a 24 h timelock.
+    The timelock has not started yet.
+    Expires 2027-02-03 07:43:39 UTC. Gate 0xf27DF4a8D0EC8825C375E6656B9706E1e434D97F.
+    If you are on this team and did not expect this: signet cancel 4 or signet freeze.
+[2026-11-17T05:33:51.897Z] [private] ALERT: demo.signet.test does not match its sealed release
+    The live site served code that differs from release #1, on two loads in a row.
+    - changed: http://demo.signet.test:62967/assets/index-BbhnVhYF.js (sha256 0b21ede67483a8ba… is not the sealed f4d28e018046d63c…)
+    If you did not deploy this: freeze the gate (signet freeze), lock the registrar account, check DNS and the CDN.
+    If you did deploy it: it was not published on-chain first. Manifest 0xd34813fcd12b1bff8500b815886bf6ba954cc46686946af8cab0d83c60280f9b, gate 0xf27DF4a8D0EC8825C375E6656B9706E1e434D97F (observe mode: Guard is not blocking users).
+[2026-11-17T05:33:51.901Z] round done: 1 domain(s), 1 site(s) loaded, 1 alert(s), 3 post(s)

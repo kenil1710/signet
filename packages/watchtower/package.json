@@ -2,7 +2,23 @@
   "name": "@signet/watchtower",
   "version": "0.0.0",
   "private": true,
-  "description": "Signet watchtower",
+  "description": "Signet watchtower: checks every sealed site against its sealed release and alerts the team",
   "license": "MIT",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@signet/cli": "workspace:*",
+    "@signet/contracts": "workspace:*",
+    "@signet/extension": "workspace:*",
+    "playwright": "1.56.1",
+    "viem": "^2.57.20"
+  },
+  "scripts": {
+    "start": "node src/cli.ts",
+    "test": "node --test test/*.test.ts",
+    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.7"
+  }
 }

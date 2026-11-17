@@ -1,7 +1,43 @@
 # Overnight log
 
-Work is on the branch `overnight-phases` (one commit per phase; fast-forward `main` to it when you've looked).
-Staging only. Nothing was sent to mainnet and ReleaseGate is unchanged.
+## Final summary (2026-11-17)
+
+All three phases are built and tested on the staging chain. Nothing touched mainnet, no funds were spent, and
+`packages/contracts/src` is unchanged (ReleaseGate included). The work is on the branch **`overnight-phases`**,
+one commit per phase; `main` is where you left it.
+
+| Phase | State | Tests |
+|---|---|---|
+| 1. SRI in `originsHash`, Diff Guard, GitHub Action | Done. The action has not run on GitHub itself. | 29 CLI unit, 3 action static; staging: 9 CLI + 5 action |
+| 2. Guard extension | Done, except that the verified copy is a preview without a wallet. Not tried with a real wallet. | 10 unit; staging: 10 headless scenarios |
+| 3. Watchtower | Done for one region, console + Telegram. Telegram was tested against a local stand-in, not the real API. | 2 unit; staging: 8 scenarios |
+
+Last full run: 182 Foundry tests, 49 unit tests, 32 staging end-to-end tests, all passing; typecheck clean.
+Run the staging suites one at a time (`pnpm --filter @signet/<cli|action|extension|watchtower> test:staging`).
+
+**Look at these first** (`docs/demo/`): `diff-guard-poisoned.txt`, `guard-blocked.png`, `guard-signature-refused.png`,
+`guard-verified-copy.png`, `watchtower-hijack.txt`.
+
+**Decisions waiting for your yes or no**
+1. The action never calls `publish`; it waits for someone else to. (The spec said the action publishes.)
+2. The action writes the three manifest files on-chain after publication, paid by the proposer key.
+3. Guard refuses a token `transfer` to anyone who is neither the user nor a sealed contract. Right for a DEX, wrong for a "send" app.
+4. Guard's list of sealed domains is the union of what the two RPCs report (protection over privacy against a lying RPC).
+5. A revoked current release turns Guard red and refuses every signature in enforce mode.
+
+**What is not done, in order of how much it matters**
+1. **Failover doesn't let users keep using the app.** "Open verified copy" shows the sealed app read from the chain, hash-checked, in a sandboxed frame with no wallet. I found no documented way to open a container path as a normal page.
+2. **The sealed-domain list won't scale on mainnet**: it is read from event logs. The registry needs an enumerable list before it is deployed.
+3. Guard is untested with MetaMask / OKX Wallet and is not submitted to the Chrome Web Store (due Nov 27).
+4. The action is untested on GitHub; its `uses:` path is a guess because the repo has no remote.
+5. Watchtower: one region only, no TapeSend, no X posts, no status page; it does not renew the registry's 30-day operator grant.
+6. Not started: the dashboard, mainnet deployment.
+
+**Two things the tests turned up, both fixed**
+- The registry's 30-day operator grant expired on staging (tests move the clock) and file writes reverted. `pnpm staging:renew` renews it. On mainnet this is a recurring duty with no owner yet.
+- The CLI could wait forever for a transaction that had already been mined (viem's receipt wait on a chain that mines on demand). It now polls the receipt itself.
+
+Details per phase follow; every decision is in `docs/decisions.md`.
 
 ## Phase 1: CLI change + Action + Diff Guard (2026-11-17)
 
@@ -54,3 +90,23 @@ Staging only. Nothing was sent to mainnet and ReleaseGate is unchanged.
 **Found while testing (both fixed)**
 - The registry's 30-day operator grant expired because tests moved the staging clock; writes reverted with `NotOwner()`. New command: `pnpm staging:renew`. On mainnet someone must renew it every 30 days.
 - The cause of the Phase 1 hang: viem's `waitForTransactionReceipt` can miss a block on a chain that mines on demand. The CLI now polls the receipt itself.
+
+## Phase 3: Watchtower (2026-11-17)
+
+**Done** (`packages/watchtower`)
+- Every minute (`--interval`), each bound domain is loaded in headless Chromium and compared with the sealed release: document, scripts and stylesheets by SHA-256, cross-origin scripts by sealed SRI hash, and every origin the page contacted against the sealed origins.
+- A mismatch is loaded a second time in a fresh context; only two bad loads in a row alert. One alert per distinct mismatch, one "Recovered" message. A site that can't be loaded twice is alerted too.
+- Alerts go to the console, and to Telegram when `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set. The token is never printed.
+- Posts every new domain binding and every pending tier-10 / tier-11 proposal, once each (state file survives restarts).
+- Staging test with the demo dApp: clean; one bad load not confirmed; hijack → one private alert; recovery; unreachable; tier 00 not posted, tier 10 and 11 posted; a second domain bound later; the command with and without Telegram. Sample output: `docs/demo/watchtower-hijack.txt`.
+
+**Not done / limits**
+- One region. "Confirm twice" is two loads from the same place, so a hijack that serves bad code once per visitor is not caught here (Guard catches that one).
+- Telegram was exercised against a local stand-in for the Bot API. No message was sent to Telegram: there is no token in `.env`.
+- No TapeSend, no X posts, no public status page, no guardian auto-freeze, no operator-grant renewal.
+
+**Decisions I made**
+1. Playwright's Chromium instead of Puppeteer (already installed for Guard's tests).
+2. The previous release is accepted during its grace window, so a normal deploy right after publish doesn't alert.
+3. A release whose manifest isn't on-chain (or doesn't hash to it) isn't compared; the team is told once.
+4. Public posts go to `TELEGRAM_PUBLIC_CHAT_ID` if set, else to the same chat as alerts.

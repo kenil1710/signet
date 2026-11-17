@@ -337,7 +337,8 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 - [x] Diff Guard analyzer, `signet diff <id>` (files, addresses and spenders, origins, SRI hashes, approve/permit/transfer calls, tier and why; text + JSON): tested on staging (2026-11-17, `packages/cli`)
 - [x] Guard extension: release read from 2 RPCs that must agree, manifest hash-checked, page hash check, red block page, window.ethereum + EIP-6963 wrap, allowlist + calldata decode, observe/enforce modes, verified-copy button (preview without a wallet): tested headless on staging (2026-11-17, `packages/extension`). Not yet tested with a real wallet.
 - [ ] Nov 27: **submit the extension to the Chrome Web Store** (keep an unpacked build for the demo as backup)
-- [ ] Nov 28–29: watchtower (3 regions, 1-min checks, 2-region confirm) + alerts via TapeSend, a Telegram bot and X posts
+- [x] Watchtower, basic: 1-min checks in headless Chromium, a mismatch confirmed on two loads, private alert on the console and through a Telegram bot, posts for new bindings and pending tier-10/11 proposals: tested on staging with a simulated hijack (2026-11-17, `packages/watchtower`)
+- [ ] Watchtower, rest: 3 regions with 2-region confirm, TapeSend, X posts, public status page
 
 **Week 3 (Nov 30–Dec 7): polish, real users, video**
 

@@ -79,7 +79,8 @@ export async function switchToEnforce(p: Project): Promise<void> {
 
 // ---------------------------------------------------------------- web server
 
-export interface Site { port: number; log: string[]; tamper: boolean; close(): void }
+/// tamper: true = the main bundle is tampered on every request; 'once' = on the next request only, then clean.
+export interface Site { port: number; log: string[]; tamper: boolean | 'once'; close(): void }
 
 /// Serves the sealed build for any *.signet.test host and a small unsealed page for every other host.
 export async function serveSite(dist: string): Promise<Site> {
@@ -111,7 +112,10 @@ export async function serveSite(dist: string): Promise<Site> {
       return;
     }
     let body: Buffer = readFileSync(file);
-    if (site.tamper && rel === main) body = Buffer.concat([body, Buffer.from(TAMPER)]);
+    if (site.tamper && rel === main) {
+      body = Buffer.concat([body, Buffer.from(TAMPER)]);
+      if (site.tamper === 'once') site.tamper = false;
+    }
     res.setHeader('content-type', types[extname(rel)] ?? 'application/octet-stream');
     res.setHeader('cache-control', rel.endsWith('.html') ? 'no-cache' : 'public, max-age=3600');
     res.end(body);
