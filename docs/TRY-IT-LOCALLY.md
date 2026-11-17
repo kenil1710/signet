@@ -13,7 +13,7 @@ cd /path/to/signet
 pnpm install
 pnpm staging:up          # the fork with Signet deployed and the Guard circuit taped out (skip if already running)
 pnpm try:setup           # seals the demo dApp as swap.localhost, publishes it, enforce mode, builds Guard + gateway
-pnpm try:serve           # keep this terminal open
+pnpm try:serve           # keep this terminal open: demo site :4180, gateway :8097, second RPC :8546
 ```
 
 Open **http://swap.localhost:4180/**. Chrome sends `*.localhost` to your own machine and treats it as a secure
@@ -28,9 +28,23 @@ the reload icon on Guard in `chrome://extensions`.
 2. Click **Load unpacked** and choose the folder **`packages/extension/dist`**.
 3. Pin **Signet Guard** to the toolbar (puzzle-piece icon → pin) to see its badge.
 
-This build talks only to the local chain (`http://127.0.0.1:8545`; it is also given `http://localhost:8545` as its
-"second RPC", which on staging is the same node). It reads the release from the chain, asks the Guard decision
-circuit before every signature, and opens the verified copy on `localhost:8097`.
+This build talks only to the local chain. Guard needs **two RPCs that must agree**; staging has one node, so (as in
+the staging tests) the second RPC is a small proxy on `http://127.0.0.1:8546` in front of the same anvil, started by
+`pnpm try:serve`. Guard reads the release from both, asks the Guard decision circuit before every signature, and
+opens the verified copy through the gateway on `localhost:8097`.
+
+**Build it with `pnpm try:build`** (it builds the gateway first, because Guard pins the hashes of its files, then
+Guard). A plain `SIGNET_NETWORK=local pnpm --filter @signet/extension build` has only one RPC and no gateway: Guard
+then says "none: Guard will not be able to check" and every page stays grey. The right build prints:
+
+```
+Guard built for local: …/packages/extension/dist
+  RPCs http://127.0.0.1:8545 + http://127.0.0.1:8546
+  Guard circuit: processor 0x7315…8F22 circuit 7
+  verified copy: gateway http://localhost:8097
+```
+
+After any rebuild, click the **reload** icon on Signet Guard in `chrome://extensions`.
 
 ## 3. MetaMask: the local chain and a test account
 

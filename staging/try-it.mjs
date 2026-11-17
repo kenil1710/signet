@@ -3,7 +3,8 @@
 //
 //   node staging/try-it.mjs setup        seal the demo dApp as swap.localhost, publish it (with a full on-chain copy),
 //                                         switch its gate to enforce mode, build the gateway and the Guard extension
-//   node staging/try-it.mjs serve        the demo site on http://swap.localhost:4180/ and the gateway on :8097
+//   node staging/try-it.mjs build        rebuild the gateway and Guard for local (2 RPCs + the local gateway) only
+//   node staging/try-it.mjs serve        the demo site on http://swap.localhost:4180/, the gateway on :8097, the second RPC on :8546
 //   node staging/try-it.mjs hack [once]  the site starts serving a tampered bundle (once = Bybit style: one request only)
 //   node staging/try-it.mjs clean        the site serves the sealed build again
 //   node staging/try-it.mjs status       what the switch is set to
@@ -22,7 +23,10 @@ const DOMAIN = 'swap.localhost';
 const SITE_PORT = 4180;
 const GATEWAY_PORT = 8097;
 const RPC = 'http://127.0.0.1:8545';
-const RPC2 = 'http://localhost:8545'; // the same anvil under a second name: staging has one node, Guard wants two
+const RPC2_PORT = 8546;
+// Guard needs two RPCs that must agree. Staging has one node, so (as in the staging tests) the second RPC is a small
+// proxy in front of the same anvil, started by `serve`.
+const RPC2 = `http://127.0.0.1:${RPC2_PORT}`;
 const DRAINER = '0xBAD0C0fFeE5BAD0c0ffEe5baD0c0ffeE5baD0C0F';
 const TOKEN = '0x1E4a5963aBFD975d8c9021ce480b42188849D41d';
 // what the "hacker" appends to the main bundle: on load, ask the wallet to approve the drainer for everything
@@ -83,10 +87,19 @@ function setup() {
     sh('cast', ['send', JSON.parse(readFileSync(cfgFile, 'utf8')).gate, 'enforce()', '--from', local.accounts.approvers[0], '--unlocked', '--rpc-url', RPC]);
   }
   console.log('6/6 building the gateway and the Guard extension');
-  sh(process.execPath, [join(ROOT, 'packages/gateway/scripts/build.mjs')], { env: { SIGNET_RPC_URL: RPC, SIGNET_RPC_URL2: RPC2 } });
-  sh(process.execPath, [join(ROOT, 'packages/extension/scripts/build.mjs')], { env: { SIGNET_RPC_URL: RPC, SIGNET_RPC_URL2: RPC2, SIGNET_GATEWAY_URL: `http://localhost:${GATEWAY_PORT}` } });
+  build();
   writeFileSync(MODE, 'clean\n');
   console.log(`\nReady. Next: node staging/try-it.mjs serve, then load ${join(ROOT, 'packages/extension/dist')} in chrome://extensions`);
+}
+
+/// The gateway first (Guard pins the hashes of its files), then Guard: both with the two RPCs and the local gateway.
+function build() {
+  const env = { SIGNET_RPC_URL: RPC, SIGNET_RPC_URL2: RPC2 };
+  const g = sh(process.execPath, [join(ROOT, 'packages/gateway/scripts/build.mjs')], { env });
+  const e = sh(process.execPath, [join(ROOT, 'packages/extension/scripts/build.mjs')], { env: { ...env, SIGNET_GATEWAY_URL: `http://localhost:${GATEWAY_PORT}` } });
+  console.log(g.stdout.trim());
+  console.log(e.stdout.trim());
+  console.log(`\nLoad (or reload) this folder in chrome://extensions: ${join(ROOT, 'packages/extension/dist')}`);
 }
 
 async function serve() {
@@ -112,8 +125,25 @@ async function serve() {
     res.setHeader('cache-control', 'no-cache'); // revalidated every time, so switching modes shows on the next reload
     res.end(body);
   }).listen(SITE_PORT, '127.0.0.1');
+  // the second RPC: forwards every JSON-RPC request to the same anvil
+  http.createServer(async (req, res) => {
+    res.setHeader('access-control-allow-origin', '*');
+    res.setHeader('access-control-allow-headers', '*');
+    if (req.method !== 'POST') return void res.end();
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    try {
+      const up = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: Buffer.concat(chunks) });
+      res.setHeader('content-type', 'application/json');
+      res.end(Buffer.from(await up.arrayBuffer()));
+    } catch {
+      res.statusCode = 502;
+      res.end();
+    }
+  }).listen(RPC2_PORT, '127.0.0.1');
   const { serveGateway } = await import(join(ROOT, 'packages/gateway/scripts/serve.mjs'));
   await serveGateway(join(ROOT, 'packages/gateway/dist'), GATEWAY_PORT);
+  console.log(`second RPC     ${RPC2}  ->  ${RPC}`);
   console.log(`demo site      http://${DOMAIN}:${SITE_PORT}/      (now: ${mode()})`);
   console.log(`verified copy  http://${DOMAIN.replace(/-/g, '--').replace(/\./g, '-')}.localhost:${GATEWAY_PORT}/`);
   console.log('switch:        node staging/try-it.mjs hack | hack once | clean      (Ctrl+C stops these servers)');
@@ -121,6 +151,7 @@ async function serve() {
 
 const [cmd, arg] = process.argv.slice(2);
 if (cmd === 'setup') setup();
+else if (cmd === 'build') build();
 else if (cmd === 'serve') await serve();
 else if (cmd === 'hack') {
   writeFileSync(MODE, arg === 'once' ? 'once\n' : 'hacked\n');
@@ -130,6 +161,6 @@ else if (cmd === 'hack') {
   console.log('CLEAN: the site serves the sealed build again. Reload the page.');
 } else if (cmd === 'status') console.log(`the demo site is ${mode()}`);
 else {
-  console.error('usage: node staging/try-it.mjs setup | serve | hack [once] | clean | status');
+  console.error('usage: node staging/try-it.mjs setup | build | serve | hack [once] | clean | status');
   process.exit(1);
 }

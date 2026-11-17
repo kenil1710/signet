@@ -26,7 +26,8 @@
     "try:setup": "node staging/try-it.mjs setup",
     "try:serve": "node staging/try-it.mjs serve",
     "try:hack": "node staging/try-it.mjs hack",
-    "try:clean": "node staging/try-it.mjs clean"
+    "try:clean": "node staging/try-it.mjs clean",
+    "try:build": "node staging/try-it.mjs build"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
