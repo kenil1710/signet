@@ -1,0 +1,26 @@
+# Signet
+
+> Signet lets a dApp team seal each release of its website on X Layer (file hashes, the contracts and spenders the site may ask a wallet to sign for, the outside origins it may use). A TapeOut circuit decides when a release goes live (CI can only propose and publish; humans approve; risky changes wait 24 h). Users who run the Guard browser extension have every page and every signature checked against the sealed release; the signing decision comes from a second TapeOut circuit. Users without Guard are NOT protected at signing; a watchtower alerts the team instead.
+
+Status (2026-11-18): the release-policy circuit (#6 on processor #101, 0x73153e5fd2Acac604D49d6ca9fea27b750718F22) is on X Layer mainnet and verified on all 512 inputs. Signet's contracts, the Guard decision circuit, the gateway, the dashboard and the watchtower run on a local fork of X Layer (staging); the mainnet deployment is planned and costed (about 0.0022 OKB) but not sent. Guard has been tested with a mock wallet, not MetaMask.
+
+## Start here
+- [JUDGES.md](JUDGES.md): a 5-minute guide
+- [CLAIMS.md](CLAIMS.md): every claim with its evidence (transaction hash, test or file)
+- [claims.json](claims.json): the same claims with the result of the last `pnpm verify:claims` run
+- [THREAT_MODEL.md](THREAT_MODEL.md): what is stopped, and the honest limits
+
+## Results
+- [docs/benchmark.md](docs/benchmark.md): the same 12 attacks against SRI only (2 blocked), a hash-only checker (7), Signet (12); 0 false blocks
+- [docs/attack-report.md](docs/attack-report.md): the attack suite in detail, plus the known limits (no extension, compromised extension)
+
+## How it works
+- [docs/signet-spec.md](docs/signet-spec.md): the product, architecture, approval tiers and build plan
+- [docs/policy-truth-table.md](docs/policy-truth-table.md): the release-policy circuit, all 512 rows
+- [docs/guard-truth-table.md](docs/guard-truth-table.md): the Guard decision circuit, all 512 rows
+- [docs/decisions.md](docs/decisions.md): every design decision and why
+- [docs/tapeout-interfaces.md](docs/tapeout-interfaces.md): the TapeOut interfaces used, each with its source
+
+## Try it
+- [docs/TRY-IT-LOCALLY.md](docs/TRY-IT-LOCALLY.md): Guard in your own Chrome against a local fork, with a hacked/clean switch
+- [docs/mainnet-plan.md](docs/mainnet-plan.md): the deployment plan with exact calls and costs

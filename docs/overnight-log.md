@@ -158,3 +158,9 @@ Token selector (USDT, USDC, WOKB), amount in / estimated amount out, balances, r
 ## Next phase, item 4: chunked upload for files over 48 KB (2026-11-18)
 
 `SignetRegistry.writeChunk`: big files are sealed with one Merkle leaf per 24,000-byte piece and written one piece per transaction, each proved against the current release. **A 300 KB bundle on staging: 13 transactions, 70.05M gas in total, at most 5.64M per transaction, ≈ 0.0015 OKB**; it reads back whole and the gateway serves it with the sealed hash (`packages/gateway/test/staging/chunked.test.ts`, `docs/demo/chunked-upload.json`). Files ≤ 48 KB are unchanged. 4 new Foundry tests (189 total); ReleaseGate unchanged. Staging was redeployed for the new registry (the `try:setup` project has to be set up again).
+
+## Next phase, item 5: README, llms.txt, claims.json (2026-11-18)
+
+- **README**: the first lines say what Signet is, the benchmark number (2 / 7 / 12 of 12, 0 false blocks), `pnpm verify:claims`, placeholders for the live dashboard URL and the mainnet addresses (only circuit #6 is real), and the honest limit.
+- **`llms.txt`**: a summary with the status and links, in the llmstxt.org shape.
+- **`claims.json`**: written by `pnpm verify:claims --write-json`, so it is the result of a real run (block, RPCs, PASS/PENDING per claim), not a hand-written file. Two new claims: R9 (benchmark), R10 (300 KB chunked upload). Last run: 7 mainnet claims PASS, 10 repo claims PASS, 2 PENDING (contracts and Guard circuit not on mainnet).

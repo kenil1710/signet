@@ -1,0 +1,148 @@
+{
+  "project": "Signet",
+  "checkedAt": "2026-11-17T18:48:25.234Z",
+  "chain": "X Layer mainnet (196)",
+  "block": "76172202",
+  "rpcs": [
+    "https://xlayerrpc.okx.com",
+    "https://xlayer.drpc.org"
+  ],
+  "reproduce": "pnpm install && pnpm verify:claims",
+  "evidence": "CLAIMS.md",
+  "summary": "all checks passed",
+  "claims": [
+    {
+      "id": "C1",
+      "kind": "mainnet",
+      "claim": "The release policy is TapeOut circuit #6 on processor #101 (X Layer mainnet): 9 inputs, 2 outputs, 34 NAND gates, no state",
+      "status": "PASS",
+      "detail": "circuitInfo(6) = (9, 2, 0, 34)"
+    },
+    {
+      "id": "C2",
+      "kind": "mainnet",
+      "claim": "Circuit #6's stored netlist is the reviewed one in packages/circuit/artifacts/policy.json",
+      "status": "PASS",
+      "detail": "sha256 0x1a2e19870a19f653af4bddf049e1070461b7466577640a4cb341a579838b20db"
+    },
+    {
+      "id": "C3",
+      "kind": "mainnet",
+      "claim": "Circuit #6 gives the published truth table (docs/policy-truth-table.md) on all 512 inputs",
+      "status": "PASS",
+      "detail": "512/512 rows equal the reviewed truth table on 2 RPC operators"
+    },
+    {
+      "id": "C4",
+      "kind": "mainnet",
+      "claim": "Circuit #6 was minted and taped out by the dev wallet in transactions 0x1c772cbe… and 0x354cb0d5…, and the dev wallet still holds it",
+      "status": "PASS",
+      "detail": "both succeeded; tape-out in block 76060134; ownerOf(6) = 0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE"
+    },
+    {
+      "id": "C5",
+      "kind": "mainnet",
+      "claim": "A taped-out circuit's behavior can't be upgraded through its beacon: the circuit beacon's owner is 0x0, it points at the implementation Signet pins, and the processor's code is the pinned proxy (TapeOut's source is not verified; this is what can be checked on-chain)",
+      "status": "PASS",
+      "detail": "owner 0x0, implementation 0x977f217887E085D298Cb3819cDAD5A0ee35F29B2, processor codehash 0x57aa306f…"
+    },
+    {
+      "id": "C6",
+      "kind": "mainnet",
+      "claim": "Signet's container is circuit #5's container on processor #101, opened on mainnet, and a file stored in it reads back with the recorded SHA-256 (Spike B)",
+      "status": "PASS",
+      "detail": "0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed, opened; 422-byte file sha256 0x9159d0b1… = fileInfo = the repo copy"
+    },
+    {
+      "id": "C7",
+      "kind": "mainnet",
+      "claim": "A contract can read a TapeOut circuit's output inside a transaction (Spike A: probe 0xD127…B7E got AND(1,1) = 1 from circuit #5)",
+      "status": "PASS",
+      "detail": "lastOut() = true, set by transaction 0xaa5aae2f… (block 76057587)"
+    },
+    {
+      "id": "C8",
+      "kind": "pending",
+      "claim": "Signet's contracts are on mainnet: SignetRegistry (with its enumerable domain list), SignetFactory, the ReleaseGate implementation and Signet's own site gate",
+      "status": "PENDING",
+      "detail": "not deployed yet: docs/mainnet-plan.md, waiting for a yes"
+    },
+    {
+      "id": "C9",
+      "kind": "pending",
+      "claim": "The Guard decision circuit is on mainnet and gives the published truth table (docs/guard-truth-table.md) on all 512 inputs",
+      "status": "PENDING",
+      "detail": "not taped out on mainnet yet: docs/mainnet-plan.md B (taped out and checked 512/512 on staging)"
+    },
+    {
+      "id": "R1",
+      "kind": "repo",
+      "claim": "Every release needs at least one human approval: no row of the policy circuit publishes without an approval",
+      "status": "PASS",
+      "detail": "0 of the 64 rows with no approval have PUBLISH = 1 (and C3 shows mainnet gives the same table)"
+    },
+    {
+      "id": "R2",
+      "kind": "repo",
+      "claim": "The Guard decision circuit never blocks in observe mode or when Guard cannot check the release (fail-open)",
+      "status": "PASS",
+      "detail": "0 of the 384 such rows are BLOCK"
+    },
+    {
+      "id": "R3",
+      "kind": "repo",
+      "claim": "The committed circuit artifacts are exactly what the netlist builders produce (no hand edits)",
+      "status": "PASS",
+      "detail": "policy.json and guard.json rebuilt and equal"
+    },
+    {
+      "id": "R4",
+      "kind": "repo",
+      "claim": "The risk tier is computed on-chain from the hashes, so CI cannot propose a changed allowlist at a lower tier",
+      "status": "PASS",
+      "detail": "5 Foundry tests in packages/contracts/test/ReleaseGate.t.sol (run: pnpm --filter @signet/contracts test)"
+    },
+    {
+      "id": "R5",
+      "kind": "repo",
+      "claim": "The CI key can propose and call publish, but can never approve, cancel, revoke, freeze, unfreeze, switch modes or propose admin changes",
+      "status": "PASS",
+      "detail": "4 Foundry tests"
+    },
+    {
+      "id": "R6",
+      "kind": "repo",
+      "claim": "On staging, all 12 attacks against Guard users are blocked, with 0 false blocks on 16 clean sessions; a user without Guard is not protected (a stated limit, not counted as an attack Guard defends against)",
+      "status": "PASS",
+      "detail": "docs/attack-report.md: Blocked 12/12 attacks against Guard users; false blocks: 0 on 16 clean sessions The user without Guard: not protected, as stated. (reproduce: pnpm staging:up && pnpm attacks)"
+    },
+    {
+      "id": "R9",
+      "kind": "repo",
+      "claim": "Against the same attacks on staging, SRI alone blocks 2 of 12, a hash-only checker 7 of 12, and Signet 12 of 12, with 0 false blocks",
+      "status": "PASS",
+      "detail": "docs/benchmark.md (reproduce: pnpm staging:up && pnpm benchmark)"
+    },
+    {
+      "id": "R10",
+      "kind": "repo",
+      "claim": "A real-size bundle (300 KB) can be stored on-chain as the verified copy, one proved 24 KB piece per transaction, each under 16.7M gas",
+      "status": "PASS",
+      "detail": "13 transactions, 70,054,138 gas in total, at most 5,635,679 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
+    },
+    {
+      "id": "R7",
+      "kind": "repo",
+      "claim": "Guard makes no network request on a domain that is not sealed",
+      "status": "PASS",
+      "detail": "staging test in packages/extension/test/staging/guard.test.ts (counts RPC and site requests)"
+    },
+    {
+      "id": "R8",
+      "kind": "repo",
+      "claim": "Diff Guard flags a poisoned npm package (new address, new origin, new approve/transferFrom calls) and the chain makes it tier 10",
+      "status": "PASS",
+      "detail": "docs/demo/diff-guard-poisoned.txt (from the staging e2e test)"
+    }
+  ]
+}

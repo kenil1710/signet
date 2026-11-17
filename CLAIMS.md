@@ -31,6 +31,8 @@ Processor #101 = `0x73153e5fd2Acac604D49d6ca9fea27b750718F22`. Dev wallet = `0x7
 | R4 | The risk tier is computed on-chain, so CI can't propose a changed allowlist at a lower tier | `packages/contracts/test/ReleaseGate.t.sol`: `test_tier_*`, `test_H1_ciCannotShipNewAllowlistAtALowerTier` |
 | R5 | The CI key can propose and call publish, but never approve, cancel, revoke, freeze, unfreeze, switch modes or propose admin changes | `test_threat7_proposerCanOnlyPropose`, `test_row11_proposerKeyCannotProposeAdmin`, `test_unfreeze_guardianAndProposerCannotApprove`, `test_freeze_anyOneApproverOrGuardian_notProposerOrStranger` |
 | R6 | On staging, **all 12 attacks against Guard users are blocked**, with **0 false blocks on 16 clean sessions** | `docs/attack-report.md`; reproduce: `pnpm staging:up && pnpm attacks` |
+| R9 | Against the same 12 attacks on staging, **SRI alone blocks 2, a hash-only checker 7, Signet 12**, with 0 false blocks | `docs/benchmark.md`; reproduce: `pnpm staging:up && pnpm benchmark`. The hash-only column is an ablation of Guard, not TEE Shield itself |
+| R10 | A 300 KB bundle can be stored on-chain as the verified copy: 13 transactions, each under the 16.7M per-transaction gas cap | `docs/demo/chunked-upload.json` (70.05M gas in total, ≈ 0.0015 OKB at 0.021 gwei); `packages/gateway/test/staging/chunked.test.ts`; `SignetRegistry.writeChunk` |
 | R7 | Guard makes no network request on a domain that isn't sealed | `packages/extension/test/staging/guard.test.ts`, "privacy: …" (counts RPC and site requests) |
 | R8 | Diff Guard flags a poisoned npm package (new address, origin, approve/transferFrom calls) and the chain makes it tier 10 | `docs/demo/diff-guard-poisoned.txt`; `packages/cli/test/staging/e2e.test.ts` |
 

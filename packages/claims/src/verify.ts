@@ -93,7 +93,7 @@ const CLAIMS: Claim[] = [
     },
   },
   {
-    id: 'C5', kind: 'mainnet', text: "Nobody can upgrade a taped-out circuit's behavior: the circuit beacon's owner is 0x0, it points at the implementation Signet pins, and the processor's code is the pinned proxy",
+    id: 'C5', kind: 'mainnet', text: "A taped-out circuit's behavior can't be upgraded through its beacon: the circuit beacon's owner is 0x0, it points at the implementation Signet pins, and the processor's code is the pinned proxy (TapeOut's source is not verified; this is what can be checked on-chain)",
     check: async (b) => {
       const owner = await call<Address>(b, net.tapeout.circuitBeacon, beaconAbi, 'owner');
       const impl = await call<Address>(b, net.tapeout.circuitBeacon, beaconAbi, 'implementation');
@@ -188,6 +188,22 @@ const CLAIMS: Claim[] = [
     },
   },
   {
+    id: 'R9', kind: 'repo', text: 'Against the same attacks on staging, SRI alone blocks 2 of 12, a hash-only checker 7 of 12, and Signet 12 of 12, with 0 false blocks',
+    check: async () => {
+      if (!existsSync(`${ROOT}docs/benchmark.md`)) return fail('docs/benchmark.md missing');
+      const m = read('docs/benchmark.md').match(/SRI alone blocked (\d+), a hash-only checker blocked (\d+), and Signet blocked (\d+), with (\d+) false blocks/);
+      return m && m[1] === '2' && m[2] === '7' && m[3] === '12' && m[4] === '0' ? pass(`docs/benchmark.md (reproduce: pnpm staging:up && pnpm benchmark)`) : fail(`benchmark says: ${m?.[0] ?? 'nothing'}`);
+    },
+  },
+  {
+    id: 'R10', kind: 'repo', text: 'A real-size bundle (300 KB) can be stored on-chain as the verified copy, one proved 24 KB piece per transaction, each under 16.7M gas',
+    check: async () => {
+      if (!existsSync(`${ROOT}docs/demo/chunked-upload.json`)) return fail('docs/demo/chunked-upload.json missing');
+      const r = json('docs/demo/chunked-upload.json') as { bytes: number; chunks: number; totalGas: number; maxChunkGas: number };
+      return r.bytes === 307200 && r.chunks === 13 && r.maxChunkGas < 16_777_216 ? pass(`${r.chunks} transactions, ${r.totalGas.toLocaleString('en-US')} gas in total, at most ${r.maxChunkGas.toLocaleString('en-US')} per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)`) : fail(JSON.stringify(r));
+    },
+  },
+  {
     id: 'R7', kind: 'repo', text: 'Guard makes no network request on a domain that is not sealed',
     check: async () => (testExists('packages/extension/test/staging/guard.test.ts', 'privacy: on a domain that is not sealed Guard makes no network call') ? pass('staging test in packages/extension/test/staging/guard.test.ts (counts RPC and site requests)') : fail('test missing')),
   },
@@ -200,11 +216,14 @@ const CLAIMS: Claim[] = [
   },
 ];
 
-const only = process.argv.slice(2);
+const args = process.argv.slice(2);
+const writeJson = args.includes('--write-json');
+const only = args.filter((a) => !a.startsWith('--'));
 const blockOf = await Promise.all(clients.map((c) => c.getBlockNumber()));
 const block = blockOf.reduce((a, b) => (a < b ? a : b));
 console.log(`Signet claims, checked against X Layer mainnet at block ${block} on ${RPCS.join(' and ')} (read-only)\n`);
 let failed = 0;
+const results: { id: string; kind: string; claim: string; status: string; detail: string }[] = [];
 for (const c of CLAIMS.filter((x) => only.length === 0 || only.includes(x.id))) {
   let r: Result;
   try {
@@ -213,6 +232,7 @@ for (const c of CLAIMS.filter((x) => only.length === 0 || only.includes(x.id))) 
     r = fail(`error: ${(e as Error).message.split('\n')[0]}`);
   }
   if (r.status === 'FAIL') failed++;
+  results.push({ id: c.id, kind: c.kind, claim: c.text, status: r.status, detail: r.detail });
   console.log(`${r.status.padEnd(7)} ${c.id} [${c.kind}] ${c.text}\n        ${r.detail}`);
 }
 // every claim id must also be in CLAIMS.md
@@ -224,4 +244,13 @@ if (missing.length) {
 }
 const counts = (s: string) => CLAIMS.filter((c) => c.kind === s).length;
 console.log(`\n${failed === 0 ? 'ALL CHECKS PASSED' : `${failed} FAILED`} (${counts('mainnet')} on mainnet, ${counts('repo')} from the repo, ${counts('pending')} pending deployment)`);
+if (writeJson) {
+  // claims.json at the repo root: the same claims, their kind, and the result of this run (CLAIMS.md has the evidence)
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(`${ROOT}claims.json`, JSON.stringify({
+    project: 'Signet', checkedAt: new Date().toISOString(), chain: 'X Layer mainnet (196)', block: String(block), rpcs: RPCS,
+    reproduce: 'pnpm install && pnpm verify:claims', evidence: 'CLAIMS.md', summary: failed === 0 ? 'all checks passed' : `${failed} failed`, claims: results,
+  }, null, 2) + '\n');
+  console.log('wrote claims.json');
+}
 process.exit(failed === 0 ? 0 : 1);
