@@ -127,19 +127,19 @@ test('first release: tier 10, 3 of 3 on the fast lane, every file written with i
   const pubOut = ok(['publish', id, dist, '--full'], 'user2');
   assert.match(pubOut, /Published release #/);
   assert.match(pubOut, /decided by the TapeOut policy circuit/);
-  assert.match(pubOut, /skipped assets\/chunk-vendor-51b0e7d4\.js/);
+  assert.match(pubOut, /wrote   assets\/chunk-vendor-51b0e7d4\.js  \(\d+ bytes in 4 transactions, gas \d+; read back: matches\)/); // over 48 KB: chunked
   assert.match(pubOut, /read back .*signet\/files\.json: matches/);
 
   // on-chain: the gate's release is this manifest, and SiteRegistry holds the exact bytes
   const b = loadSealed(dist);
   assert.equal(await gateRead<Hex>('currentManifestHash'), b.manifest.manifestHash);
   assert.equal(await gateRead<boolean>('isValidManifest', [b.manifest.manifestHash]), true);
-  for (const f of ['index.html', 'signet/allowlist.json', 'signet/origins.json', 'signet/files.json', ...b.files.filter((x) => x.size <= 48_000).map((x) => x.path)]) {
+  for (const f of ['index.html', 'signet/allowlist.json', 'signet/origins.json', 'signet/files.json', ...b.files.map((x) => x.path)]) {
     const onchain = (await pub.readContract({ address: sites, abi: siteReadAbi, functionName: 'read', args: [net.tapeout.sharedContainer as Address, `projects/${domain}/${f}`] })) as Hex;
     assert.equal(onchain, `0x${b.bytes(f).toString('hex')}`, f);
   }
   const again = ok(['upload', dist, '--full'], 'user2');
-  assert.ok(!/wrote /.test(again) && /same {4}index\.html/.test(again), 'a second upload writes nothing');
+  assert.ok(!/wrote |chunk {3}/.test(again) && /same {4}index\.html/.test(again) && /same {4}assets\/chunk-vendor-51b0e7d4\.js {2}\(4 chunks\)/.test(again), 'a second upload writes nothing');
 });
 
 test('code-only release: tier 00, 1 approval, refused until the 1 h timelock is over', async () => {

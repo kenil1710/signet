@@ -328,3 +328,16 @@ Found while building it:
 - **Pending is never shown as passed.** C8 (Signet's contracts) and C9 (Guard circuit) turn into real checks as soon as `deployments/mainnet.json` names them.
 - **Overclaims removed** from the spec, `CLAUDE.md` and the new `README.md`. The pitch now says what is true: protection at signing reaches Guard users only; others get the watchtower's alert to the team. Also qualified: "nobody can change the circuit" (rests on bytecode and on-chain checks; TapeOut has no verified source), "keeps your app running" (verified copy for Guard users, gateway not deployed), "10 minutes" (a target), "no false blocks" (0 on 16 staging sessions, not measured on real sites), "first to ship", "zero-install users" via OKX Wallet (not discussed with them).
 - **`THREAT_MODEL.md`** lists what each layer does, the attack-suite result per threat, and the limits, including the ones that hurt: most users aren't protected at signing; fail-open can be triggered by making a user's RPCs fail; a compromised Guard extension defeats everything; SiteRegistry is upgradeable by its owner.
+
+## 2026-11-18: Chunked upload for files over 48 KB (`SignetRegistry.writeChunk`)
+
+| Decision | Why |
+|---|---|
+| **A file over 48,000 bytes gets one extra Merkle leaf per 24,000-byte piece**, sealed by the CLI: `sha256(abi.encode(domain, "<path> <i>", "signet/chunk", sha256(piece)))`. `files.json` lists the piece hashes (`chunks`). | `filesRoot` commits to each file's SHA-256 as a whole, and SHA-256 can't be checked across transactions. Per-piece leaves let each transaction prove its own bytes. A path with a space can't be stored and no file has the type `signet/chunk`, so a chunk leaf never equals a file leaf (tested: `writeFile` refuses such a path). |
+| **`writeChunk(Chunk)`**: piece 0 also proves the whole file's leaf and starts the file with its SHA-256 (SiteRegistry stores it); later pieces are appended in order (SiteRegistry checks the index). Every piece must be in the gate's current release; anyone may relay. | Same trust rule as `writeFile`. A reader still checks the whole file against its sealed hash. |
+| **Files of 48,000 bytes or less are unchanged**, so releases without big files keep the same `filesRoot`. Limit: 350 pieces (SiteRegistry's `CHUNKS_MAX`), 8.4 MB per file. | |
+| **One piece per transaction**, 24,000 bytes. | Measured on staging: a 300 KB bundle = **13 transactions, 70,054,138 gas in total, at most 5,635,679 per transaction** (under the 2^24 per-transaction cap OP-stack chains are adopting), **≈ 0.0015 OKB** at 0.021 gwei (`docs/demo/chunked-upload.json`). |
+| `signet upload --full` resumes a partial upload (SiteRegistry keeps the declared hash and the piece count) and reads the file back before it says "wrote". | |
+| **Every verifier rebuilds the same leaves** from `files.json`: the CLI (`merkle.ts leavesOf`) and the shared extension library (`sealed.ts leavesOf`), used by Guard, the gateway, the dashboard and the watchtower. Cross-checked by a unit test on a build with a chunked file. | |
+
+Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unchanged. Staging was redeployed for the new registry.

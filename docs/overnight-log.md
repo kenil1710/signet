@@ -154,3 +154,7 @@ Last full run: 185 Foundry tests, 58 unit tests, 41 staging end-to-end tests, th
 ## Next phase, item 3: the demo dApp looks like a swap app (2026-11-18)
 
 Token selector (USDT, USDC, WOKB), amount in / estimated amount out, balances, rate and pool fee, Max, flip, an **Approve** step, and a **Review swap → Confirm swap** sheet (you pay, minimum received, rate, router, recipient, fee) before the wallet is asked; a stake card and an activity list. Balances are demo balances kept in the browser (the page says so). The element IDs and the `?spender=` / `?recipient=` hooks stay, so `pnpm try:hack` / `try:clean` and every test still work; the tests now click "Review swap" then "Confirm swap". Guard staging suite 12/12; attack suite again 12/12, 0 false blocks on 16 clean sessions. New screenshots in `docs/demo/`.
+
+## Next phase, item 4: chunked upload for files over 48 KB (2026-11-18)
+
+`SignetRegistry.writeChunk`: big files are sealed with one Merkle leaf per 24,000-byte piece and written one piece per transaction, each proved against the current release. **A 300 KB bundle on staging: 13 transactions, 70.05M gas in total, at most 5.64M per transaction, ≈ 0.0015 OKB**; it reads back whole and the gateway serves it with the sealed hash (`packages/gateway/test/staging/chunked.test.ts`, `docs/demo/chunked-upload.json`). Files ≤ 48 KB are unchanged. 4 new Foundry tests (189 total); ReleaseGate unchanged. Staging was redeployed for the new registry (the `try:setup` project has to be set up again).

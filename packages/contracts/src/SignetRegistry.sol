@@ -60,6 +60,8 @@ contract SignetRegistry {
     uint256 public constant TRANSFER_WINDOW = 7 days;
     string public constant ALLOWLIST_PATH = "signet/allowlist.json";
     string public constant ORIGINS_PATH = "signet/origins.json";
+    /// Content type of a chunk leaf. No sealed file can have it, so a chunk leaf never equals a file leaf.
+    string public constant CHUNK_TYPE = "signet/chunk";
 
     bytes32 public signetSiteDomain; // keccak256 of the ONE shared-container domain of Signet's site gate (0 = none)
     mapping(address => bool) public isGate;
@@ -79,6 +81,7 @@ contract SignetRegistry {
     event Unbound_(string domain, address indexed gate);
     event FileWritten(string domain, address indexed gate, string path, bytes32 sha256Hash, uint256 size);
     event FileRemoved(string domain, address indexed gate, string path);
+    event ChunkWritten(string domain, address indexed gate, string path, uint256 index, bytes32 sha256Hash);
 
     error BadDomain();
     error BadPath();
@@ -251,6 +254,18 @@ contract SignetRegistry {
         bytes32[] proof; // Merkle proof against filesRoot (empty for the allowlist and origins files)
     }
 
+    /// One CHUNK-sized piece of a sealed file larger than MAX_FILE_BYTES, written in its own transaction.
+    struct Chunk {
+        string domain;
+        string path;
+        string contentType;
+        bytes32 fileSha256; // the whole file's SHA-256 (proved by chunk 0, stored by SiteRegistry)
+        uint256 index; // 0, 1, 2, ... in order
+        bytes data; // CHUNK bytes, the last one may be shorter
+        bytes32[] fileProof; // chunk 0 only: Merkle proof of the whole file's leaf
+        bytes32[] chunkProof; // Merkle proof of this chunk's leaf
+    }
+
     /// Writes one file of the domain's current release. Anyone may call. The whole file comes in one transaction,
     /// is checked against the approved hashes here, and is stored in 24,000-byte chunks.
     function writeFile(File calldata f) external {
@@ -263,6 +278,40 @@ contract SignetRegistry {
         (address container, string memory full) = _target(b, f.domain, f.path);
         _store(container, full, f.contentType, h, f.data);
         emit FileWritten(f.domain, b.gate, f.path, h, f.data.length);
+    }
+
+    /// A file larger than MAX_FILE_BYTES, one chunk per transaction (docs/decisions.md, "Chunked upload"). `signet seal`
+    /// adds one leaf per CHUNK-byte piece of such a file to the release's Merkle tree:
+    ///   sha256(abi.encode(domain, string.concat(path, " ", index), CHUNK_TYPE, sha256(piece)))
+    /// (a path with a space can't be stored, so the chunk path never names a real file). Chunk 0 also proves the whole
+    /// file's leaf and starts the file with its SHA-256; later chunks are appended in order (SiteRegistry checks the
+    /// index). Every chunk must belong to the gate's current release. Anyone may relay them, as with writeFile.
+    function writeChunk(Chunk calldata c) external {
+        if (c.data.length == 0 || c.data.length > CHUNK) revert BadSize();
+        bytes32 pathHash = keccak256(bytes(c.path));
+        if (pathHash == keccak256(bytes(ALLOWLIST_PATH)) || pathHash == keccak256(bytes(ORIGINS_PATH))) revert BadPath();
+        Binding storage b = _bound(c.domain);
+        bytes32 h = sha256(c.data);
+        _checkChunk(b.gate, pathHash, c, h);
+        (address container, string memory full) = _target(b, c.domain, c.path);
+        if (c.index == 0) siteRegistry.putFile(container, full, c.contentType, c.fileSha256, c.data);
+        else siteRegistry.appendChunk(container, full, c.index, c.data);
+        emit ChunkWritten(c.domain, b.gate, c.path, c.index, h);
+    }
+
+    function _checkChunk(address gate, bytes32 pathHash, Chunk calldata c, bytes32 h) internal view {
+        bytes32 leaf = sha256(abi.encode(c.domain, string.concat(c.path, " ", _dec(c.index)), CHUNK_TYPE, h));
+        _checkApproved(gate, pathHash, h, leaf, c.chunkProof);
+        if (c.index == 0) _checkApproved(gate, pathHash, c.fileSha256, sha256(abi.encode(c.domain, c.path, c.contentType, c.fileSha256)), c.fileProof);
+    }
+
+    function _dec(uint256 v) internal pure returns (string memory) {
+        if (v == 0) return "0";
+        uint256 n;
+        for (uint256 x = v; x != 0; x /= 10) n++;
+        bytes memory b = new bytes(n);
+        for (; v != 0; v /= 10) b[--n] = bytes1(uint8(48 + v % 10));
+        return string(b);
     }
 
     function _checkApproved(address gate, bytes32 pathHash, bytes32 h, bytes32 node, bytes32[] calldata proof) internal view {

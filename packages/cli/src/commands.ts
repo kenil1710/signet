@@ -9,7 +9,8 @@ import {
   read, send, errorName, chainTime, fmtTime, fmtSpan, showPath, type Ctx, type ProjectConfig, type Signer,
 } from './chain.ts';
 import { sha256Hex } from './merkle.ts';
-import { loadSealed, parseSealed, isValidDomain, isOnchainPath, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH, MAX_ONCHAIN_BYTES, type SealedBuild, type SealedLists } from './seal.ts';
+import { loadSealed, parseSealed, isValidDomain, isOnchainPath, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH, MAX_ONCHAIN_BYTES, MAX_CHUNKS, type SealedBuild, type SealedLists } from './seal.ts';
+import { CHUNK_BYTES } from './merkle.ts';
 import { diffSealed, formatDiff, type DiffReport } from './diff.ts';
 
 type Log = (line?: string) => void;
@@ -468,12 +469,14 @@ export async function upload(ctx: Ctx, buildDir: string, o: { full?: boolean }, 
     { path: ORIGINS_PATH, contentType: 'application/json', proof: [] },
   ];
   const skipped: string[] = [];
+  const chunked: typeof build.files = [];
   for (const f of build.files) {
     if (f.path !== FILES_PATH && !o.full) continue;
-    if (f.size === 0 || f.size > MAX_ONCHAIN_BYTES || !isOnchainPath(f.path)) skipped.push(f.path);
+    if (f.chunks) chunked.push(f); // over MAX_ONCHAIN_BYTES: one transaction per chunk (writeChunk)
+    else if (f.size === 0 || f.size > MAX_ONCHAIN_BYTES || !isOnchainPath(f.path)) skipped.push(f.path);
     else wanted.push({ path: f.path, contentType: f.contentType, proof: build.proof(f.path) });
   }
-  log(`Writing ${wanted.length} file(s) to ${container} under ${prefix || '(container root)'}`);
+  log(`Writing ${wanted.length} file(s)${chunked.length ? ` and ${chunked.length} chunked file(s)` : ''} to ${container} under ${prefix || '(container root)'}`);
   let gas = 0n;
   let fee = 0n;
   for (const w of wanted) {
@@ -489,7 +492,30 @@ export async function upload(ctx: Ctx, buildDir: string, o: { full?: boolean }, 
     fee += r.gasUsed * r.effectiveGasPrice;
     log(`  wrote   ${w.path}  (${data.length} bytes, gas ${r.gasUsed})`);
   }
-  for (const p of skipped) log(`  skipped ${p}  (empty, over ${MAX_ONCHAIN_BYTES} bytes, or a path that can't be stored on-chain)`);
+  for (const f of chunked) {
+    const data = build.bytes(f.path);
+    const n = f.chunks!.length;
+    const info = await read<[number, string, Hex, number, bigint]>(ctx, { address: sites, abi: siteReadAbi, functionName: 'fileInfo', args: [container, prefix + f.path] });
+    // a partial upload of this same file is resumed where it stopped (SiteRegistry keeps the declared hash and the chunk count)
+    const done = info[2] === f.sha256 && info[1] === f.contentType ? Number(info[4]) : 0;
+    if (done === n) {
+      log(`  same    ${f.path}  (${n} chunks)`);
+      continue;
+    }
+    let fileGas = 0n;
+    for (let i = done; i < n; i++) {
+      const piece = data.subarray(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES);
+      const r = await send(ctx, signer, { address: registry, abi: registryAbi, functionName: 'writeChunk', args: [{ domain: cfg.domain, path: f.path, contentType: f.contentType, fileSha256: f.sha256, index: BigInt(i), data: `0x${piece.toString('hex')}`, fileProof: i === 0 ? build.proof(f.path) : [], chunkProof: build.chunkProof(f.path, i) }] });
+      gas += r.gasUsed;
+      fileGas += r.gasUsed;
+      fee += r.gasUsed * r.effectiveGasPrice;
+      log(`  chunk   ${f.path}  ${i + 1}/${n}  (${piece.length} bytes, gas ${r.gasUsed})`);
+    }
+    const stored = await read<Hex>(ctx, { address: sites, abi: siteReadAbi, functionName: 'read', args: [container, prefix + f.path] });
+    if (sha256Hex(Buffer.from(stored.slice(2), 'hex')) !== f.sha256) throw new SignetError('read-back', `${f.path} read back from the chain does not hash to its sealed value`);
+    log(`  wrote   ${f.path}  (${data.length} bytes in ${n - done} transactions, gas ${fileGas}; read back: matches)`);
+  }
+  for (const p of skipped) log(`  skipped ${p}  (empty, more than ${MAX_CHUNKS} chunks, or a path that can't be stored on-chain)`);
   const back = await read<Hex>(ctx, { address: sites, abi: siteReadAbi, functionName: 'read', args: [container, prefix + FILES_PATH] });
   if (back !== `0x${build.bytes(FILES_PATH).toString('hex')}`) throw new SignetError('read-back', `${FILES_PATH} read back from the chain does not match`);
   log(`  read back ${prefix}${FILES_PATH}: matches. Total gas ${gas} (${formatEther(fee)} OKB).`);

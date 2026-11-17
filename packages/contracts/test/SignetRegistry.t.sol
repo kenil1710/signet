@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {GateBase} from "./GateBase.sol";
+import {console2} from "forge-std/console2.sol";
 import {ReleaseGate} from "../src/ReleaseGate.sol";
 import {SignetRegistry} from "../src/SignetRegistry.sol";
 import {SignetFactory} from "../src/SignetFactory.sol";
@@ -200,6 +201,123 @@ contract SignetRegistryTest is GateBase {
             (uint32 size,,,, uint256 chunks) = sites.fileInfo(sharedContainer, at("f.bin"));
             assertEq(size, sizes[i]);
             assertEq(chunks, chunksWant[i]);
+        }
+    }
+
+    // ---------------------------------------------------------------- chunked upload (files over MAX_FILE_BYTES)
+
+    /// Merkle root and proofs in the CLI's shape: leaves sorted, paired left to right, an odd last node moves up.
+    function _tree(bytes32[] memory leaves, uint256 which) internal pure returns (bytes32 root, bytes32[] memory proof) {
+        bytes32[] memory level = new bytes32[](leaves.length); // a copy: sorting must not reorder the caller's array
+        for (uint256 i; i < leaves.length; i++) level[i] = leaves[i];
+        for (uint256 i = 1; i < level.length; i++) {
+            for (uint256 j = i; j > 0 && level[j] < level[j - 1]; j--) (level[j], level[j - 1]) = (level[j - 1], level[j]);
+        }
+        bytes32 target = leaves[which];
+        uint256 idx;
+        for (; level[idx] != target; idx++) {}
+        bytes32[] memory tmp = new bytes32[](16);
+        uint256 n;
+        while (level.length > 1) {
+            if ((idx ^ 1) < level.length) tmp[n++] = level[idx ^ 1];
+            bytes32[] memory next = new bytes32[]((level.length + 1) / 2);
+            for (uint256 i; i < level.length; i += 2) next[i / 2] = i + 1 < level.length ? pair(level[i], level[i + 1]) : level[i];
+            level = next;
+            idx >>= 1;
+        }
+        root = level[0];
+        proof = new bytes32[](n);
+        for (uint256 i; i < n; i++) proof[i] = tmp[i];
+    }
+
+    function _chunkLeaf(string memory d, string memory path, uint256 i, bytes memory piece) internal pure returns (bytes32) {
+        return sha256(abi.encode(d, string.concat(path, " ", vm.toString(i)), "signet/chunk", sha256(piece)));
+    }
+
+    function _bigFile() internal pure returns (bytes memory big, bytes[] memory pieces) {
+        big = new bytes(60_000); // 3 chunks: 24,000 + 24,000 + 12,000
+        for (uint256 i; i < big.length; i += 13) big[i] = bytes1(uint8(i * 7));
+        pieces = new bytes[](3);
+        for (uint256 k; k < 3; k++) {
+            uint256 end = k == 2 ? 60_000 : (k + 1) * 24_000;
+            bytes memory p = new bytes(end - k * 24_000);
+            for (uint256 i; i < p.length; i++) p[i] = big[k * 24_000 + i];
+            pieces[k] = p;
+        }
+    }
+
+    /// Publishes a release whose tree has the big file's leaf, its 3 chunk leaves and index.html.
+    function _bigRelease() internal returns (bytes memory big, bytes[] memory pieces, bytes32[] memory leaves) {
+        (big, pieces) = _bigFile();
+        leaves = new bytes32[](5);
+        leaves[0] = leaf(DOMAIN, "assets/app.js", JS, big);
+        for (uint256 k; k < 3; k++) leaves[1 + k] = _chunkLeaf(DOMAIN, "assets/app.js", k, pieces[k]);
+        leaves[4] = leaf(DOMAIN, "index.html", HTML, INDEX);
+        (bytes32 root,) = _tree(leaves, 0);
+        releaseRoot(root);
+    }
+
+    function _chunk(bytes32[] memory leaves, bytes[] memory pieces, bytes memory big, uint256 k) internal view returns (SignetRegistry.Chunk memory c) {
+        (, bytes32[] memory fp) = _tree(leaves, 0);
+        (, bytes32[] memory cp) = _tree(leaves, 1 + k);
+        c = SignetRegistry.Chunk(DOMAIN, "assets/app.js", JS, sha256(big), k, pieces[k], k == 0 ? fp : none, cp);
+    }
+
+    function test_chunked_aFileOver48KB_isWrittenOneChunkPerTransaction_andReadsBackWhole() public {
+        (bytes memory big, bytes[] memory pieces, bytes32[] memory leaves) = _bigRelease();
+        for (uint256 k; k < 3; k++) reg.writeChunk(_chunk(leaves, pieces, big, k));
+        (uint32 size,, bytes32 h,, uint256 chunks) = sites.fileInfo(sharedContainer, at("assets/app.js"));
+        assertEq(size, 60_000);
+        assertEq(chunks, 3);
+        assertEq(h, sha256(big));
+        assertEq(sha256(stored(sharedContainer, at("assets/app.js"))), sha256(big));
+    }
+
+    function test_chunked_outOfOrder_orAChunkNotInTheRelease_isRefused() public {
+        (bytes memory big, bytes[] memory pieces, bytes32[] memory leaves) = _bigRelease();
+        SignetRegistry.Chunk memory early = _chunk(leaves, pieces, big, 1);
+        vm.expectRevert(); // SiteRegistry: chunk 1 before chunk 0
+        reg.writeChunk(early);
+        SignetRegistry.Chunk memory c = _chunk(leaves, pieces, big, 0);
+        c.data = bytes.concat(c.data);
+        c.data[5] = 0xff; // one byte changed
+        vm.expectRevert(SignetRegistry.NotApproved.selector);
+        reg.writeChunk(c);
+        c = _chunk(leaves, pieces, big, 0);
+        c.fileSha256 = sha256("another file"); // the whole-file hash must be the sealed one
+        vm.expectRevert(SignetRegistry.NotApproved.selector);
+        reg.writeChunk(c);
+        c = _chunk(leaves, pieces, big, 2);
+        c.index = 1; // a chunk at the wrong position
+        SignetRegistry.Chunk memory first = _chunk(leaves, pieces, big, 0);
+        reg.writeChunk(first);
+        vm.expectRevert(SignetRegistry.NotApproved.selector);
+        reg.writeChunk(c);
+    }
+
+    function test_chunked_onlyTheCurrentRelease_neverTheListsOrAChunkLeafAsAFile() public {
+        (bytes memory big, bytes[] memory pieces, bytes32[] memory leaves) = _bigRelease();
+        SignetRegistry.Chunk memory c = _chunk(leaves, pieces, big, 0);
+        c.path = "signet/allowlist.json";
+        vm.expectRevert(SignetRegistry.BadPath.selector);
+        reg.writeChunk(c);
+        // a chunk leaf's path has a space: writeFile can't use it to store a chunk as a file
+        vm.expectRevert(SignetRegistry.BadPath.selector);
+        write(DOMAIN, "assets/app.js 0", "signet/chunk", pieces[0], none);
+        // a newer release without this file: its chunks are no longer accepted
+        release(DOMAIN, ALLOWLIST, ORIGINS);
+        SignetRegistry.Chunk memory old = _chunk(leaves, pieces, big, 0);
+        vm.expectRevert(SignetRegistry.NotApproved.selector);
+        reg.writeChunk(old);
+    }
+
+    function test_chunked_gas_perChunk() public {
+        (bytes memory big, bytes[] memory pieces, bytes32[] memory leaves) = _bigRelease();
+        for (uint256 k; k < 3; k++) {
+            SignetRegistry.Chunk memory c = _chunk(leaves, pieces, big, k);
+            uint256 g = gasleft();
+            reg.writeChunk(c);
+            console2.log("chunk", k, "gas", g - gasleft());
         }
     }
 
