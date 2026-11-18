@@ -19,27 +19,28 @@ Built from `docs/design/landing-v2.html` into `packages/dashboard` (`index.html`
 - A still image of the seal (`src/landing/seal-still.webp`, 640×640, 23.5 KB) shows at once. It is rendered from
   the real 3D scene by `test/render-still.ts` (the live seal at rest, captured on a transparent background) and
   drawn exactly where the 3D seal will be.
-- The WebGL seal loads when the browser is idle after load (`requestIdleCallback`), then the image fades into it
-  over 0.8 s. With reduced motion, WebGL never loads and the page shows only the still image.
+- The WebGL seal then fades in over 0.8 s. On desktop it loads when the browser is idle after load
+  (`requestIdleCallback`). On touch devices (`pointer: coarse`) it loads on the first touch, pointer press, key or
+  scroll. With reduced motion, WebGL never loads and the page shows only the still image.
 
 ## Lighthouse 12.2.1 (local `vite preview`, headless Chromium)
 
 | | Performance | Accessibility | Best practices | SEO | FCP | LCP | TBT | CLS |
 |---|---|---|---|---|---|---|---|---|
 | Desktop | 86 | 95 (100 with reduced motion) | 100 | 100 | 0.5 s | 0.6 s | 290 ms | 0.077 |
-| Mobile | 72 | 100 | 100 | 100 | 1.8 s | 1.9 s | 1,180 ms | 0.097 |
+| Mobile | **95–96** (two runs) | 100 | 100 | 100 | 1.8 s | 1.9 s | 0–10 ms | 0.097 |
 
-Before this round: desktop 86 / 93 / 100 / 100, mobile 70 / 93 / 100 / 100.
+Earlier: mobile 72 with WebGL on idle (TBT 1,180 ms), and 70 / 93 / 100 / 100 before the still image and contrast work; desktop 86 / 93 / 100 / 100.
 
 - **Accessibility:** small text uses `--dim` `#8B807A` (was `#6E6560` at 3.4:1; now 4.98:1 on panels, 5.18:1 on the
   page). The hero beat labels moved from `#5C5450` to `--dim`. The tape tags use `#E04A33` (4.9:1). The footer
   headings are h3. The decorative "SIGNET" word is drawn by CSS. The remaining desktop items are motion states,
   not resting colours: the design shows the `signet seal dist` lines at 10% opacity until you scroll to them, and
   Lighthouse catches the hero labels mid fade-in. With reduced motion (everything at rest) desktop scores 100.
-- **Mobile performance:** almost all of the blocking time is one ~1.2 s task, the WebGL shader compile on
-  Lighthouse's software GPU. Starting on idle doesn't move it out of Lighthouse's window. Measured alternative:
-  starting WebGL on the phone's first touch or scroll (the still image covers the gap) scored **mobile 89,
-  TBT 10 ms**. That build was not kept, because the request was "after first paint or on idle".
+- **Mobile performance:** on touch devices the WebGL seal (and its ~1.2 s shader compile on Lighthouse's
+  software GPU) waits for the first touch or scroll, so it is outside the load. Mobile went 72 → 95–96 and TBT
+  1,180 ms → 0–10 ms. Lighthouse never touches the page, so its mobile run measures the page with the still
+  image only. Desktop keeps the idle start.
 
 ## DeWEB size and cost (nothing uploaded)
 

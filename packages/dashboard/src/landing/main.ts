@@ -29,7 +29,8 @@ applyLinks();
 
 // The 3D seal starts after the first paint, so it never delays the text. (Two frames: the first runs before paint.)
 // The seal shows at once as a still image rendered from the real 3D scene (test/render-still.ts), placed and sized
-// exactly where the 3D seal draws. The live WebGL seal starts when the browser is idle after load, then the image
+// exactly where the 3D seal draws. The live WebGL seal starts when the browser is idle after load (on touch
+// devices: on the first touch or scroll), then the image
 // fades into it. Reduced motion: the still image only, no WebGL.
 const still = $<HTMLImageElement>('#seal-still');
 const STILL_EXTENT = 2.6; // world units across the image; must match test/render-still.ts
@@ -58,7 +59,13 @@ if (reduce) {
       onComplete: () => { stillAlpha = 0; still.style.display = 'none'; cancelAnimationFrame(stillRaf); } });
   }).catch(() => { /* no WebGL: the still image stays */ });
   const whenIdle = () => ('requestIdleCallback' in window ? requestIdleCallback(goLive, { timeout: 2000 }) : setTimeout(goLive, 200));
-  if (document.readyState === 'complete') requestAnimationFrame(whenIdle);
+  if (window.matchMedia('(pointer: coarse)').matches) {
+    // touch devices: the shader compile is a long task on a phone, so it waits for the first touch or scroll
+    // (the still image covers the wait); desktop starts on idle
+    const events = ['touchstart', 'pointerdown', 'scroll', 'keydown'] as const;
+    const first = () => { events.forEach((t) => window.removeEventListener(t, first)); goLive(); };
+    events.forEach((t) => window.addEventListener(t, first, { passive: true }));
+  } else if (document.readyState === 'complete') requestAnimationFrame(whenIdle);
   else window.addEventListener('load', () => requestAnimationFrame(whenIdle), { once: true });
 }
 
