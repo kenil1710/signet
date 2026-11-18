@@ -30,3 +30,52 @@ test('URL to sealed path', () => {
   assert.equal(pathOfUrl('/assets/app-1.js'), 'assets/app-1.js');
   assert.equal(pathOfUrl('/a%20b.js'), 'a b.js');
 });
+
+// ---- clean URLs (Cloudflare Pages / Netlify / Vercel serve about.html at /about) — sealedPathFor
+import { sealedPathFor } from '../src/lib/sealed.ts';
+const has = (...paths: string[]) => (p: string) => paths.includes(p);
+
+test('clean URLs: a document at /app must be the sealed app.html (Cloudflare Pages)', () => {
+  const h = has('index.html', 'app.html', 'assets/app.js');
+  assert.equal(sealedPathFor(pathOfUrl('/app'), true, h), 'app.html');
+  assert.equal(sealedPathFor(pathOfUrl('/app.html'), true, h), 'app.html'); // the exact path still works
+  assert.equal(sealedPathFor(pathOfUrl('/'), true, h), 'index.html');
+});
+
+test('clean URLs: Netlify / Vercel style, nested, and directories', () => {
+  const h = has('index.html', 'about.html', 'docs/intro.html', 'docs/index.html', 'blog/index.html');
+  assert.equal(sealedPathFor(pathOfUrl('/about'), true, h), 'about.html');
+  assert.equal(sealedPathFor(pathOfUrl('/docs/intro'), true, h), 'docs/intro.html');
+  assert.equal(sealedPathFor(pathOfUrl('/docs/'), true, h), 'docs/index.html');
+  assert.equal(sealedPathFor(pathOfUrl('/blog/'), true, h), 'blog/index.html');
+  assert.equal(sealedPathFor(pathOfUrl('/about?ref=x'.split('?')[0]!), true, h), 'about.html');
+});
+
+test('a different sealed file can never stand in: /app is app.html only, not index.html', () => {
+  // the check compares the page's bytes with the hash of the ONE path returned. With app.html sealed, a document
+  // at /app whose bytes are index.html's is compared with app.html's hash, so it is a mismatch (red), not a pass.
+  const sealed: Record<string, string> = { 'index.html': 'h-index', 'app.html': 'h-app' };
+  const want = sealedPathFor(pathOfUrl('/app'), true, (p) => p in sealed);
+  assert.equal(want, 'app.html');
+  assert.notEqual(sealed[want!], 'h-index');
+  // and no fallback to index.html once a clean-URL file exists
+  assert.notEqual(sealedPathFor('app', true, has('index.html', 'app.html')), 'index.html');
+});
+
+test('single-page-app routes still map to index.html only when no clean-URL file is sealed', () => {
+  const h = has('index.html', 'assets/app.js');
+  assert.equal(sealedPathFor(pathOfUrl('/swap/eth'), true, h), 'index.html');
+  assert.equal(sealedPathFor(pathOfUrl('/app'), true, h), 'index.html');
+  assert.equal(sealedPathFor(pathOfUrl('/app'), true, has('assets/app.js')), null); // nothing to stand for
+});
+
+test('the clean-URL rule applies only to documents without an extension', () => {
+  const h = has('index.html', 'app.html', 'x.js.html');
+  assert.equal(sealedPathFor('app', false, h), null); // a script or fetch at /app is not app.html
+  assert.equal(sealedPathFor('x.js', true, h), null); // has an extension: no .html guessing
+  assert.equal(sealedPathFor('missing.html', true, h), null);
+});
+
+test('the exact sealed path wins over the clean-URL guess', () => {
+  assert.equal(sealedPathFor('download', true, has('download', 'download.html')), 'download');
+});

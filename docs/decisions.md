@@ -373,3 +373,11 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 | The full rehearsal (`staging/rehearse-mainnet-full.sh`) runs the mainnet scripts on a fork, then every staging suite against that deployment, without touching the staging chain. `record-mainnet` has a rehearsal mode that writes only `deployments/rehearsal.json`. | The suites prove the deployment the mainnet scripts make, not only the staging one. The rehearsal caught a crash in `record-mainnet` (a nested site-gate field) before the real deploy. |
 | JSON-RPC batches are capped at 3 calls (`rpc.ts MAX_BATCH`). | xlayer.drpc.org rejects 4+, which broke /prove and Guard's site check on mainnet. |
 | `verify:claims` labels a "pending" claim that now passes as a mainnet claim, and counts by result. | C8 and C9 pass on mainnet; the report should say "0 pending". |
+
+## 2026-11-18 — First release of signetguard.xyz
+
+| Decision | Why |
+|---|---|
+| One rule, `sealedPathFor` (extension `lib/sealed.ts`), decides which sealed file a loaded URL must equal, in Guard, the watchtower and the gateway: the exact path; else, for a document with no extension, `<path>.html` (a clean URL, as Cloudflare Pages, Netlify and Vercel serve it); else `index.html` (a single-page-app route). It returns one path, never a choice, so another sealed file can't stand in. | Cloudflare serves app.html at /app, and Guard compared it with index.html (red). Tested: unit tests, the Guard/gateway/watchtower staging suites, and the fork rehearsal on the live bytes (`/` and `/app` sealed; index.html's bytes at /app refused). |
+| Signet's site seals only the origins the page connects to: the two X Layer RPCs (the site's own CSP `connect-src`). Library documentation URLs and link targets are excluded in `packages/dashboard/signet.config.json`. | Text inside library code isn't something the page loads; a tighter list is a tighter seal. |
+| The first release is tier 10 (no earlier release to compare with): A and B approve in MetaMask through the dashboard, then publish 24 h later; the 3 manifest files are written; the full verified copy waits. Gas for the proposer and approvers comes from signet-dev. | The circuit's tier-10 rule; Guard needs the manifest to show "Sealed". |

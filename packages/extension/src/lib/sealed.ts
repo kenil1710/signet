@@ -60,6 +60,20 @@ export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsB
   };
 }
 
+/// Which sealed file a loaded URL must equal, or null if none. `path` comes from pathOfUrl; `has` says whether a
+/// path is in the sealed release. In order:
+///   1. the exact path (`/app.html` → app.html, `/docs/` → docs/index.html);
+///   2. for a document without a file extension, a clean URL: `/app` → app.html, as Cloudflare Pages, Netlify and
+///      Vercel serve it. When app.html is sealed, a document at /app must be exactly app.html: no other file;
+///   3. otherwise a document without a file extension is a single-page-app route: index.html.
+/// One path only, never a choice of several, so a page can't pass by matching some other sealed file.
+export function sealedPathFor(path: string, isDocument: boolean, has: (p: string) => boolean): string | null {
+  if (has(path)) return path;
+  if (!isDocument || /\.[a-z0-9]+$/i.test(path)) return null;
+  if (has(`${path}.html`)) return `${path}.html`;
+  return has('index.html') ? 'index.html' : null;
+}
+
 /// The sealed path a URL of the site stands for: "/" and directories are index.html; the query is ignored.
 export function pathOfUrl(pathname: string): string {
   let p = pathname.replace(/^\/+/, '');

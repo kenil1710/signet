@@ -2,5 +2,17 @@
   "network": "mainnet",
   "chainId": 196,
   "domain": "signetguard.xyz",
-  "gate": "0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503"
+  "gate": "0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503",
+  "origins": {
+    "exclude": [
+      "https://4byte.sourcify.dev",
+      "https://abitype.dev",
+      "https://discourse.threejs.org",
+      "https://docs.soliditylang.org",
+      "https://gsap.com",
+      "https://www.oklink.com",
+      "https://x.com",
+      "https://t.me"
+    ]
+  }
 }

@@ -3,7 +3,7 @@
 // hash, and every origin the page talked to against the sealed origins.
 import { createHash } from 'node:crypto';
 import type { Browser } from 'playwright';
-import { pathOfUrl } from '@signet/extension/src/lib/sealed.ts';
+import { pathOfUrl, sealedPathFor } from '@signet/extension/src/lib/sealed.ts';
 import type { Sealed } from './chain.ts';
 
 export interface Finding { kind: 'changed' | 'not-sealed' | 'sri' | 'origin'; url: string; note: string }
@@ -41,8 +41,9 @@ export async function checkSite(browser: Browser, url: string, valid: Sealed[], 
     if (u.origin !== origin || !['document', 'script', 'stylesheet'].includes(type) || res.status() >= 300) return;
     if (type === 'document' && req.frame() !== page.mainFrame()) return;
     const path = pathOfUrl(u.pathname);
-    // a route of a single-page app is its index.html
-    const want = hashes.get(path) ?? (type === 'document' && !/\.[a-z0-9]+$/i.test(path) ? hashes.get('index.html') : undefined);
+    // the exact path, a clean URL (/app → app.html) or a single-page-app route (→ index.html), as Guard decides
+    const sp = sealedPathFor(path, type === 'document', (p) => hashes.has(p));
+    const want = sp === null ? undefined : hashes.get(sp);
     if (!want) {
       if (type !== 'stylesheet') add({ kind: 'not-sealed', url: res.url(), note: `${type} is not part of the sealed release` });
       return;

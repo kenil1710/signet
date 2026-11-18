@@ -11,7 +11,7 @@
 import { decodeFunctionResult, encodeFunctionData, hexToBytes, sha256, zeroAddress, type Abi } from 'viem';
 import { gateAbi, registryAbi, siteAbi } from '@signet/extension/src/lib/abi.ts';
 import { agree, either, type Call } from '@signet/extension/src/lib/rpc.ts';
-import { parseSealed, pathOfUrl, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from '@signet/extension/src/lib/sealed.ts';
+import { parseSealed, pathOfUrl, sealedPathFor, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from '@signet/extension/src/lib/sealed.ts';
 import { decodeLabel } from '@signet/extension/src/lib/label.ts';
 import type { Hex, Net, Sealed } from '@signet/extension/src/lib/types.ts';
 
@@ -126,12 +126,9 @@ async function serve(url: URL, isNavigation: boolean): Promise<Response> {
   const s = await getSite(DOMAIN);
   if (!s.ok) return page(s.at === 0 ? 503 : 404, s.title, `<p>${esc(s.text)}</p>`);
   if (url.pathname === STATUS_PATH) return statusPage(s);
-  let path = pathOfUrl(url.pathname);
-  let f = s.sealed.files.find((x) => x.path === path);
-  if (!f && isNavigation && !/\.[a-z0-9]+$/i.test(path)) {
-    path = 'index.html'; // a route of a single-page app
-    f = s.sealed.files.find((x) => x.path === path);
-  }
+  // the exact path, a clean URL (/app → app.html) or a single-page-app route (→ index.html), as Guard decides
+  const want = sealedPathFor(pathOfUrl(url.pathname), isNavigation, (p) => s.sealed.files.some((x) => x.path === p));
+  const f = want === null ? undefined : s.sealed.files.find((x) => x.path === want);
   if (!f) return page(404, 'Not part of the sealed release', `<p><code>${esc(url.pathname)}</code> is not a file of release #${s.release} of ${esc(DOMAIN)}.</p>`);
   let bytes = verified.get(f.sha256);
   if (!bytes) {

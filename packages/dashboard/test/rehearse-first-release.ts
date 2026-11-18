@@ -123,8 +123,11 @@ log(`   gate.currentRelease() = ${sh('cast', ['call', GATE, 'currentRelease()(ui
 // ---- 5. Guard on the live bytes under signetguard.xyz
 const ext = mkdtempSync(join(tmpdir(), 'guard-'));
 log('   Guard build: ' + sh(process.execPath, [join(ROOT, 'packages/extension/scripts/build.mjs')], { SIGNET_NETWORK: 'mainnet', SIGNET_RPC_URL: FORK, SIGNET_RPC_URL2: FORK, GUARD_OUT: ext, SIGNET_GATEWAY_URL: '' }, join(ROOT, 'packages/extension')).split('\n').slice(0, 3).join(' | '));
+// The live bytes. With `swap`, /app is answered with index.html's bytes instead: a different sealed file put in
+// its place, which Guard must call a mismatch.
+let swap = false;
 const proxy = http.createServer(async (q, r) => {
-  const res = await fetch(LIVE + q.url, { redirect: 'manual' });
+  const res = await fetch(LIVE + (swap && q.url === '/app' ? '/' : q.url), { redirect: 'manual' });
   r.statusCode = res.status;
   res.headers.forEach((v, k) => { if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(k)) r.setHeader(k, v); });
   r.end(Buffer.from(await res.arrayBuffer()));
@@ -137,7 +140,9 @@ const sw = gctx.serviceWorkers()[0] ?? (await gctx.waitForEvent('serviceworker')
 const extId = new URL(sw.url()).host;
 for (let i = 0; i < 300; i++) { const l = await sw.evaluate(async () => ((await chrome.storage.local.get('domains')).domains?.list ?? []) as string[]).catch(() => []); if (l.includes(DOMAIN)) break; await new Promise((r) => setTimeout(r, 200)); }
 log(`   Guard's sealed-domain list: ${JSON.stringify(await sw.evaluate(async () => (await chrome.storage.local.get('domains')).domains ?? null))}`);
-for (const path of ['/', '/app']) {
+const seen: Record<string, string> = {};
+for (const [path, swapped] of [['/', false], ['/app', false], ['/app', true]] as const) {
+  swap = swapped;
   const page = await gctx.newPage();
   await page.goto(origin + path, { waitUntil: 'load' });
   await page.waitForTimeout(6000);
@@ -153,14 +158,20 @@ for (const path of ['/', '/app']) {
   await pop.goto(`chrome-extension://${extId}/popup.html?tab=${tab}`);
   await pop.waitForSelector('h1');
   const t = (await pop.locator('#root').innerText()).replace(/\s+/g, ' ');
-  log(`5. Guard on ${DOMAIN}${path} (live Cloudflare bytes): ${t.slice(0, 300)}`);
+  const label = `${path}${swapped ? ' (index.html bytes put in place of app.html)' : ''}`;
+  seen[label] = t;
+  log(`5. Guard on ${DOMAIN}${label}: ${t.slice(0, 300)}`);
   const st = await sw.evaluate(async (d) => { const x = (await chrome.storage.local.get(`site:${d}`))[`site:${d}`] as { status?: string; reason?: string; release?: number } | undefined; return x ? { status: x.status, reason: x.reason, release: x.release } : null; }, DOMAIN);
   const tabst = await sw.evaluate(async (t) => (await chrome.storage.session.get(`tab:${t}`))[`tab:${t}`] ?? null, tab);
   log(`   site state: ${JSON.stringify(st)} | tab report: ${JSON.stringify(tabst).slice(0, 600)}`);
-  await pop.screenshot({ path: join(OUT, `guard-popup${path === '/' ? '-home' : path.replace(/\//g, '-')}.png`) });
+  await pop.screenshot({ path: join(OUT, `guard-popup${path === '/' ? '-home' : path.replace(/\//g, '-')}${swapped ? '-swapped' : ''}.png`) });
   await pop.close(); await page.close();
 }
 await gctx.close(); await browser.close(); dsrv.close(); proxy.close();
+const okHome = /SEALED .*this page matches/i.test(seen['/']!), okApp = /SEALED .*this page matches/i.test(seen['/app']!);
+const redSwap = /DOESN'T MATCH/i.test(seen['/app (index.html bytes put in place of app.html)']!);
+log(`   checks: / sealed ${okHome}, /app sealed ${okApp}, substituted /app refused ${redSwap}`);
+if (!okHome || !okApp || !redSwap) throw new Error('Guard did not give the expected results');
 
 // ---- every transaction on the fork, with its signer and gas
 const end = parseInt(await rpc('eth_blockNumber'), 16);

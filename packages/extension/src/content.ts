@@ -4,7 +4,7 @@
 //     (fetch with cache: 'only-if-cached' never touches the network), hashed, and compared with the sealed
 //     release. Cross-origin scripts can't be read that way: their SRI attribute is compared with the sealed one.
 //  3. Passes signing requests from the in-page wrapper to the service worker and shows why one was refused.
-import { pathOfUrl } from './lib/sealed.ts';
+import { pathOfUrl, sealedPathFor } from './lib/sealed.ts';
 import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts';
 
 (() => {
@@ -50,8 +50,11 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     let valid: string[] | undefined;
     if (gw && (path === 'sw.js' || path === '.signet/boot.js')) valid = gw[path] ? [gw[path]!] : undefined; // the gateway's own files, pinned
     else if (gw && isDocument && path.startsWith('.signet/')) return { url: u.href, status: 'not-cached', note: "a page made by the gateway's worker" };
-    // a route of a single-page app (no file extension) is the app's index.html
-    else valid = info!.hashes[path] ?? (isDocument && !/\.[a-z0-9]+$/i.test(path) ? info!.hashes['index.html'] : undefined);
+    // the exact path; a clean URL (/app → app.html); or a single-page-app route (→ index.html): sealedPathFor
+    else {
+      const want = sealedPathFor(path, isDocument, (p) => !!info!.hashes[p]);
+      valid = want === null ? undefined : info!.hashes[want];
+    }
     // on the gateway the document is the pinned boot page until its worker takes over, then the sealed file
     if (gw && isDocument && gw['index.html']) valid = [...(valid ?? []), gw['index.html']];
     if (!valid) return scripty || isDocument ? { url: u.href, status: 'unknown', note: 'not in the sealed release' } : null;
