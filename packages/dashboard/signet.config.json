@@ -1,0 +1,6 @@
+{
+  "network": "mainnet",
+  "chainId": 196,
+  "domain": "signetguard.xyz",
+  "gate": "0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503"
+}
