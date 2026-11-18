@@ -358,6 +358,10 @@ html.static .h-pin{height:auto;min-height:0;display:block}
 html.static .h-track{flex-direction:column;padding:0 max(18px, calc((100vw - 1320px)/2 + 40px)) 40px}
 html.static .panel{width:100%}
 html.static .term .ln{opacity:1}
-a[data-todo]{cursor:not-allowed}
+a.soon{cursor:default;pointer-events:none}
+.btn.soon{opacity:.62}
+.btn.soon .arr{display:none}
+.soon-tag{font-family:var(--mono);font-size:.72em;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-left:4px;white-space:nowrap}
+.btn .soon-tag{color:inherit;opacity:.8}
 
 .bigword::before{content:attr(data-word)} /* decorative: drawn by CSS so it is not read as low-contrast text */

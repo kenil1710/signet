@@ -1,5 +1,5 @@
 // Every outside link on the landing page, in one place. A value starting with "TODO" is not live yet: the page
-// renders it as a disabled link (href="#", data-todo) instead of a broken one. Replace the TODOs when they exist.
+// shows it as "coming soon" (no href, not clickable) instead of a broken link. Replace the TODOs when they exist.
 export const SITE = {
   /** The public domain this site will be served from (used for the canonical link). */
   domain: 'https://signetguard.xyz',
@@ -23,17 +23,29 @@ export const SITE = {
 export type LinkKey = keyof typeof SITE;
 export const isTodo = (v: string) => v.startsWith('TODO');
 
-/// Points every [data-link] element at its configured URL.
+/// Points every [data-link] element at its configured URL. A link that isn't ready (TODO) is shown as "coming soon":
+/// it has no href, can't be clicked or focused, and says so. "Add Guard to Chrome" reads "Coming soon" until the
+/// Chrome Web Store listing exists.
 export function applyLinks(root: ParentNode = document): void {
   for (const a of root.querySelectorAll<HTMLAnchorElement>('a[data-link]')) {
-    const v = SITE[a.dataset.link as LinkKey];
+    const key = a.dataset.link as LinkKey;
+    const v = SITE[key];
     if (v === undefined) continue;
     if (isTodo(v)) {
-      a.setAttribute('href', '#');
-      a.dataset.todo = v;
-      a.title = v;
+      a.removeAttribute('href');
+      a.classList.add('soon');
       a.setAttribute('aria-disabled', 'true');
-      a.addEventListener('click', (e) => e.preventDefault());
+      a.dataset.todo = v;
+      if (key === 'chromeWebStore') {
+        a.textContent = 'Coming soon';
+        a.title = 'Guard for Chrome: the Chrome Web Store listing is coming soon';
+      } else {
+        const tag = document.createElement('span');
+        tag.className = 'soon-tag';
+        tag.textContent = 'coming soon';
+        a.append(' ', tag);
+        a.title = 'Coming soon';
+      }
     } else {
       a.setAttribute('href', v);
       if (/^https?:/.test(v)) {
