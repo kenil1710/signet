@@ -1,7 +1,7 @@
-# Landing page: build report (2026-11-18)
+# Landing page: build report (updated 2026-11-18)
 
 Built from `docs/design/landing-v2.html` into `packages/dashboard` (`index.html` + `src/landing/`). The dashboard and
-`/prove` moved to `app.html` (same hash routes); old `index.html#/…` links redirect there.
+`/prove` are on `app.html` (same hash routes); old `index.html#/…` links redirect there.
 
 ## Checks
 
@@ -11,61 +11,71 @@ Built from `docs/design/landing-v2.html` into `packages/dashboard` (`index.html`
   other host (no CDN), no sideways scroll, no text cut off at 390 / 768 / 1280 / 1440 and with reduced motion; old
   dashboard links redirect. Screenshots are in this folder (desktop: one per pinned scene; phone, tablet and
   reduced motion: full page).
-- Dashboard staging suite against `app.html`: 6/6.
+- Dashboard staging suite against `app.html`, with the slimmed wallet code: 6/6 (approve, publish, freeze,
+  unfreeze, revoke, a contract refusal decoded as `AlreadyApproved`, /prove).
+
+## Seal loading
+
+- A still image of the seal (`src/landing/seal-still.webp`, 640×640, 23.5 KB) shows at once. It is rendered from
+  the real 3D scene by `test/render-still.ts` (the live seal at rest, captured on a transparent background) and
+  drawn exactly where the 3D seal will be.
+- The WebGL seal loads when the browser is idle after load (`requestIdleCallback`), then the image fades into it
+  over 0.8 s. With reduced motion, WebGL never loads and the page shows only the still image.
 
 ## Lighthouse 12.2.1 (local `vite preview`, headless Chromium)
 
 | | Performance | Accessibility | Best practices | SEO | FCP | LCP | TBT | CLS |
 |---|---|---|---|---|---|---|---|---|
-| Desktop | 86 | 93 | 100 | 100 | 0.5 s | 0.6 s | 310 ms | 0.077 |
-| Mobile | 70 | 93 | 100 | 100 | 2.1 s | 2.1 s | 1,240 ms | 0.097 |
+| Desktop | 86 | 95 (100 with reduced motion) | 100 | 100 | 0.5 s | 0.6 s | 290 ms | 0.077 |
+| Mobile | 72 | 100 | 100 | 100 | 1.8 s | 1.9 s | 1,180 ms | 0.097 |
 
-An earlier desktop run gave 94; the score moves by a few points between runs. On mobile the blocking time is one
-~1 s task without a script attached: the WebGL seal's first draw (shader compile). Lighthouse runs it on a software
-GPU with a 4× CPU slowdown. The setup is already split into short steps and the shaders compile with
-`compileAsync`. Accessibility loses points on the design's dim text colour (#6e6560 on #0B0A09, 3.47:1) and one
-heading level in the footer. Both are design choices and were left as designed. Full reports:
-`lighthouse-desktop.html`, `lighthouse-mobile.html`.
+Before this round: desktop 86 / 93 / 100 / 100, mobile 70 / 93 / 100 / 100.
+
+- **Accessibility:** small text uses `--dim` `#8B807A` (was `#6E6560` at 3.4:1; now 4.98:1 on panels, 5.18:1 on the
+  page). The hero beat labels moved from `#5C5450` to `--dim`. The tape tags use `#E04A33` (4.9:1). The footer
+  headings are h3. The decorative "SIGNET" word is drawn by CSS. The remaining desktop items are motion states,
+  not resting colours: the design shows the `signet seal dist` lines at 10% opacity until you scroll to them, and
+  Lighthouse catches the hero labels mid fade-in. With reduced motion (everything at rest) desktop scores 100.
+- **Mobile performance:** almost all of the blocking time is one ~1.2 s task, the WebGL shader compile on
+  Lighthouse's software GPU. Starting on idle doesn't move it out of Lighthouse's window. Measured alternative:
+  starting WebGL on the phone's first touch or scroll (the still image covers the gap) scored **mobile 89,
+  TBT 10 ms**. That build was not kept, because the request was "after first paint or on idle".
 
 ## DeWEB size and cost (nothing uploaded)
 
 Cost = KB × 241,000 gas × gas price. Gas price read on 2026-11-18: 0.020 gwei (xlayerrpc.okx.com), 0.021 gwei
 (xlayer.drpc.org).
 
-| File | Bytes |
-|---|---:|
-| assets/seal3d-*.js (three.js + the seal, loaded after first paint) | 502,910 |
-| assets/app-*.js (dashboard + /prove, viem) | 377,161 |
-| assets/index-*.js (landing: gsap, ScrollTrigger, lenis, simulator) | 141,045 |
-| assets/archivo-latin-wdth-normal-*.woff2 | 90,104 |
-| index.html | 26,258 |
-| assets/index-*.css | 25,579 |
-| assets/ibm-plex-mono-latin-500-normal-*.woff2 | 14,888 |
-| assets/ibm-plex-mono-latin-400-normal-*.woff2 | 14,708 |
-| assets/ccip-*.js (viem, dashboard only) | 4,329 |
-| assets/preload-helper-*.js | 4,100 |
-| assets/app-*.css | 2,291 |
-| app.html | 544 |
-| robots.txt | 23 |
-| **Total** | **1,203,940 (1,175.7 KB)** |
+| File | Bytes | Before |
+|---|---:|---:|
+| assets/seal3d-*.js (three.js + the seal, loaded on idle) | 502,903 | 502,910 |
+| assets/index-*.js (landing: gsap, ScrollTrigger, lenis, simulator) | 143,423 | 141,045 |
+| assets/app-*.js (dashboard + /prove) | 114,873 | 377,161 |
+| assets/archivo-subset-*.woff2 (weight and width axes kept) | 44,112 | 90,104 |
+| index.html | 26,389 | 26,258 |
+| assets/index-*.css | 25,641 | 25,579 |
+| assets/seal-still-*.webp | 23,554 | — |
+| assets/ibm-plex-mono-latin-500-normal-*.woff2 | 14,888 | 14,888 |
+| assets/ibm-plex-mono-latin-400-normal-*.woff2 | 14,708 | 14,708 |
+| assets/policy-*.js (circuit #6 table, shared) | 2,478 | — |
+| assets/app-*.css | 2,291 | 2,291 |
+| app.html | 536 | 544 |
+| robots.txt | 23 | 23 |
+| assets/ccip-*.js, assets/preload-helper-*.js | — | 8,429 |
+| **Total** | **915,819 (894.4 KB)** | 1,203,940 (1,175.7 KB) |
 
 | Upload | KB | OKB at 0.020–0.021 gwei |
 |---|---:|---|
-| Whole site (landing + dashboard + /prove) | 1,175.7 | 0.0057 – 0.0060 |
-| Landing page only | 800.3 | 0.0039 – 0.0041 |
-| Dashboard + /prove only | 375.3 | 0.0018 – 0.0019 |
-| three.js chunk alone | 491.1 | 0.0024 – 0.0025 |
+| **Whole site** (landing + dashboard + /prove) | **894.4** | **0.0043 – 0.0045** (was 0.0057 – 0.0060) |
+| Landing page only | 779.4 | 0.0038 – 0.0039 |
+| Dashboard + /prove only | 114.9 | 0.00055 – 0.00058 |
 
-The whole site is over 0.005 OKB (the break-even at 0.021 gwei is 988 KB). Three files exceed 48 KB and need the
-chunked upload (`writeChunk`, 24 KB pieces).
+The site is now under 0.005 OKB. Three files are over 48 KB and need the chunked upload (`writeChunk`, 24 KB
+pieces): the three .js bundles.
 
-Ways to get under 0.005 OKB, largest first (savings are estimates, not measured):
-1. **Replace the WebGL seal with pre-rendered frames** (a short WebP sprite or a few stills for sealed / cracked /
-   stamped): about −400 KB. This changes how the motion is produced, so it needs your approval.
-2. **Slim the dashboard's viem use** (import only `createPublicClient`, `http` and the actions it needs; drop the
-   ENS/CCIP paths), or publish `/prove` as its own small page: an estimated −100 to −200 KB.
-3. **Subset Archivo** to the characters the page uses, keeping the weight and width axes: about −50 KB.
-4. Drop `RoomEnvironment` + PMREM for a small baked environment texture: a few KB of code, plus faster mobile start.
-5. Minify `index.html` (the inline SVGs and whitespace): about −5 KB.
+How the size came down:
+- `src/wallet.ts` talks plain JSON-RPC (`eth_call`, `eth_estimateGas`, `eth_sendTransaction`, receipt polling)
+  instead of building viem clients. viem is now used only to encode calls and decode reverts: −262 KB.
+- Archivo is subset to the characters the page uses (`test/subset-font.sh`): −46 KB.
 
-Doing 2 + 3 alone would bring the whole site to roughly 0.0045–0.005 OKB. Doing 1 brings it to about 0.004 OKB.
+To regenerate: `bash test/subset-font.sh` after copy changes; `node test/render-still.ts` after changing the seal.

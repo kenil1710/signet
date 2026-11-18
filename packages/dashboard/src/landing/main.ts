@@ -14,11 +14,11 @@ import { makeSim, INPUT_NAMES, type SimState } from './sim.ts';
 import { VERIFY_OUTPUT } from './verify-output.ts';
 import { applyLinks } from './config.ts';
 
-export interface Seal { x: number; y: number; scale: number; opacity: number; spin: number; tilt: number; crack: number; ready: boolean; mobile: boolean; thud?: () => void }
+export interface Seal { x: number; y: number; scale: number; opacity: number; spin: number; tilt: number; crack: number; ready: boolean; mobile: boolean; fade: number; thud?: () => void }
 declare global {
   interface Window { SEAL: Seal }
 }
-const S: Seal = (window.SEAL = { x: 0, y: 0.03, scale: 0, opacity: 1, spin: 0, tilt: 0, crack: 0, ready: false, mobile: window.innerWidth < 960 });
+const S: Seal = (window.SEAL = { x: 0, y: 0.03, scale: 0, opacity: 1, spin: 0, tilt: 0, crack: 0, ready: false, mobile: window.innerWidth < 960, fade: 0 });
 if (S.mobile) S.y = (window.innerHeight / 2 - 240) / window.innerHeight;
 
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -28,7 +28,39 @@ const $$ = <T extends HTMLElement = HTMLElement>(q: string, r: ParentNode = docu
 applyLinks();
 
 // The 3D seal starts after the first paint, so it never delays the text. (Two frames: the first runs before paint.)
-requestAnimationFrame(() => requestAnimationFrame(() => void import('./seal3d.ts').then((m) => m.start(S, reduce)).catch(() => { S.ready = true; })));
+// The seal shows at once as a still image rendered from the real 3D scene (test/render-still.ts), placed and sized
+// exactly where the 3D seal draws. The live WebGL seal starts when the browser is idle after load, then the image
+// fades into it. Reduced motion: the still image only, no WebGL.
+const still = $<HTMLImageElement>('#seal-still');
+const STILL_EXTENT = 2.6; // world units across the image; must match test/render-still.ts
+let stillAlpha = 1;
+function placeStill(): void {
+  const W = window.innerWidth, H = window.innerHeight;
+  const vhw = 2 * Math.tan((15 * Math.PI) / 180) * 8, vww = (vhw * W) / H; // the camera's view at the seal (fov 30, z 8)
+  const base = S.mobile ? Math.min(0.8, vww / 3) : Math.min(1, vww / 5.6);
+  const size = STILL_EXTENT * Math.max(0, S.scale) * base * (H / vhw);
+  const cx = W / 2 + S.x * W, cy = H / 2 - S.y * H;
+  still.style.width = still.style.height = `${size}px`;
+  still.style.transform = `translate3d(${cx - size / 2}px, ${cy - size / 2}px, 0)`;
+  still.style.opacity = String(S.opacity * stillAlpha);
+}
+let stillRaf = 0;
+const followStill = () => { placeStill(); stillRaf = stillAlpha > 0 ? requestAnimationFrame(followStill) : 0; };
+if (reduce) {
+  placeStill();
+  window.addEventListener('scroll', placeStill, { passive: true });
+  window.addEventListener('resize', placeStill);
+} else {
+  followStill();
+  const goLive = () => void import('./seal3d.ts').then((m) => m.start(S)).then(() => {
+    const f = { v: 0 };
+    gsap.to(f, { v: 1, duration: 0.8, ease: 'power2.inOut', onUpdate: () => { S.fade = f.v; stillAlpha = 1 - f.v; },
+      onComplete: () => { stillAlpha = 0; still.style.display = 'none'; cancelAnimationFrame(stillRaf); } });
+  }).catch(() => { /* no WebGL: the still image stays */ });
+  const whenIdle = () => ('requestIdleCallback' in window ? requestIdleCallback(goLive, { timeout: 2000 }) : setTimeout(goLive, 200));
+  if (document.readyState === 'complete') requestAnimationFrame(whenIdle);
+  else window.addEventListener('load', () => requestAnimationFrame(whenIdle), { once: true });
+}
 
 /* hero lines always fit the screen, whatever font width loads */
 function fitHero(): void {
@@ -173,11 +205,12 @@ function finalScenes(): void {
 function staticMode(): void {
   document.documentElement.classList.add('static');
   S.scale = 1;
+  placeStill();
   const ld = document.getElementById('loader'); if (ld) ld.remove();
   $$('.term .ln').forEach((l) => (l.style.opacity = '1'));
   $('#shell').innerHTML = shellText;
   finalScenes();
-  const f = () => { S.opacity = window.scrollY < window.innerHeight * 0.55 ? 1 : 0; }; f(); window.addEventListener('scroll', f, { passive: true });
+  const f = () => { S.opacity = window.scrollY < window.innerHeight * 0.55 ? 1 : 0; placeStill(); }; f(); window.addEventListener('scroll', f, { passive: true });
 }
 
 if (reduce) staticMode();
@@ -201,8 +234,8 @@ function animated(): void {
   const loadTl = gsap.timeline();
   loadTl.to(ld, { v: 100, duration: 1.1, ease: 'power2.inOut', onUpdate: () => { ldN.textContent = String(Math.round(ld.v)).padStart(3, '0'); } })
         .to('#loader .bar i', { scaleX: 1, duration: 1.1, ease: 'power2.inOut' }, 0);
-  const waitReady = () => new Promise<void>((res) => { const t0 = performance.now(); (function chk() { if (S.ready || performance.now() - t0 > 3500) res(); else requestAnimationFrame(chk); })(); });
-  void Promise.all([waitReady(), new Promise((r) => loadTl.eventCallback('onComplete', r))]).then(() => {
+  // the intro no longer waits for WebGL: the still image stands in until the live seal is ready
+  void new Promise((r) => loadTl.eventCallback('onComplete', r)).then(() => {
     const intro = gsap.timeline();
     intro.to('#loader', { yPercent: -100, duration: 0.9, ease: 'expo.inOut' })
          .set('#loader', { display: 'none' })

@@ -25,6 +25,7 @@ Smart contracts get audited, but the website users sign from does not. Attackers
 | May 2025 | [Curve](https://www.theblock.co/post/354067/curve-finances-front-end-targeted-in-dns-attack-on-website) | Registrar-level DNS | Users drained |
 | Feb 2025 | [Bybit via Safe{Wallet}](https://slowmist.medium.com/bybits-1-5-billion-theft-unveiled-safe-wallet-front-end-code-tampered-84b78f0fa9c2) | Dev machine → S3 JS tampered, removed after 2 min | ~$1.5B |
 | Dec 2023 | Ledger Connect Kit | npm supply chain | $600K+ |
+| Dec 2021 | BadgerDAO ([The Block](https://www.theblock.co/post/126072), [rekt](https://rekt.news/badger-rekt/)) | Script injected into the frontend | ~$120M |
 
 Why current fixes fall short:
 

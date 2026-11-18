@@ -1,5 +1,5 @@
 // The 3D wax seal (from docs/design/landing-v2.html, unchanged in look). Loaded by main.ts after the first paint.
-// It draws only while the tab is visible and the seal is showing (opacity > 0), and caps the pixel ratio at 2.
+// Reduced-motion users never load it. It draws only while the tab is visible and the seal is showing (opacity > 0), and caps the pixel ratio at 2.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Seal } from './main.ts';
@@ -7,7 +7,7 @@ import type { Seal } from './main.ts';
 // Setup is split into short steps that give the main thread back in between, so a phone stays responsive.
 const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
 
-export async function start(S: Seal, reduce: boolean): Promise<void> {
+export async function start(S: Seal): Promise<void> {
   const canvas = document.getElementById('seal-gl') as HTMLCanvasElement;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -149,7 +149,7 @@ export async function start(S: Seal, reduce: boolean): Promise<void> {
     raf = 0;
     if (document.hidden) return;
     const t = clock.getElapsedTime();
-    canvas.style.opacity = String(S.opacity);
+    canvas.style.opacity = String(S.opacity * S.fade);
     if (S.opacity > 0.01) {
       const vh = 2 * Math.tan(THREE.MathUtils.degToRad(15)) * 8, vw = vh * camera.aspect;
       const base = S.mobile ? Math.min(0.8, vw / 3) : Math.min(1, vw / 5.6);
@@ -157,7 +157,7 @@ export async function start(S: Seal, reduce: boolean): Promise<void> {
       seal.position.set(S.x * vw + (Math.random() - 0.5) * 0.05 * shake, S.y * vh + (Math.random() - 0.5) * 0.05 * shake, 0);
       seal.scale.setScalar(Math.max(0.0001, S.scale * base));
       sm.x += (mouse.x - sm.x) * 0.05; sm.y += (mouse.y - sm.y) * 0.05;
-      const idle = reduce ? 0 : 1;
+      const idle = 1;
       seal.rotation.x = -0.18 + S.tilt * 0.5 + Math.sin(t * 0.4) * 0.06 * idle + sm.y * 0.35;
       seal.rotation.y = 0.22 + Math.sin(t * 0.33) * 0.14 * idle + sm.x * 0.5 + S.spin;
       seal.rotation.z = Math.sin(t * 0.22) * 0.03 * idle - S.tilt * 0.15;

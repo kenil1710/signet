@@ -351,3 +351,6 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 | The proof terminal shows lines copied from a real `pnpm verify:claims` run (`src/landing/verify-output.ts`). | No invented output. |
 | All outside links live in `src/landing/config.ts`; any `TODO` value renders as a disabled link. | We have no public repo, Web Store listing, X or Telegram yet. |
 | The 3D seal loads after first paint, draws only while the tab is visible and the seal is showing, caps the pixel ratio at 2, and builds in short steps. | Performance on phones. |
+| The seal shows first as a still image rendered from the real 3D scene (`test/render-still.ts`); WebGL loads on idle and fades in; reduced motion never loads WebGL. | Something to see at once on phones without changing the design; no WebGL for people who asked for less motion. |
+| The dashboard's wallet code uses plain JSON-RPC; viem only encodes and decodes. Archivo is subset to the page's characters. | DeWEB cost: the site went from 1,176 KB to 894 KB, under 0.005 OKB. |
+| Small text uses `--dim` `#8B807A` (≥4.5:1), the same warm grey made lighter; footer headings are h3. | Accessibility 100 at rest. |
