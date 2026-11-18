@@ -161,7 +161,7 @@ async function paint(tabId: number, site: SiteState | null, report: PageReport |
     const light = lightOf(site, report);
     await chrome.action.setBadgeText({ tabId, text: BADGE[light].text });
     await chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE[light].color });
-    const words = light === 'green' ? `Sealed · release #${site.release} · 3 approvers` : light === 'red' ? "This page doesn't match its sealed release" : site.reason || 'Not fully checked';
+    const words = light === 'green' ? `Sealed · release #${site.release}` : light === 'red' ? "This page doesn't match its sealed release" : site.reason || 'Not fully checked';
     await chrome.action.setTitle({ tabId, title: `Signet Guard: ${site.domain}\n${words}` });
   } catch { /* the tab is gone */ }
 }

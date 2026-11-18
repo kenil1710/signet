@@ -233,7 +233,7 @@ After setup, everything runs on its own. People act only when a new release need
 **3. End user**
 
 1. Has the Guard extension (or not)
-2. Opens app.xyz → green badge "Sealed · release #42 · 3 approvers"
+2. Opens app.xyz → green badge "Sealed · release #42"
 3. Signs normally; Guard checks the target against the allowlist silently
 4. No extension: still protected by watchtower alerts, X posts and the team's freeze
 

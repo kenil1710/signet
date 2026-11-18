@@ -21,7 +21,7 @@ export async function reportWrongBlock(domain: string, note: string, into: HTMLE
 
 export function headline(i: TabInfo): { title: string; text: string } {
   const s = i.site;
-  if (i.light === 'green') return { title: 'Sealed', text: `Release #${s.release} · 3 approvers · this page matches what the team sealed.` };
+  if (i.light === 'green') return { title: 'Sealed', text: `Release #${s.release} · this page matches what the team sealed.` };
   if (i.light === 'red') return s.status === 'revoked'
     ? { title: 'Release revoked', text: "The team revoked this site's current release. Don't sign anything here." }
     : { title: "Doesn't match the sealed release", text: `This page is not what the team sealed as release #${s.release}. Don't sign.` };

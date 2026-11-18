@@ -28,7 +28,7 @@ void (async () => {
     <p>${esc(h.text)}</p>
     <dl class="facts">
       <dt>Release</dt><dd>${i.site.release ? `#${i.site.release}` : '-'}</dd>
-      <dt>Approvers</dt><dd>${i.site.approvers.length} on the gate</dd>
+      <dt>Approvers on this gate</dt><dd>${i.site.approvers.length}</dd>
       <dt>Files matched</dt><dd class="${bad.length ? 'bad' : 'good'}">${files.length - bad.length} / ${files.length} loaded · ${i.files} sealed</dd>
       <dt>Allowed contracts</dt><dd>${i.contracts ?? '-'}</dd>
       <dt>Nodes</dt><dd>${nodes.length ? nodes.map(esc).join(' + ') : 'none'}${nodes.length === 2 ? ' (must agree)' : ''}</dd>

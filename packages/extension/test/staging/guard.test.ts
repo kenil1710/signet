@@ -66,6 +66,8 @@ async function popupShot(s: Session, tab: number, name: string): Promise<string>
   assert.ok(size.w <= 360, `the popup is ${size.w}px wide: it must fit 360`);
   await p.setViewportSize({ width: 360, height: Math.min(600, size.h) });
   const text = (await p.locator('#root').innerText()).replace(/\s+/g, ' ');
+  // Guard doesn't read how many approved a release: the popup must never claim an approval count
+  assert.doesNotMatch(text, /approved by|\d+ of \d+ approved|\d+ approvers?\b(?! on this gate)/i, text);
   await shot(p, name);
   await p.close();
   return text;
@@ -107,7 +109,7 @@ test('observe mode, clean site: green badge, every signature reaches the wallet'
   assert.deepEqual(await events(s), []);
   const st = (await siteState(s, domain))!;
   assert.deepEqual([st.status, st.enforced], ['sealed', false]);
-  assert.match(await popupShot(s, tab, 'guard-popup-sealed.png'), /Sealed .* Release #1 · 3 approvers .* Mode: observe/i);
+  assert.match(await popupShot(s, tab, 'guard-popup-sealed.png'), /Sealed .* Release #1 · this page matches .* Approvers on this gate 3 .* Mode: observe/i);
   await s.close();
 });
 
