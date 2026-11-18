@@ -51,14 +51,20 @@ async function click(page: Page, id: string, state: 'ok' | 'error'): Promise<str
 }
 async function shot(page: Page, name: string): Promise<void> {
   if (!process.env.SIGNET_SAVE_DEMO) return;
-  mkdirSync(DEMO_DIR, { recursive: true });
-  await page.screenshot({ path: join(DEMO_DIR, name) });
+  const dir = process.env.SIGNET_DEMO_DIR ?? DEMO_DIR; // e.g. docs/demo/ui for the UI screenshots
+  mkdirSync(dir, { recursive: true });
+  await page.screenshot({ path: join(dir, name) });
 }
 async function popupShot(s: Session, tab: number, name: string): Promise<string> {
   const p = await s.ctx.newPage();
-  await p.setViewportSize({ width: 392, height: 560 });
+  // the real popup: 360 wide (pages.css), as tall as its content up to Chrome's 600 px cap
+  await p.setViewportSize({ width: 360, height: 600 });
   await p.goto(`chrome-extension://${s.extId}/popup.html?tab=${tab}`);
   await p.waitForSelector('h1');
+  await p.evaluate(() => document.fonts.ready);
+  const size = await p.evaluate(() => ({ h: document.documentElement.scrollHeight, w: document.documentElement.scrollWidth }));
+  assert.ok(size.w <= 360, `the popup is ${size.w}px wide: it must fit 360`);
+  await p.setViewportSize({ width: 360, height: Math.min(600, size.h) });
   const text = (await p.locator('#root').innerText()).replace(/\s+/g, ' ');
   await shot(p, name);
   await p.close();
@@ -101,7 +107,7 @@ test('observe mode, clean site: green badge, every signature reaches the wallet'
   assert.deepEqual(await events(s), []);
   const st = (await siteState(s, domain))!;
   assert.deepEqual([st.status, st.enforced], ['sealed', false]);
-  assert.match(await popupShot(s, tab, 'guard-popup-sealed.png'), /Sealed .* Release #1 · 3 approvers .* Mode: observe/);
+  assert.match(await popupShot(s, tab, 'guard-popup-sealed.png'), /Sealed .* Release #1 · 3 approvers .* Mode: observe/i);
   await s.close();
 });
 
@@ -116,7 +122,7 @@ test('observe mode never blocks: a tampered bundle and an unsealed spender are r
   assert.ok(ev.every((e) => !e.refused));
   assert.ok(ev.some((e) => e.kind === 'page' && /doesn't match its sealed release/.test(e.title)));
   assert.ok(ev.some((e) => e.kind === 'sign'));
-  assert.match(await popupShot(s, tab, 'guard-popup-observe-mismatch.png'), /Doesn't match the sealed release .* \(reported only\)/);
+  assert.match(await popupShot(s, tab, 'guard-popup-observe-mismatch.png'), /Doesn't match the sealed release .* \(reported only\)/i);
   await s.close();
   site.tamper = false;
 
@@ -147,7 +153,7 @@ test('enforce mode, clean site: green, sealed signatures go through (wallet inst
     assert.deepEqual(await events(s), []);
     if (!late) {
       await shot(page, 'guard-clean-site.png');
-      assert.match(await popupShot(s, tab, 'guard-popup-enforce-sealed.png'), /Sealed .* Mode: enforce/);
+      assert.match(await popupShot(s, tab, 'guard-popup-enforce-sealed.png'), /Sealed .* Mode: enforce/i);
     }
     await s.close();
   }
@@ -216,9 +222,20 @@ test('enforce mode, tampered bundle: red badge, full red page, the drainer never
   await page.waitForSelector('h1');
   await light(s, tab, '!');
   const text = await page.locator('#root').innerText();
-  assert.match(text, /This site doesn’t match its sealed release\. Don’t sign\./);
+  assert.match(text, /Stop\. This site's seal is broken\./i); // h1 is uppercase in CSS
+  assert.match(text, /Nothing was sent\./);
   assert.match(text, /changed · http:\/\/guard-.*\/assets\/index-.*\.js/);
   await shot(page, 'guard-blocked.png');
+  if (process.env.SIGNET_SAVE_DEMO) {
+    const vp = page.viewportSize();
+    for (const [w, h] of [[1280, 800], [390, 844]] as const) {
+      await page.setViewportSize({ width: w, height: h });
+      const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+      assert.ok(sw <= w, `the red page scrolls sideways at ${w}`);
+      await shot(page, `guard-blocked-${w}.png`);
+    }
+    if (vp) await page.setViewportSize(vp);
+  }
   assert.deepEqual(signed(s), [], 'nothing reached the wallet');
 
   // "Open verified copy": the gateway's page for this domain, a normal origin where the wallet works
@@ -234,7 +251,7 @@ test('enforce mode, tampered bundle: red badge, full red page, the drainer never
   await light(s, copyTab, 'OK'); // Guard checked the copy against the same sealed release, and the gateway's own files against its pins
   assert.match(await click(copy, 'approve', 'ok'), /Approve: done/); // the user keeps using the app while the real site is hijacked
   assert.equal(signed(s).length, 1);
-  assert.match(await popupShot(s, copyTab, 'guard-popup-verified-copy.png'), new RegExp(`Sealed ${domain} Release #1`));
+  assert.match(await popupShot(s, copyTab, 'guard-popup-verified-copy.png'), new RegExp(`Sealed ${domain} Release #1`, 'i'));
   await shot(copy, 'guard-verified-copy.png');
   // the sealed allowlist is enforced on the copy too
   await copy.goto(`${copy.url()}?spender=${DRAINER}`);
@@ -329,7 +346,7 @@ test('fail-open: RPCs that disagree, or are down, give a grey badge and nothing 
   const st = (await siteState(s, domain));
   assert.equal(st, undefined, 'an unverified answer is not cached as a release');
   assert.match(await click(page, 'approve', 'ok'), /Approve: done/);
-  assert.match(await popupShot(s, tab, 'guard-popup-could-not-check.png'), /Could not check .* the two RPCs disagree .* does not block/);
+  assert.match(await popupShot(s, tab, 'guard-popup-could-not-check.png'), /Could not check .* the two RPCs disagree .* does not block/i);
   await s.close();
   rpcB.lie = null;
 
@@ -386,7 +403,7 @@ test('manifest files that do not hash to the on-chain release are rejected (H-1,
   const p = await s.ctx.newPage();
   await p.goto(info);
   await p.waitForSelector('h1');
-  assert.match((await p.locator('#root').innerText()).replace(/\s+/g, ' '), /Could not check .* do not hash to the release published on-chain\. They were rejected\./);
+  assert.match((await p.locator('#root').innerText()).replace(/\s+/g, ' '), /Could not check .* do not hash to the release published on-chain\. They were rejected\./i);
   rpcA.lie = rpcB.lie = null;
   await s.close();
 });

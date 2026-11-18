@@ -354,3 +354,12 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 | The seal shows first as a still image rendered from the real 3D scene (`test/render-still.ts`); WebGL loads on idle and fades in; reduced motion never loads WebGL. | Something to see at once on phones without changing the design; no WebGL for people who asked for less motion. |
 | The dashboard's wallet code uses plain JSON-RPC; viem only encodes and decodes. Archivo is subset to the page's characters. | DeWEB cost: the site went from 1,176 KB to 894 KB, under 0.005 OKB. |
 | Small text uses `--dim` `#8B807A` (≥4.5:1), the same warm grey made lighter; footer headings are h3. | Accessibility 100 at rest. |
+
+## 2026-11-18 — UI restyle
+
+| Decision | Why |
+|---|---|
+| The dashboard, /prove and Guard's pages use the landing page's tokens and fonts. Restyle only: no check, rule or message logic changed. | One product look. |
+| /prove labels its statuses "Verified" / "Pending deployment" / "Failed" / "Stale" (the same four outcomes). Each row shows its source and OKLink links; OKLink links appear only for addresses that exist on mainnet. | Judges read it as a report. A link to a staging-only address would be misleading. |
+| Guard's red page gets a "Leave this site" button (opens a new tab page in that tab). "Go back" (signing stays blocked) and "Report wrong block" stay, as smaller links. | It matches the approved design. Leaving can't unblock anything. |
+| The popup's data adds a count of allowed contracts (targets and spenders in the sealed allowlist). It reads data Guard already has; no new request. | The popup shows release, approvers, files matched, allowed contracts and nodes. |

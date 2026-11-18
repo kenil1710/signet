@@ -16,7 +16,7 @@ export async function badgePage(domain: string, embed: boolean): Promise<void> {
   const here = `${location.origin}${location.pathname}`;
   const link = `<a href="${here}#/p/${domain}" target="_blank" rel="noopener" style="display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border:1px solid #15803d;border-radius:999px;color:#15803d;font:600 13px system-ui;text-decoration:none">● Sealed by Signet · verify</a>`;
   const frame = `<iframe src="${here}#/badge/${domain}?embed" title="Signet seal status" width="260" height="56" style="border:0" loading="lazy"></iframe>`;
-  view(`<p><a href="#/p/${esc(domain)}">← ${esc(domain)}</a></p><h1>Badge</h1>
+  view(`<a class="back" href="#/p/${esc(domain)}">← ${esc(domain)}</a><h1>Badge</h1>
     <p>Live status, read from the chain now:</p>${card}
     <h2>1. Link badge (recommended)</h2><p>Static HTML, no script. Clicking it opens this dashboard, which checks the chain.</p>
     <pre>${esc(link)}</pre><div>${link}</div>

@@ -40,6 +40,9 @@ for (const [name, entry] of Object.entries(entries)) {
   });
 }
 for (const f of ['popup.html', 'blocked.html', 'copy.html', 'sandbox.html', 'pages.css']) copyFileSync(`${root}src/pages/${f}`, `${out}/${f}`);
+// fonts and the seal image, bundled (the pages make no network request)
+mkdirSync(`${out}/assets`, { recursive: true });
+for (const f of ['archivo-subset.woff2', 'ibm-plex-mono-latin-400-normal.woff2', 'ibm-plex-mono-latin-500-normal.woff2', 'seal-still.webp']) copyFileSync(`${root}src/pages/assets/${f}`, `${out}/assets/${f}`);
 
 const rpcHosts = [...new Set([net.rpcUrl, net.rpcUrl2].filter(Boolean).map((u) => `${new URL(u).origin}/*`))];
 const manifest = {

@@ -26,12 +26,19 @@ export async function projectPage(domain: string): Promise<void> {
   const me = (a: string) => (account && a.toLowerCase() === account.toLowerCase() ? ' <b>(you)</b>' : '');
   const open = s.proposals.map((x) => ({ x, st: status(x, s) })).filter((r) => r.st.open);
   const done = s.proposals.map((x) => ({ x, st: status(x, s) })).filter((r) => !r.st.open).slice(0, 8);
-  const row = ({ x, st }: (typeof open)[number]) => `<tr data-id="${x.id}"><td>#${x.id}</td><td>${x.kind === 1 ? 'release' : 'admin'}${x.emergency ? ', emergency' : ''}</td>
-    <td>tier ${TIERS[x.tier]}</td><td>${[0, 1, 2].map((i) => `<span title="${esc(s.approvers[i])}">${(x.approvals >> i) & 1 ? '✓' : '·'}</span>`).join(' ')}</td>
-    <td>${esc(st.text)} ${st.at && st.at > s.chainTime ? `<b class="cd" data-at="${st.at}">${span(st.at - s.chainTime)}</b>` : ''}</td>
-    <td>${st.open ? `${x.kind === 1 ? `<a href="#/p/${esc(s.domain)}/proposal/${x.id}">Diff Guard</a> ` : ''}<button data-a="approve">Approve</button> <button data-a="withdrawApproval">Withdraw</button> <button data-a="cancel">Cancel</button> <button data-a="publish" ${st.publishable ? '' : 'disabled'}>Publish</button>` : ''}</td></tr>`;
-  const v = view(`<p><a href="#/">← all projects</a></p>
+  const tierCell = (t: number) => { const [code, ...name] = TIERS[t]!.split(' '); return `<span class="tier t${t}" title="risk tier, computed on-chain"><span class="code">${code}</span><small>${esc(name.join(' '))}</small></span>`; };
+  const row = ({ x, st }: (typeof open)[number]) => `<tr data-id="${x.id}"><td><div class="pid">#${x.id}</div><div class="kind">${x.kind === 1 ? 'release' : 'admin'}${x.emergency ? ', emergency' : ''}</div></td>
+    <td>${tierCell(x.tier)}</td><td><span class="appr" aria-label="approvals">${[0, 1, 2].map((i) => `<span class="${(x.approvals >> i) & 1 ? 'y' : ''}" title="${esc(s.approvers[i])}">${'ABC'[i]}</span>`).join('')}</span></td>
+    <td class="state">${esc(st.text)} ${st.at && st.at > s.chainTime ? `<b class="cd" data-at="${st.at}">${span(st.at - s.chainTime)}</b>` : ''}</td>
+    <td>${st.open ? `<div class="ops">${x.kind === 1 ? `<a href="#/p/${esc(s.domain)}/proposal/${x.id}">Diff Guard</a> ` : ''}<button data-a="approve">Approve</button> <button data-a="withdrawApproval">Withdraw</button> <button data-a="cancel">Cancel</button> <button data-a="publish" ${st.publishable ? '' : 'disabled'}>Publish</button></div>` : ''}</td></tr>`;
+  const v = view(`<a class="back" href="#/">← all projects</a>
     <h1>${esc(s.domain)} ${state} ${mode}</h1>
+    <div class="glance">
+      <div><span class="label">State</span><b class="${s.revoked || s.frozen ? 'bad' : 'ok'}">${s.revoked ? 'Revoked' : s.frozen ? 'Frozen' : 'Active'}</b></div>
+      <div><span class="label">Release</span><b>${s.currentRelease ? `#${s.currentRelease}` : 'None'}</b></div>
+      <div><span class="label">Open proposals</span><b>${open.length}</b></div>
+      <div><span class="label">Timelocks</span><b>${span(s.shortDelay)} · ${span(s.longDelay)}</b></div>
+    </div>
     <table class="kv">
       <tr><td>release</td><td>${s.currentRelease ? `#${s.currentRelease} · manifest <code>${esc(s.manifest)}</code>` : 'none published yet'}</td></tr>
       <tr><td>gate</td><td><code>${esc(s.gate)}</code></td></tr>
@@ -41,11 +48,11 @@ export async function projectPage(domain: string): Promise<void> {
       <tr><td>recovery · guardian</td><td><code>${esc(short(s.recovery))}</code> · <code>${esc(s.guardian === '0x0000000000000000000000000000000000000000' ? 'none' : short(s.guardian))}</code>${me(s.guardian)}</td></tr>
       <tr><td>timelocks</td><td>${span(s.shortDelay)} (tiers 00, 01) · ${span(s.longDelay)} (tiers 10, 11) · grace ${span(s.graceWindow)}</td></tr>
     </table>
-    <p><button id="connect">${account ? `Wallet ${short(account)}` : 'Connect wallet'}</button>
+    <div class="actions"><button id="connect">${account ? `Wallet ${short(account)}` : 'Connect wallet'}</button>
       <button id="freeze" ${s.frozen ? 'disabled' : ''}>Freeze</button>
       <button id="unfreeze" ${s.frozen ? '' : 'disabled'}>Unfreeze (${count(s.unfreezeApprovals)} of 2)</button>
       <button id="revoke" ${s.currentRelease && !s.revoked ? '' : 'disabled'}>Revoke release #${s.currentRelease}</button>
-      <a href="#/badge/${esc(s.domain)}">Badge</a></p>
+      <a class="btn" href="#/badge/${esc(s.domain)}">Badge</a></div>
     <h2>Open proposals</h2>${open.length ? `<table class="props"><tbody>${open.map(row).join('')}</tbody></table>` : '<p class="dim">none</p>'}
     <h2>Recent</h2>${done.length ? `<table class="props"><tbody>${done.map(row).join('')}</tbody></table>` : '<p class="dim">none</p>'}`);
   const reload = () => void projectPage(domain);

@@ -9,6 +9,7 @@ import { badgePage } from './pages/badge.ts';
 async function route(): Promise<void> {
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?');
   const parts = (path || '/').split('/').filter(Boolean).map(decodeURIComponent);
+  for (const a of document.querySelectorAll<HTMLElement>('.top nav a[data-nav]')) a.classList.toggle('on', a.dataset.nav === (parts[0] === 'prove' ? 'prove' : 'home'));
   try {
     if (parts[0] === 'prove') await provePage();
     else if (parts[0] === 'badge' && parts[1]) await badgePage(parts[1], new URLSearchParams(query).has('embed'));

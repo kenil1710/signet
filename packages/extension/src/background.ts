@@ -272,7 +272,10 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const site = await getSite(tab.domain);
       const events = ((await get<GuardEvent[]>(local, 'events')) ?? []).filter((e) => e.domain === tab.domain).slice(0, 20);
       const { manifests: _m, ...brief } = site;
-      return { tab, site: brief, light: lightOf(site, tab.report), events, files: site.current ? site.manifests[site.current]?.files.length : 0 };
+      // contracts: how many addresses the sealed allowlist lets this site ask to sign for (shown in the popup)
+      const sealed = site.current ? site.manifests[site.current] : undefined;
+      const contracts = sealed ? new Set(Object.values(sealed.allowlist).flatMap((c) => [...c.targets, ...c.spenders]).map((a) => a.toLowerCase())).size : 0;
+      return { tab, site: brief, light: lightOf(site, tab.report), events, files: sealed?.files.length ?? 0, contracts };
     }
     case 'bypass': {
       await session.set({ [`bypass:${msg.tabId}:${msg.domain}`]: true });

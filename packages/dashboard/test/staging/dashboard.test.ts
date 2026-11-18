@@ -92,11 +92,11 @@ test('home lists the sealed domain; the project page shows release, roles, mode 
   await page.click(`a[href="#/p/${domain}"]`);
   await page.locator('h1').filter({ hasText: domain }).waitFor();
   const t = await text();
-  assert.match(t, /release\s+#1 · manifest 0x[0-9a-f]{64}/);
+  assert.match(t, /release\s+#1 · manifest 0x[0-9a-f]{64}/i); // labels are uppercase in CSS
   assert.match(t, new RegExp(p.gate));
   for (const a of A.approvers) assert.ok(t.toLowerCase().includes(a.toLowerCase()), a);
-  assert.match(t, /active/);
-  assert.match(t, /observe/);
+  assert.match(t, /active/i);
+  assert.match(t, /observe/i);
   assert.match(t, /can propose and publish; never approve/);
   if (process.env.SIGNET_SAVE_DEMO) await page.screenshot({ path: join(DEMO_DIR, 'dashboard-project.png'), fullPage: true });
 });
@@ -203,10 +203,10 @@ test('/prove, with no wallet: both circuits re-checked on all 512 inputs, the be
   await pg.waitForFunction(() => /All checks passed|FAILED/.test(document.getElementById('sum')?.textContent ?? ''), null, { timeout: 280_000 });
   const t = await pg.locator('#app').innerText();
   assert.match(t, /All checks passed/);
-  assert.match(t, /PASS\s+The release policy is circuit #6[\s\S]*34 NAND gates[\s\S]*all 512 rows equal the published truth table/);
-  assert.match(t, /PASS\s+The Guard decision circuit[\s\S]*circuit #7: 22 NAND gates[\s\S]*all 512 rows/);
-  assert.match(t, /PASS\s+A taped-out circuit's behavior can't be upgraded/);
-  assert.match(t, new RegExp(`PASS\\s+${domain.replace(/\./g, '\\.')}: the release files stored on-chain hash to what its gate published\\s+release #${published} is revoked`));
+  assert.match(t, /Verified\s+The release policy is circuit #6[\s\S]*34 NAND gates[\s\S]*all 512 rows equal the published truth table/i);
+  assert.match(t, /Verified\s+The Guard decision circuit[\s\S]*circuit #7: 22 NAND gates[\s\S]*all 512 rows/i);
+  assert.match(t, /Verified\s+A taped-out circuit's behavior can't be upgraded/i);
+  assert.match(t, new RegExp(`Verified\\s+${domain.replace(/\./g, '\\.')}: the release files stored on-chain hash to what its gate published\\s+release #${published} is revoked`, 'i'));
   if (process.env.SIGNET_SAVE_DEMO) await pg.screenshot({ path: join(DEMO_DIR, 'dashboard-prove.png'), fullPage: true });
   await ctx.close();
 });

@@ -80,3 +80,9 @@ How the size came down:
 - Archivo is subset to the characters the page uses (`test/subset-font.sh`): −46 KB.
 
 To regenerate: `bash test/subset-font.sh` after copy changes; `node test/render-still.ts` after changing the seal.
+
+## After the UI restyle (dashboard, /prove, Guard)
+
+The dashboard now shares the landing page's fonts (the same files, no second copy). Its CSS grew from 2.3 KB to
+10.7 KB, its JS from 114.9 KB to 118.8 KB, and `app.html` from 0.5 KB to 1.7 KB. **New total: 929,517 bytes
+(907.7 KB), ≈ 0.0044 – 0.0046 OKB** at 0.020–0.021 gwei. Still under 0.005 OKB; nothing uploaded.

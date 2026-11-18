@@ -18,7 +18,17 @@ const beaconAbi = [
 ] as const satisfies Abi;
 const T = NET.tapeout as { processor: Address; circuitBeacon: Address; circuitImplementation: Address; processorCodehash: Hex; guardCircuitId?: number; policyCircuitId: number };
 
-type Row = { claim: string; status: 'PASS' | 'FAIL' | 'PENDING' | 'STALE' | '…'; detail: string };
+type Row = { claim: string; status: 'PASS' | 'FAIL' | 'PENDING' | 'STALE' | '…'; detail: string; src: string };
+const LABEL: Record<Row['status'], string> = { PASS: 'Verified', FAIL: 'Failed', PENDING: 'Pending deployment', STALE: 'Stale', '…': 'Checking' };
+// OKLink links only for addresses that exist on X Layer mainnet: TapeOut's (the same on staging, a mainnet fork),
+// and Signet's own only when this build reads mainnet.
+const OKLINK = 'https://www.oklink.com/xlayer/address/';
+const onMainnet = NET.name === 'mainnet';
+const addr = (a: string, name: string, mainnetAddress = true) => mainnetAddress || onMainnet
+  ? `${name} <a href="${OKLINK}${a}" target="_blank" rel="noopener">${a.slice(0, 8)}…${a.slice(-4)} ↗</a>`
+  : `${name} <span title="${a}">${a.slice(0, 8)}…${a.slice(-4)}</span> (${esc(NET.name)} only)`;
+const todo = (what: string) => `<span class="todo">TODO: ${esc(what)}</span>`;
+const repoFile = (f: string) => `repo <code>${f}</code>`;
 class Stale extends Error {}
 
 async function truthTable(id: number, art: { netlistSha256: string; expected: string; nIn: number; nOut: number; gates: number }): Promise<string> {
@@ -43,14 +53,26 @@ async function truthTable(id: number, art: { netlistSha256: string; expected: st
 
 export async function provePage(): Promise<void> {
   const rows: Row[] = [];
-  const v = view(`<p><a href="#/">← dashboard</a></p><h1>Prove it</h1>
-    <p>Everything below is read from the chain by <b>this browser</b> (${esc(NET.rpcUrl)}${NET.rpcUrl2 ? ` and ${esc(NET.rpcUrl2)}, which must agree` : ''}), with no wallet and no Signet server. Network: <b>${esc(NET.name)}</b>.</p>
-    <table class="claims"><tbody id="rows"></tbody></table><p id="sum" class="dim">running…</p>`);
+  const host = (u: string) => { try { return new URL(u).host; } catch { return u; } };
+  const v = view(`<a class="back" href="#/">← dashboard</a>
+    <div class="kicker" style="margin-top:18px">Verification report · no wallet · no Signet server</div>
+    <h1>Prove it</h1>
+    <p class="lead">Every row below is checked by <b>this browser</b>, reading the chain directly. On-chain values are compared with the reviewed files in the Signet repository.</p>
+    <div class="report-meta">
+      <div><span class="label">Network</span><b>${esc(NET.name)} · chain ${NET.chainId}</b></div>
+      <div><span class="label">Read at block</span><b id="blk">…</b></div>
+      <div><span class="label">Node 1</span><b>${esc(host(NET.rpcUrl))}</b></div>
+      <div><span class="label">Node 2 (must agree)</span><b>${NET.rpcUrl2 ? esc(host(NET.rpcUrl2)) : 'none'}</b></div>
+    </div>
+    <h2>Claims</h2>
+    <ul class="claims" id="rows"></ul><p id="sum" class="summary">running…</p>`);
+  void fetch(NET.rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }) })
+    .then((r) => r.json()).then((j) => { $('#blk', v).textContent = BigInt(j.result).toLocaleString('en-US'); }).catch(() => { $('#blk', v).textContent = 'unknown'; });
   const render = () => {
-    $('#rows', v).innerHTML = rows.map((r) => `<tr><td class="st ${r.status}">${r.status}</td><td>${esc(r.claim)}<div class="dim">${esc(r.detail)}</div></td></tr>`).join('');
+    $('#rows', v).innerHTML = rows.map((r) => `<li class="claim"><div><span class="st ${r.status}">${LABEL[r.status]}</span></div><div><div class="what">${esc(r.claim)}</div><div class="detail">${esc(r.detail)}</div></div><div class="src">${r.src}</div></li>`).join('');
   };
-  const check = async (claim: string, f: () => Promise<string | null>) => {
-    const r: Row = { claim, status: '…', detail: '' };
+  const check = async (claim: string, src: string, f: () => Promise<string | null>) => {
+    const r: Row = { claim, status: '…', detail: '', src };
     rows.push(r);
     render();
     try {
@@ -61,9 +83,13 @@ export async function provePage(): Promise<void> {
     }
     render();
   };
-  await check(`The release policy is circuit #${T.policyCircuitId} on processor ${T.processor.slice(0, 8)}…, and it gives the published truth table on all 512 inputs`, () => truthTable(T.policyCircuitId, policy));
-  await check('The Guard decision circuit gives its published truth table on all 512 inputs', async () => (T.guardCircuitId === undefined ? null : `circuit #${T.guardCircuitId}: ${await truthTable(T.guardCircuitId, guard)}`));
-  await check("A taped-out circuit's behavior can't be upgraded (beacon owner 0x0, pinned implementation, pinned processor code)", async () => {
+  const chainSrc = 'on-chain, read at the block above';
+  await check(`The release policy is circuit #${T.policyCircuitId} on processor ${T.processor.slice(0, 8)}…, and it gives the published truth table on all 512 inputs`,
+    `${chainSrc}<br>${addr(T.processor, 'processor')}<br>compared with ${repoFile('packages/circuit/artifacts/policy.json')}`, () => truthTable(T.policyCircuitId, policy));
+  await check('The Guard decision circuit gives its published truth table on all 512 inputs',
+    `${T.guardCircuitId === undefined ? `${todo('Guard circuit id on mainnet (after tape-out)')}<br>` : `${chainSrc}<br>circuit #${T.guardCircuitId} on ${addr(T.processor, 'processor')}<br>`}compared with ${repoFile('packages/circuit/artifacts/guard.json')}`, async () => (T.guardCircuitId === undefined ? null : `circuit #${T.guardCircuitId}: ${await truthTable(T.guardCircuitId, guard)}`));
+  await check("A taped-out circuit's behavior can't be upgraded (beacon owner 0x0, pinned implementation, pinned processor code)",
+    `${chainSrc}<br>${addr(T.circuitBeacon, 'beacon')}<br>${addr(T.circuitImplementation, 'implementation')}<br>pinned in ${repoFile(`packages/contracts/deployments/${NET.name}.json`)}`, async () => {
     const [o, i] = await read([enc(T.circuitBeacon, beaconAbi, 'owner'), enc(T.circuitBeacon, beaconAbi, 'implementation')]);
     const owner = dec<Address>(beaconAbi, 'owner', o!);
     const impl = dec<Address>(beaconAbi, 'implementation', i!);
@@ -73,13 +99,15 @@ export async function provePage(): Promise<void> {
     return `owner 0x0, implementation ${impl.slice(0, 10)}…, processor code hash ${ch.slice(0, 12)}…`;
   });
   let names: string[] = [];
-  await check("Signet's registry is deployed and lists its sealed domains", async () => {
+  await check("Signet's registry is deployed and lists its sealed domains",
+    NET.registry ? `${chainSrc}<br>${addr(NET.registry, 'registry', false)}${onMainnet ? '' : `<br>mainnet: ${todo('SignetRegistry address (after deploy)')}`}` : todo('SignetRegistry mainnet address (after deploy)'), async () => {
     if (!NET.registry) return null;
     names = await domains();
     return `${names.length} domain(s) in the registry's list`;
   });
   for (const d of names.slice(-10).reverse()) {
-    await check(`${d}: the release files stored on-chain hash to what its gate published`, async () => {
+    await check(`${d}: the release files stored on-chain hash to what its gate published`,
+      `${chainSrc}<br>files from the TapeOut container (${addr(NET.siteRegistry as string, 'SiteRegistry')})<br>hashes recomputed in this browser`, async () => {
       const p = await project(d);
       if (!p) return 'no longer bound (unbound or moved)';
       if (!p.currentRelease) return 'no release published yet';
@@ -95,5 +123,6 @@ export async function provePage(): Promise<void> {
   }
   const fails = rows.filter((r) => r.status === 'FAIL').length;
   const stale = rows.filter((r) => r.status === 'STALE').length;
+  $('#sum', v).className = `summary ${fails ? 'bad' : 'ok'}`;
   $('#sum', v).textContent = fails ? `${fails} check(s) FAILED.` : `All checks passed (${rows.filter((r) => r.status === 'PENDING').length} pending deployment${stale ? `; ${stale} project(s) with a release whose files were not uploaded` : ''}).`;
 }

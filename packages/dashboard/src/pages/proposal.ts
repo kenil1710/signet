@@ -13,18 +13,22 @@ export async function proposalPage(domain: string, id: number): Promise<void> {
   const p = await project(domain);
   const x = p?.proposals.find((q) => q.id === id);
   if (!p || !x) {
-    view(`<p><a href="#/p/${esc(domain)}">← ${esc(domain)}</a></p><p>No proposal #${id} on this gate (the dashboard shows the last 25).</p>`);
+    view(`<a class="back" href="#/p/${esc(domain)}">← ${esc(domain)}</a><p>No proposal #${id} on this gate (the dashboard shows the last 25).</p>`);
     return;
   }
   const st = status(x, p);
-  const v = view(`<p><a href="#/p/${esc(domain)}">← ${esc(domain)}</a></p>
+  const v = view(`<a class="back" href="#/p/${esc(domain)}">← ${esc(domain)}</a>
     <h1>Diff Guard: proposal #${id}</h1>
+    <div class="glance">
+      <div><span class="label">Risk tier (on-chain)</span><b class="${x.tier >= 2 ? 'bad' : ''}">${TIERS[x.tier]!.split(' ')[0]}</b></div>
+      <div style="grid-column:span 3"><span class="label">Status</span><b style="font-size:16px;font-stretch:100%;text-transform:none;letter-spacing:0">${esc(st.text)}${st.at && st.at > p.chainTime ? ` · ${span(st.at - p.chainTime)} left` : ''}</b></div>
+    </div>
     <p>Risk tier computed on-chain: <b>${TIERS[x.tier]}</b>${x.emergency ? ' (emergency fast lane requested)' : ''}. ${esc(st.text)}${st.at && st.at > p.chainTime ? ` Publishable in ${span(st.at - p.chainTime)}.` : ''}</p>
     <table class="kv"><tr><td>filesRoot</td><td><code>${x.filesRoot}</code></td></tr><tr><td>allowlistHash</td><td><code>${x.allowlistHash}</code></td></tr><tr><td>originsHash</td><td><code>${x.originsHash}</code></td></tr></table>
     <p><b>Choose the build folder CI proposed</b> (the sealed <code>dist</code> with its <code>signet/</code> files; the GitHub Action's artifact). It stays in your browser.</p>
-    <p><input type="file" id="dir" webkitdirectory multiple></p>
+    <div class="actions"><input type="file" id="dir" webkitdirectory multiple></div>
     <div id="result"></div>
-    <p>${st.open ? '<button data-a="approve">Approve</button> <button data-a="withdrawApproval">Withdraw</button> <button data-a="cancel">Cancel</button>' : ''} ${st.publishable ? '<button data-a="publish">Publish</button>' : ''}</p>`);
+    <div class="actions">${st.open ? '<button data-a="approve">Approve</button> <button data-a="withdrawApproval">Withdraw</button> <button data-a="cancel">Cancel</button>' : ''} ${st.publishable ? '<button data-a="publish" class="primary">Publish</button>' : ''}</div>`);
   for (const b of v.querySelectorAll<HTMLButtonElement>('button[data-a]')) action(b, async () => `${b.dataset.a} sent (tx ${short(await send(p.gate, b.dataset.a!, [BigInt(id)], b.dataset.a === 'publish'))})`, () => void proposalPage(domain, id));
   ($('#dir', v) as HTMLInputElement).onchange = async (e) => {
     const out = $('#result', v);
