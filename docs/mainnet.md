@@ -64,7 +64,7 @@ Gas price paid: 0.020000001 gwei. The value in rows 6 and 7 is TapeOut's mint co
 
 ## Still to do (no OKB unless stated)
 
-- Verify the source on OKLink: `staging/verify-oklink.sh` (needs a free OKLink API key in `.env` as `OKLINK_API_KEY`).
+- Verify the source on OKX Explorer by hand: [`docs/verify/README.md`](verify/README.md) (OKLink's API login is no longer available; free, no wallet). Files checked against mainnet by `docs/verify/check.py`.
 - Renew the registry's operator grant on the shared container before **2026-12-18** (30 days; ≈ 0.000003 OKB, from signet-dev).
 - Signet's own site's first release (propose, 3 approvals, publish, upload): not done; DeWEB upload not approved.
 - Fund the CI proposer and approvers with a little OKB when they start acting (not done).
