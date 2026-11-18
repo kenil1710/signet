@@ -10,7 +10,7 @@ We build Signet for the X Layer TapeOut Accelerate hackathon (deadline Dec 7, 20
 
 **Goal for Dec 7:** a team can seal its app in about 10 minutes (a target; not yet timed with an outside team) without knowing anything about TapeOut. At least 2 real projects are sealed. Then a 3-minute demo shows a live hijack being stopped.
 
-**Honest position:** "hash on-chain + browser extension" already exists (TEE Shield, Meta Code Verify, Blockaid). What we add, which we have not seen combined elsewhere: a sealed allowlist enforced at signing, behavior-based release review, an immutable TapeOut release-policy circuit, verified failover to DeWEB, and a public watchtower.
+**Honest position:** "hash on-chain + browser extension" already exists (TEE Shield, Meta Code Verify, Blockaid). What we add, which we have not seen combined elsewhere: a sealed allowlist enforced at signing, behavior-based release review, an immutable TapeOut release-policy circuit, verified failover to the copy stored on-chain (Circuit Container + SiteRegistry), and a public watchtower.
 
 ## Problem and evidence
 
@@ -46,8 +46,8 @@ Signet has seven parts. Teams touch the CLI, the GitHub Action and the dashboard
 | **SignetRegistry + SignetFactory contracts** | The factory deploys each project's ReleaseGate and claims its domain in one transaction, using commit-reveal (commit a hash, reveal at least 2 blocks later) so a claim can't be copied from the mempool. The registry binds domains only to factory-made gates. It never holds a circuit NFT: it writes as the SiteRegistry *operator* of a container (a grant of at most 30 days, renewed by the holder). It writes only files the bound gate's current release approves. Signet's container (`0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`) holds Signet's own site under `signet/<domain>/` and Free projects under `projects/<domain>/`; a Pro/Enterprise gate can instead hold its own container's NFT and get files at that container's root. The registry has no owner, no migration switch and nothing configurable after deployment: its factory and Signet's site gate are fixed in its constructor. | On-chain | Yes |
 | **Domain Registry contract** | Maps domain → project (shared container + `projects/<domain>/`, or the team's own container). Changes need M-of-N approval. | On-chain | Yes |
 | **Guard extension** | Hashes the loaded page, enforces the sealed allowlist when the wallet signs (the decision comes from a second TapeOut circuit), blocks the page in enforce mode, opens the verified copy. **Only users who install it get this.** | End users | Yes (Chrome) |
-| **Watchtower** | Checks every sealed site every minute from 3 regions. Alerts via TapeSend, Telegram and X. Public status page. | Everyone | Yes (basic) |
-| **Dashboard (on DeWEB)** | Diff Guard review, approvals, release history, freeze button, status, "Sealed" badge | Team approvers | Yes |
+| **Watchtower** | Checks every sealed site every minute and alerts the team on Telegram (**built**, one region). 3 regions, TapeSend alerts, X posts and a public status page: **planned, not built** (TapeSend waits on TapeOut confirming the 2026-11-18 hub upgrade; `docs/ecosystem-integration.md`). | Everyone | Yes (basic) |
+| **Dashboard** | Diff Guard review, approvals, release history, freeze button, status, "Sealed" badge, `/prove`. **Built**; live on Cloudflare Pages (https://signet-6l4.pages.dev). Hosting it on DeWEB: **planned, not built** (≈ 0.0044 OKB of storage, `docs/demo/site/REPORT.md`) | Team approvers | Yes |
 
 **What gets sealed per release** (one manifest file):
 
@@ -73,21 +73,21 @@ GitHub Action ──propose──▶ ReleaseGate contract
 (seal + propose)            (computes risk tier on-chain)
                                    │ ask
 Approvers (2 of 3) ──approve──▶    ▼
-(Diff Guard in DeWEB         Policy circuit (NAND/LATCH, immutable,
+(Diff Guard in the           Policy circuit (NAND/LATCH, immutable,
  dashboard; approve/freeze)   512-case truth table proof)
         ▲                          │ ALLOW: publish
         │                          ▼
-        │                    Container + SiteRegistry ──read via TapeKit──▶ Guard extension
+        │                    Container + SiteRegistry ──eth_call, 2 RPCs──▶ Guard extension
         │                    (sealed manifest, allowlist,                   (hash page, block,
-        │                     verified copy on DeWEB)                        open safe copy)
+        │                     verified copy on-chain)                        open safe copy)
         │                          │                                              │
         │                          └──compare──▶ Watchtower                       ▼
         │ alert                                (every site, every min,      User's wallet
-        └──────────────── TapeSend ◀──alert──   3 regions)                  (signs only if target
-                          (team inbox)                                       is on sealed list)
+        └──────────────── Telegram ◀──alert──   1 region)                   (signs only if target
+                          (TapeSend: planned)                                       is on sealed list)
 ```
 
-The watchtower compares live sites with the sealed manifest and alerts the team through TapeSend; Guard reads the same manifest through TapeKit.
+The watchtower compares live sites with the sealed manifest and alerts the team on Telegram (TapeSend: planned, not built). Guard reads the same manifest straight from SiteRegistry with `eth_call`s on two RPCs that must agree, using TapeKit's verification rule (TAP-10 §7.1), not the TapeKit kernel.
 
 ## Release-lock circuit and approval tiers
 
@@ -199,7 +199,7 @@ The biggest product risk is not missing an attack. It's **blocking real users by
 
 | Case | Handling |
 | --- | --- |
-| Geo-targeted hijack | Crawl from 3 regions, plus Guard telemetry from real users (opt-in, only for sealed domains) |
+| Geo-targeted hijack | Crawl from 3 regions, plus Guard telemetry from real users (opt-in, only for sealed domains). Planned, not built: today the watchtower runs in one region and Guard sends no telemetry |
 | False public alert | Private alert to the team first. A public X post only after 2 regions confirm, or when the team acknowledges. |
 | Privacy | Guard downloads the list of sealed domains and checks locally. It never sends browsing history. |
 
@@ -226,7 +226,7 @@ After setup, everything runs on its own. People act only when a new release need
 **2. Daily release**
 
 1. A dev merges to main → the Action builds, seals and proposes
-2. ReleaseGate computes the tier on-chain; approvers get a TapeSend and Telegram ping
+2. ReleaseGate computes the tier on-chain; approvers see it in the dashboard (a TapeSend / Telegram ping on new proposals: planned, not built)
 3. An approver opens Diff Guard: "3 files changed, no new contracts, no new origins → tier 00" → one click
 4. After the 1 h timelock, anyone calls `publish` (the Action does it; the circuit decides, and the CI key still can't approve) → the Action writes the manifest files and deploys to hosting
 
@@ -240,9 +240,9 @@ After setup, everything runs on its own. People act only when a new release need
 **4. Incident (DNS hijacked at 02:00)**
 
 1. 02:00 Guard users see a full red page: "This site doesn't match its sealed release. Don't sign." Button: Open verified copy.
-2. 02:01 Watchtower confirms from 2 regions → private alert to the team, then a public post on X, Telegram and TapeSend
+2. 02:01 Watchtower confirms the mismatch on two loads → a private Telegram alert to the team (built). Two regions, public posts on X and TapeSend alerts: planned, not built
 3. The team (or the opt-in guardian) presses Freeze → no release can be published until 2 of 3 unfreeze
-4. Users continue on the verified copy from DeWEB via TapeKit
+4. Users continue on the verified copy: the sealed files read from the Circuit Container through SiteRegistry, every file checked against its sealed hash (Signet's gateway on TapeKit's service-worker design; built and tested on staging, not yet on a public domain)
 5. The dashboard shows an incident checklist: lock the registrar account, rotate DNS/API keys, contact the registrar, post an official notice, and a revoke.cash link for users who signed
 6. Fixed → 2 of 3 unfreeze → an incident report is generated for the community
 
@@ -253,7 +253,7 @@ Users never pay. Teams pay because one hijack costs them users, money and reputa
 | Plan | Price (proposal) | Includes |
 | --- | --- | --- |
 | Free | $0 | 1 domain, manifest sealing in Signet's shared container, Guard protection, community alerts, 5-min watchtower |
-| Pro | $49 / month | 3 domains, optional own container, 1-min watchtower from 3 regions, private alerts (TapeSend, Telegram), Diff Guard, badge, failover copy (storage gas passed through) |
+| Pro | $49 / month | 3 domains, optional own container, 1-min watchtower (3 regions planned), private alerts (Telegram; TapeSend planned), Diff Guard, badge, failover copy (storage gas passed through) |
 | Enterprise | Custom | Own container, setup done for you, allowlist review, incident support, SLA, 5-approver circuit, wallet verification API |
 
 **Other revenue:** wallets and exchanges pay per call for the verification API ("is this page sealed and is this tx allowed?"), and an optional per-release fee covers the on-chain gas.
@@ -296,7 +296,7 @@ Each criterion has one piece of proof we must show, in the product and in the vi
 | --- | --- |
 | User value and commercial potential | Incident table ($1.5B+), pricing, 2+ real projects sealed, observe mode, and 0 false blocks on 16 clean sessions in the staging attack suite (not yet measured on real sites) |
 | Innovation (circuit design, new use cases) | A release-policy circuit with an exhaustive 512-case truth table (9 input bits); TapeOut used as a security policy engine (a new use case) |
-| Ecosystem integration | A circuit on an X Layer Processor, Circuit Container + SiteRegistry (DeWEB) for manifests and failover, TapeKit for reading and verifying, TapeSend for alerts, dashboard hosted on DeWEB |
+| Ecosystem integration | Built: two TapeOut circuits on X Layer processor #101 (release policy #6, Guard decision #7), the Circuit Container of #5 + SiteRegistry (DeWEB's storage) for sealed manifests and the verified copy, chunked writes for files over 48 KB, TapeKit's verification rule and gateway design. Planned, not built: TapeSend alerts, the dashboard hosted on DeWEB, TapeCode sealing |
 | Product readiness and UX | 10-minute setup, one-click approvals, live demo dApp, Chrome extension installable |
 | Demo video ≤ 3 min | Script below: problem → features → users and business → TapeOut usage |
 
@@ -308,10 +308,10 @@ Each criterion has one piece of proof we must show, in the product and in the vi
 - [ ] Team background and elevator pitch
 - [ ] GitHub repo (public)
 - [ ] Demo video link, ≤ 3 min (longer may be disqualified)
-- [ ] Website link (the DeWEB dashboard + a normal landing page)
+- [x] Website link: https://signet-6l4.pages.dev (landing page + dashboard + `/prove`; `signetguard.xyz` once its nameservers move). On DeWEB: planned, not built
 - [ ] Description covering: product, target users and how to reach them, revenue model, why users pay and keep using it
 - [ ] Circuit info required for circuit projects: **Processor contract address and circuit ID**
-- [ ] List of the TapeOut features used (circuit, Processor, Container, SiteRegistry/DeWEB, TapeKit, TapeSend)
+- [ ] List of the TapeOut features used (circuits #6 and #7 on processor #101, Circuit Container, SiteRegistry/DeWEB, TapeKit's verification rule; TapeSend only if built)
 - [ ] Answer "What challenges are you solving? How are you different? What are the plans forward?"
 - [ ] Follow @XLayerOfficial and @TapeOutWorld; post weekly progress
 
@@ -340,11 +340,11 @@ We submit on Dec 6, keeping Dec 7 as a buffer. The two riskiest items are first:
 - [ ] Nov 27: **submit the extension to the Chrome Web Store** (keep an unpacked build for the demo as backup)
 - [x] Watchtower, basic: 1-min checks in headless Chromium, a mismatch confirmed on two loads, private alert on the console and through a Telegram bot, posts for new bindings and pending tier-10/11 proposals: tested on staging with a simulated hijack (2026-11-17, `packages/watchtower`)
 - [x] Failover gateway (`packages/gateway`, TapeKit's service-worker design): the verified copy as a normal page where wallets inject, every file checked against the sealed hashes; tested on staging at `*.localhost` (2026-11-17). Not deployed on a public https domain.
-- [ ] Watchtower, rest: 3 regions with 2-region confirm, TapeSend, X posts, public status page
+- [ ] Watchtower, rest (planned, not built): 3 regions with 2-region confirm, TapeSend (waiting on TapeOut confirming the hub upgrade), X posts, public status page
 
 **Week 3 (Nov 30–Dec 7): polish, real users, video**
 
-- [ ] Nov 30–Dec 1: dashboard on DeWEB (approvals, Diff Guard view, history, freeze, status page, badge)
+- [x] Dashboard (approvals, Diff Guard view, history, freeze, badge, `/prove`): built, live on Cloudflare Pages. [ ] Hosting it on DeWEB: planned, not built
 - [ ] Dec 1: demo dApp (a simple X Layer swap/stake page) + attack simulator (local DNS override + JS swap)
 - [ ] Dec 2–3: onboard 2–3 real TapeOut/X Layer projects; fix whatever breaks; write docs and a landing page
 - [ ] Dec 4: final end-to-end test of every journey; record the screen footage
@@ -364,9 +364,9 @@ One story, a live hijack, told in the order the judges score: problem, features,
 | 0:20–0:45 | `npx signet init` + the Action in GitHub | "A team seals its app in about 10 minutes. Every build is sealed on X Layer." |
 | 0:45–1:10 | Dashboard: Diff Guard flags "new contract address" → tier 10, needs 2 of 3 + 24 h | "A hacked laptop can't approve anything. A TapeOut circuit decides, and its rule can't be changed after tape-out." Show the truth-table proof. |
 | 1:10–1:50 | **Live attack:** DNS override + swapped JS → Guard turns red → user clicks Swap → signature refused | "Signet doesn't just warn. It refuses the signature to an address the team never sealed." |
-| 1:50–2:10 | Open verified copy (tape://) → user swaps safely; Telegram + TapeSend alert arrives; Freeze pressed | "The app keeps working during the attack, and the team knows in a minute." |
+| 1:50–2:10 | Open verified copy (served from the chain, every file hash-checked) → user swaps safely; Telegram alert arrives; Freeze pressed | "The app keeps working during the attack, and the team knows in a minute." |
 | 2:10–2:35 | Pricing table + logos of real sealed projects | "Free for users. Teams pay for watchtower, alerts and the badge. Wallets pay for the API." |
-| 2:35–2:50 | Architecture: circuit, Container, SiteRegistry, TapeKit, TapeSend on X Layer | "Built on TapeOut on X Layer. With Signet Guard, the website can only ask you to sign what the team sealed." |
+| 2:35–2:50 | Architecture: circuits #6 and #7, Container, SiteRegistry, TapeKit's verification rule on X Layer | "Built on TapeOut on X Layer. With Signet Guard, the website can only ask you to sign what the team sealed." |
 
 Record in 1080p with large fonts and no dead air. Subtitles in English. Do a dry run with a friend who doesn't know crypto: if they get the problem in 20 seconds, it works.
 
@@ -380,7 +380,7 @@ Five facts are not confirmed yet, and the Week 1 spikes exist to answer them. If
 | ~~Can a contract hold the circuit NFT and write via the container to SiteRegistry?~~ **Answered yes** (fork tests, 2026-11-16): a contract holder can write, and can appoint an operator contract that writes | Only the gate should be able to publish | Not needed |
 | Cost per KB for SiteRegistry on X Layer | Pricing of the failover copy | Manifest-only by default (already the plan) |
 | Can the extension read executed bytes reliably (`only-if-cached`, `no-store` files)? | Targeted-attack detection | Re-fetch + hash, documented as a v1 limit; the signing allowlist still protects |
-| Can TapeSend messages be sent by our watchtower service automatically? | Alerts | Telegram + X only; TapeSend for the team inbox in the dashboard |
+| Can TapeSend messages be sent by our watchtower service automatically? | Alerts | **Researched 2026-11-18** (`docs/ecosystem-integration.md`): yes, from a relay contract holding an opened container (≈ 0.0000039 OKB per alert). Blocked until TapeOut confirms the hub implementation upgraded on 2026-11-18. Until then: Telegram |
 
 **Risks**
 
@@ -404,8 +404,8 @@ Give Claude Code this doc as the spec, and work one package at a time in the ord
 | Circuit | Netlist built in the TapeOut canvas or a script; exhaustive test in TypeScript against a reference function |
 | CLI + Action | TypeScript, Node 20+, viem, commander; Action as a composite action |
 | Extension | Chrome MV3, TypeScript, Vite; content script in MAIN world for the provider wrap, service worker for manifest cache |
-| Watchtower | Node workers on 3 regions (e.g. Fly.io), Puppeteer for real-browser loads, Telegram Bot API |
-| Dashboard | Static React/Vite build, published to DeWEB via HashPort or SiteRegistry; also a normal web mirror |
+| Watchtower | Node + Puppeteer for real-browser loads, Telegram Bot API; one region today (3 regions on e.g. Fly.io: planned) |
+| Dashboard | Static Vite build (TypeScript, no framework). Live on Cloudflare Pages; publishing it to DeWEB via SiteRegistry: planned, not built |
 
 **Rules to give Claude Code**
 

@@ -2,7 +2,23 @@
 
 > Signet lets a dApp team seal each release of its website on X Layer (file hashes, the contracts and spenders the site may ask a wallet to sign for, the outside origins it may use). A TapeOut circuit decides when a release goes live (CI can propose and publish but never approve; humans approve; risky changes wait 24 h). Users who run the Guard browser extension have every page and every signature checked against the sealed release; the signing decision comes from a second TapeOut circuit. Users without Guard are NOT protected at signing; a watchtower alerts the team instead.
 
-Status (2026-11-18): the release-policy circuit (#6 on processor #101, 0x73153e5fd2Acac604D49d6ca9fea27b750718F22) is on X Layer mainnet and verified on all 512 inputs. Signet's contracts, the Guard decision circuit, the gateway, the dashboard and the watchtower run on a local fork of X Layer (staging); the mainnet deployment is planned and costed (about 0.0022 OKB) but not sent. Guard has been tested with a mock wallet, not MetaMask.
+Status (2026-11-18): live on X Layer mainnet (chain 196), deployed 2026-11-18 for 0.002171 OKB (docs/mainnet.md):
+- Release-policy circuit #6 and Guard decision circuit #7 on TapeOut processor #101 (0x73153e5fd2Acac604D49d6ca9fea27b750718F22), each verified on all 512 inputs on two RPCs.
+- SignetRegistry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, SignetFactory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, ReleaseGate implementation 0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D, Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz; observe mode, no release published yet).
+- `pnpm verify:claims`: 9 claims on mainnet, 10 from the repo, 0 pending.
+- Site (landing, dashboard, /prove against mainnet, no wallet): https://signet-6l4.pages.dev (Cloudflare Pages; signetguard.xyz once its nameservers move).
+- Not live: the Guard extension (not in the Chrome Web Store; tested with a mock wallet, not MetaMask), the gateway (staging only), the watchtower (one region, Telegram, staging).
+
+## Built on TapeOut (what is really used)
+- Two TapeOut circuits on processor #101: #6 decides when a release may publish (ReleaseGate calls it on every publish and unfreeze); #7 decides Guard's allow/warn/block at signing.
+- The Circuit Container of circuit #5 (0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed, opened) + TapeOut's SiteRegistry (0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6, the storage behind DeWEB) hold each release's sealed manifest and the files of the verified copy; SignetRegistry writes only files an approved release lists, as the container's 30-day SiteRegistry operator.
+- Files over 48,000 bytes are stored in 24,000-byte pieces, one proved piece per transaction (SignetRegistry.writeChunk on top of SiteRegistry.appendChunk).
+- Reading and checking follow TapeKit / TAP-10: every file's size and SHA-256 checked against the chain, two independent RPCs that must agree; the gateway reuses TapeKit's service-worker design.
+
+## Roadmap (planned, not built)
+- TapeSend alerts from the watchtower to a team's container inbox (about 0.0000039 OKB per alert). Waiting on TapeOut to confirm the DeWEB hub implementation upgraded on 2026-11-18 (docs/ecosystem-integration.md).
+- TapeCode sealing: TapeCode uploads to a staging container, `signet seal --from-container` reads it from the chain, and the approved release is copied to production (design ready, docs/ecosystem-integration.md).
+- Hosting the site itself on DeWEB (about 0.0044 OKB of storage); the Chrome Web Store listing; watchtower in 3 regions.
 
 ## Start here
 - [JUDGES.md](JUDGES.md): a 5-minute guide
@@ -23,4 +39,5 @@ Status (2026-11-18): the release-policy circuit (#6 on processor #101, 0x73153e5
 
 ## Try it
 - [docs/TRY-IT-LOCALLY.md](docs/TRY-IT-LOCALLY.md): Guard in your own Chrome against a local fork, with a hacked/clean switch
-- [docs/mainnet-plan.md](docs/mainnet-plan.md): the deployment plan with exact calls and costs
+- [docs/mainnet.md](docs/mainnet.md): what is on mainnet, every address and transaction
+- [docs/ecosystem-integration.md](docs/ecosystem-integration.md): TapeSend, TapeCode and FabX research

@@ -1,8 +1,8 @@
 {
   "project": "Signet",
-  "checkedAt": "2026-11-18T10:03:13.052Z",
+  "checkedAt": "2026-11-18T12:18:16.415Z",
   "chain": "X Layer mainnet (196)",
-  "block": "76226970",
+  "block": "76235142",
   "rpcs": [
     "https://xlayerrpc.okx.com",
     "https://xlayer.drpc.org"
@@ -128,7 +128,7 @@
       "kind": "repo",
       "claim": "A real-size bundle (300 KB) can be stored on-chain as the verified copy, one proved 24 KB piece per transaction, each under 16.7M gas",
       "status": "PASS",
-      "detail": "13 transactions, 70,049,913 gas in total, at most 5,635,704 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
+      "detail": "13 transactions, 70,049,906 gas in total, at most 5,635,691 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
     },
     {
       "id": "R7",
