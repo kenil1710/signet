@@ -180,3 +180,13 @@ Follow-up (2026-11-18): BadgerDAO added to the spec's incident table (The Block,
 ## UI restyle (2026-11-18)
 
 The dashboard, /prove and the Guard pages are restyled to the landing look. /prove is a verification report: each claim has its status, source and OKLink links, and TODOs mark the mainnet addresses that don't exist yet. The project page has an at-a-glance strip, and each proposal shows its tier code, A/B/C approvals and timelock. The Guard red page (#7A2216) has the broken-seal icon, "Open the verified copy" / "Leave this site" and "What changed". The popup shows the sealed state in green with the seal image, plus release, approvers, files matched, allowed contracts and nodes. Screenshots are in `docs/demo/ui/`. Only the tests' text assertions changed: they are now case-insensitive because labels are uppercase in CSS, and use the new status words and block-page heading.
+
+## Mainnet deploy (2026-11-18)
+
+Rehearsed in full on a fork with the real inputs (all suites, attacks 12/12, real-role checks), then sent with three approved commands from signet-dev. Results:
+- Registry `0x98dB5B6B1545D0fb374da40a02045B93398E0589`, factory `0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986`, implementation `0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D`.
+- Site gate `0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503` for signetguard.xyz.
+- Guard circuit #7.
+- 7 transactions, 0.002171256509462825 OKB.
+
+`verify:claims`: 9 on mainnet, 10 from the repo, 0 pending; /prove on mainnet all verified. Fixed after the deploy: drpc's 3-call batch limit (it broke /prove and Guard's site check on mainnet). OKLink source verification is waiting for an API key.

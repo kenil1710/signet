@@ -27,11 +27,20 @@ export async function rpc<T>(url: string, method: string, params: unknown[]): Pr
   return r.result as T;
 }
 
+/// The most calls one JSON-RPC batch may carry. xlayer.drpc.org (one of the two mainnet RPCs) answers HTTP 400 to a
+/// batch of 4 or more (measured 2026-11-18); xlayerrpc.okx.com takes any size. Bigger call lists are sent as several
+/// batches, one after another, all at the same pinned block, so the two-RPC comparison is unchanged.
+export const MAX_BATCH = 3;
+
 /// eth_call for each call at one block. A reverted call gives "revert" (so a revert can be compared too).
 async function callAt(url: string, calls: Call[], block: string): Promise<string[]> {
-  const batch = calls.map((c, i) => ({ jsonrpc: '2.0', id: i, method: 'eth_call', params: [c, block] }));
-  const replies = (await post(url, batch)) as (Reply & { id: number })[];
-  if (!Array.isArray(replies) || replies.length !== calls.length) throw new RpcError(`${new URL(url).host} gave a malformed answer`);
+  const replies: (Reply & { id: number })[] = [];
+  for (let start = 0; start < calls.length; start += MAX_BATCH) {
+    const batch = calls.slice(start, start + MAX_BATCH).map((c, k) => ({ jsonrpc: '2.0', id: start + k, method: 'eth_call', params: [c, block] }));
+    const got = (await post(url, batch)) as (Reply & { id: number })[];
+    if (!Array.isArray(got) || got.length !== batch.length) throw new RpcError(`${new URL(url).host} gave a malformed answer`);
+    replies.push(...got);
+  }
   const out: string[] = [];
   for (let i = 0; i < calls.length; i++) {
     const r = replies.find((x) => x.id === i);

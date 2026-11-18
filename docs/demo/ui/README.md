@@ -5,6 +5,7 @@ Restyled to the landing page's look: Archivo wide headings, IBM Plex Mono labels
 
 | File | What |
 |---|---|
+| `prove-mainnet-1280.png`, `prove-mainnet-390.png` | /prove built for mainnet, run against mainnet after the deploy: every row verified, 0 pending |
 | `prove-1280.png`, `prove-390.png` | /prove: the verification report. Each claim has its status (verified / pending deployment), its source (on-chain at the block shown, plus the repo file it is compared with) and OKLink links for mainnet addresses. Signet's own contracts, not on mainnet yet, show a TODO. |
 | `dashboard-home-*.png` | Sealed projects |
 | `dashboard-project-*.png` | A project with two open proposals: tier 10 (poisoned build, 0 of 3) and tier 00 (1 of 3, timelock counting down) |

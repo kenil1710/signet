@@ -284,5 +284,6 @@ test('guards: no key, wrong network, --as outside staging', () => {
   const fresh = mkdtempSync(join(tmpdir(), 'signet-e2e-'));
   const m = spawnSync(process.execPath, [CLI, '-C', fresh, '--as', 'user1', 'init', '--domain', 'x.example.org', '--approvers', 'a,b,c', '--recovery', 'd'], { encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'mainnet' } });
   assert.equal(m.status, 1);
-  assert.match(m.stderr, /not deployed on mainnet yet/);
+  // Signet is on mainnet now (docs/mainnet.md), so the guard that stops it is --as (test accounts exist only on staging)
+  assert.match(m.stderr, /--as works only on the local staging chain/);
 });

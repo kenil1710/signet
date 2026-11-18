@@ -2,7 +2,7 @@
 // renders it as a disabled link (href="#", data-todo) instead of a broken one. Replace the TODOs when they exist.
 export const SITE = {
   /** The public domain this site will be served from (used for the canonical link). */
-  domain: 'TODO: the site domain, e.g. https://signet.example',
+  domain: 'https://signetguard.xyz',
   /** The public GitHub repository. */
   github: 'TODO: https://github.com/<org>/signet',
   /** The project's X account. */

@@ -364,3 +364,12 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 | Guard's red page gets a "Leave this site" button (opens a new tab page in that tab). "Go back" (signing stays blocked) and "Report wrong block" stay, as smaller links. | It matches the approved design. Leaving can't unblock anything. |
 | The popup's data adds a count of allowed contracts (targets and spenders in the sealed allowlist). It reads data Guard already has; no new request. | The popup shows release, approvers, files matched, allowed contracts and nodes. |
 | The popup says "Approvers on this gate: 3", never an approval count. The headline and the toolbar tooltip no longer say "3 approvers" (it was hard-coded). | Guard doesn't read how many approvers approved the current release, and we don't add a chain read for it. A staging test fails if the popup ever claims "approved by" or "N of M approved". |
+
+## 2026-11-18 — Mainnet deploy
+
+| Decision | Why |
+|---|---|
+| Signet is on mainnet: registry, factory, gate implementation, site gate for `signetguard.xyz`, Guard circuit #7 (`docs/mainnet.md`), for 0.002171 OKB. Guardian = signet-dev, by Kenil's choice (freeze only). | Approved step by step (CLAUDE.md rule 2), after a full rehearsal with the same inputs on a fork. |
+| The full rehearsal (`staging/rehearse-mainnet-full.sh`) runs the mainnet scripts on a fork, then every staging suite against that deployment, without touching the staging chain. `record-mainnet` has a rehearsal mode that writes only `deployments/rehearsal.json`. | The suites prove the deployment the mainnet scripts make, not only the staging one. The rehearsal caught a crash in `record-mainnet` (a nested site-gate field) before the real deploy. |
+| JSON-RPC batches are capped at 3 calls (`rpc.ts MAX_BATCH`). | xlayer.drpc.org rejects 4+, which broke /prove and Guard's site check on mainnet. |
+| `verify:claims` labels a "pending" claim that now passes as a mainnet claim, and counts by result. | C8 and C9 pass on mainnet; the report should say "0 pending". |

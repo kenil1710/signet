@@ -7,7 +7,7 @@ export const VERIFY_OUTPUT: [kind: 'cmd' | 'dim' | 'gap' | 'ok' | 'pend', text: 
  ],
  [
   "dim",
-  "Signet claims, checked against X Layer mainnet at block 76213870 on https://xlayerrpc.okx.com and https://xlayer.drpc.org (read-only)"
+  "Signet claims, checked against X Layer mainnet at block 76226970 on https://xlayerrpc.okx.com and https://xlayer.drpc.org (read-only)"
  ],
  [
   "gap",
@@ -26,8 +26,12 @@ export const VERIFY_OUTPUT: [kind: 'cmd' | 'dim' | 'gap' | 'ok' | 'pend', text: 
   "PASS    C5 [mainnet] A taped-out circuit's behavior can't be upgraded through its beacon: the circuit beacon's owner is 0x0, it points at the implementation Signet pins, and the processor's code is the pinned proxy (TapeOut's source is not verified; this is what can be checked on-chain)"
  ],
  [
-  "pend",
-  "PENDING C8 [pending] Signet's contracts are on mainnet: SignetRegistry (with its enumerable domain list), SignetFactory, the ReleaseGate implementation and Signet's own site gate"
+  "ok",
+  "PASS    C8 [mainnet] Signet's contracts are on mainnet: SignetRegistry (with its enumerable domain list), SignetFactory, the ReleaseGate implementation and Signet's own site gate"
+ ],
+ [
+  "ok",
+  "PASS    C9 [mainnet] The Guard decision circuit is on mainnet and gives the published truth table (docs/guard-truth-table.md) on all 512 inputs"
  ],
  [
   "gap",
@@ -35,6 +39,6 @@ export const VERIFY_OUTPUT: [kind: 'cmd' | 'dim' | 'gap' | 'ok' | 'pend', text: 
  ],
  [
   "ok",
-  "ALL CHECKS PASSED (7 on mainnet, 10 from the repo, 2 pending deployment)"
+  "ALL CHECKS PASSED (9 on mainnet, 10 from the repo, 0 pending deployment)"
  ]
 ];

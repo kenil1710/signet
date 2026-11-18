@@ -18,8 +18,8 @@ pnpm verify:claims
 
 It checks, on two independent RPC operators that must agree, that the release-policy circuit #6 is on processor
 #101, is the reviewed netlist, and gives the published truth table on all 512 inputs. It also checks who taped it
-out, that it can't be upgraded through its beacon, and that Signet's container stores what we say. Claims about things not
-on mainnet yet print **PENDING**. Every claim and its evidence: [`CLAIMS.md`](CLAIMS.md).
+out, that it can't be upgraded through its beacon, and that Signet's container stores what we say. Signet's contracts and the Guard
+decision circuit #7 are on mainnet too (C8, C9; `docs/mainnet.md`); a claim about something not deployed would print **PENDING**. Every claim and its evidence: [`CLAIMS.md`](CLAIMS.md).
 
 Two rows by hand, from [`docs/policy-truth-table.md`](docs/policy-truth-table.md). Row 0x00b (approvers 1 and 2,
 short timelock passed, code-only tier) publishes: `0x03`. Row 0x1a9 (one approval, frozen) does not: `0x00`.

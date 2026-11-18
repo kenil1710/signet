@@ -1,0 +1,14 @@
+{
+  "chainId": 196,
+  "network": "X Layer mainnet",
+  "processor": "0x73153e5fd2Acac604D49d6ca9fea27b750718F22",
+  "processorIndex": 101,
+  "circuitId": 7,
+  "netlistSha256": "0x03c94d0295eded753d52ad50fae8c7ceac3590d4a9320ca97823dd300784de44",
+  "holder": "0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE",
+  "mintTx": "0xa655247a48cb08f60d0b3304b3a8d0fea540115b6ed1f5472900f3c793f3b059",
+  "tapeoutTx": "0x8fc6a9d7dbf6082783b267449ee13c6327af56f2a662e087f23f1c40ade44c16",
+  "tapeoutBlock": 76226683,
+  "verifiedAtBlock": 76226736,
+  "verifiedWith": "scripts/verify-mainnet.ts guard: 512/512 eval() eth_calls match on xlayerrpc.okx.com and xlayer.drpc.org"
+}

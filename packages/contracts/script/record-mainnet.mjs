@@ -1,6 +1,8 @@
 // After the mainnet deployment (docs/mainnet-plan.md): writes what is now on X Layer into the repo, so Guard, the
 // CLI, the watchtower and `pnpm verify:claims` use it. Read-only: it sends nothing.
 //   node packages/contracts/script/record-mainnet.mjs [contracts|circuit|all]
+// Rehearsal (staging/rehearse-mainnet-full.sh): SIGNET_RECORD_REHEARSAL=<fork RPC> checks the fork instead and writes
+// ONLY deployments/rehearsal.json; it never writes mainnet.json or the circuit artifacts.
 // Every transaction hash it records is first fetched from BOTH mainnet RPCs and must have succeeded there, so a
 // rehearsal or staging run (same chain id 196 in forge's broadcast folder) can never be recorded by mistake.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -11,9 +13,13 @@ import { createPublicClient, http, parseAbi, getAddress } from 'viem';
 const C = fileURLToPath(new URL('..', import.meta.url)); // packages/contracts/
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const what = process.argv[2] ?? 'all';
-const NET_FILE = `${C}deployments/mainnet.json`;
-const net = JSON.parse(readFileSync(NET_FILE, 'utf8'));
+const REHEARSAL = process.env.SIGNET_RECORD_REHEARSAL || '';
+const NET_FILE = `${C}deployments/${REHEARSAL ? 'rehearsal' : 'mainnet'}.json`;
+const net = JSON.parse(readFileSync(`${C}deployments/mainnet.json`, 'utf8')); // the rehearsal starts from mainnet's file
+if (REHEARSAL) Object.assign(net, { name: 'rehearsal', rpcUrl: REHEARSAL, rpcUrl2: REHEARSAL, rehearsal: true });
 const RPCS = [net.rpcUrl, net.rpcUrl2];
+const DEPLOY_OUT = `${C}${process.env.SIGNET_DEPLOY_OUT || 'deployments/mainnet-deploy.json'}`;
+const GUARD_OUT = `${C}${process.env.SIGNET_GUARD_OUT || 'deployments/guard-tapeout.json'}`;
 const clients = RPCS.map((url) => createPublicClient({ transport: http(url, { retryCount: 5, retryDelay: 800 }) }));
 const DEV = '0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE';
 const json = (p) => JSON.parse(readFileSync(p, 'utf8'));
@@ -34,7 +40,9 @@ async function onMainnet(hash) {
 const txsOf = (file) => (existsSync(file) ? json(file).receipts.map((r) => r.transactionHash) : fail(`${file} not found: run the forge command first`));
 
 if (what === 'contracts' || what === 'all') {
-  const dep = json(`${C}deployments/mainnet-deploy.json`);
+  const dep = json(DEPLOY_OUT);
+  // MainnetDeploy writes the site gate as {"siteGate": {"siteGate": "0x…"}} (forge's serialize-then-write): unwrap it
+  if (dep.siteGate && typeof dep.siteGate === 'object') dep.siteGate = dep.siteGate.siteGate;
   if (!dep.siteGate) fail('deployments/mainnet-deploy.json has no siteGate: run step2 first');
   const hashes = [...txsOf(`${C}broadcast/MainnetDeploy.s.sol/196/step1-latest.json`), ...txsOf(`${C}broadcast/MainnetDeploy.s.sol/196/step2-latest.json`)];
   const receipts = [];
@@ -54,8 +62,9 @@ if (what === 'contracts' || what === 'all') {
 }
 
 if (what === 'circuit' || what === 'all') {
-  const out = `${C}deployments/guard-tapeout.json`;
-  if (!existsSync(out)) fail('deployments/guard-tapeout.json not found: run the GuardTapeout forge command first');
+  if (existsSync(NET_FILE)) Object.assign(net, { ...JSON.parse(readFileSync(NET_FILE, 'utf8')), ...(REHEARSAL ? { rpcUrl: REHEARSAL, rpcUrl2: REHEARSAL } : {}) });
+  const out = GUARD_OUT;
+  if (!existsSync(out)) fail(`${out} not found: run the GuardTapeout forge command first`);
   const id = json(out).guardCircuitId;
   const [mintTx, tapeoutTx] = txsOf(`${C}broadcast/GuardTapeout.s.sol/196/run-latest.json`);
   if (!tapeoutTx) fail('expected two transactions (mint, tape-out)');
@@ -63,10 +72,16 @@ if (what === 'circuit' || what === 'all') {
   const t = await onMainnet(tapeoutTx);
   if (getAddress(t.to) !== getAddress(net.tapeout.processor)) fail('the tape-out was not sent to processor #101');
   // the 512-row check, on both RPCs, before anything is recorded as verified
-  const v = spawnSync(process.execPath, [`${ROOT}packages/circuit/scripts/verify-mainnet.ts`, net.tapeout.processor, String(id), 'guard'], { encoding: 'utf8' });
+  const v = spawnSync(process.execPath, [`${ROOT}packages/circuit/scripts/verify-mainnet.ts`, net.tapeout.processor, String(id), 'guard'], { encoding: 'utf8', env: REHEARSAL ? { ...process.env, SIGNET_VERIFY_RPCS: REHEARSAL } : process.env });
   process.stdout.write(v.stdout);
   if (v.status !== 0) fail(`verify-mainnet failed:\n${v.stderr}`);
   const block = Number(v.stdout.match(/pinned block (\d+)/)[1]);
+  if (REHEARSAL) {
+    net.tapeout.guardCircuitId = id;
+    writeFileSync(NET_FILE, JSON.stringify(net, null, 2) + '\n');
+    console.log(`rehearsal: Guard decision circuit #${id}, tape-out ${tapeoutTx}, 512/512 on the fork (circuit artifacts not touched)`);
+    process.exit(0);
+  }
   const art = json(`${ROOT}packages/circuit/artifacts/guard.json`);
   writeFileSync(`${ROOT}packages/circuit/artifacts/guard-deployment.json`, JSON.stringify({
     chainId: 196, network: 'X Layer mainnet', processor: net.tapeout.processor, processorIndex: 101, circuitId: id, netlistSha256: art.netlistSha256, holder: DEV,

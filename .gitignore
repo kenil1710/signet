@@ -42,3 +42,4 @@ packages/contracts/deployments/rehearsal.json
 packages/contracts/broadcast/MainnetDeploy.s.sol/
 packages/contracts/broadcast/GuardTapeout.s.sol/
 packages/contracts/deployments/guard-*.json
+packages/contracts/deployments/rehearsal-*.json

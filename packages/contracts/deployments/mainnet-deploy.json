@@ -1,0 +1,10 @@
+{
+  "factory": "0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986",
+  "gateImplementation": "0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D",
+  "predictedSiteGate": "0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503",
+  "registry": "0x98dB5B6B1545D0fb374da40a02045B93398E0589",
+  "step1Block": 76226314,
+  "siteGate": {
+    "siteGate": "0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503"
+  }
+}

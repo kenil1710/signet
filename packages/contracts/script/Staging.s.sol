@@ -117,6 +117,27 @@ contract Staging is Script {
         return vm.serializeString(key, "prefix", prefix);
     }
 
+    /// For a deployment made by the MAINNET scripts (staging/rehearse-mainnet-full.sh): there the factory's first gate
+    /// is already Signet's site gate, so only the demo project's gate is added, as any user would: commit, then
+    /// (2 blocks later) create. Writes .gates.demo.
+    function demoCommit() external {
+        _init();
+        SignetFactory factory = SignetFactory(vm.parseJsonAddress(vm.readFile(OUT), ".contracts.factory"));
+        vm.startBroadcast(acct[0]);
+        factory.commit(factory.commitmentOf(DEMO_DOMAIN, _salt(DEMO_DOMAIN), acct[0]));
+        vm.stopBroadcast();
+    }
+
+    function demoGate() external {
+        _init();
+        SignetFactory factory = SignetFactory(vm.parseJsonAddress(vm.readFile(OUT), ".contracts.factory"));
+        vm.startBroadcast(acct[0]);
+        address demo = _create(factory, DEMO_DOMAIN);
+        vm.stopBroadcast();
+        vm.writeJson(_gateJson("demo", demo, DEMO_DOMAIN, string.concat("projects/", DEMO_DOMAIN, "/")), OUT, ".gates.demo");
+        console2.log("demo project gate:", demo);
+    }
+
     /// One release, end to end, on the demo gate. Each actor sends their own transaction.
     function smoke() external {
         _init();

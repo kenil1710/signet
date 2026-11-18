@@ -4,7 +4,7 @@
 **Benchmark (staging):** against the same 12 attacks, SRI alone blocks 2, a hash-only checker 7, **Signet 12**, with **0 false blocks** ([`docs/benchmark.md`](docs/benchmark.md)).
 **Verify it yourself:** `pnpm install && pnpm verify:claims` (read-only, about 2 minutes, checks [`CLAIMS.md`](CLAIMS.md) against X Layer mainnet).
 **Live dashboard:** _not deployed yet (placeholder: https://…)._ Run it locally: [`docs/TRY-IT-LOCALLY.md`](docs/TRY-IT-LOCALLY.md).
-**On mainnet:** release-policy circuit **#6** on processor #101 `0x73153e5fd2Acac604D49d6ca9fea27b750718F22`. SignetRegistry, SignetFactory and the Guard circuit: _not deployed yet (placeholders)_; costed plan in [`docs/mainnet-plan.md`](docs/mainnet-plan.md).
+**On mainnet** ([`docs/mainnet.md`](docs/mainnet.md)): release-policy circuit **#6** and Guard decision circuit **#7** on processor #101 `0x73153e5fd2Acac604D49d6ca9fea27b750718F22`; SignetRegistry [`0x98dB5B6B…0589`](https://www.oklink.com/xlayer/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589), SignetFactory [`0xc5e12ffe…7986`](https://www.oklink.com/xlayer/address/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986), Signet's site gate for `signetguard.xyz` [`0xa3d4dfb5…4503`](https://www.oklink.com/xlayer/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503).
 **Honest limit:** users without Guard are not protected at signing; the watchtower alerts their team instead ([`THREAT_MODEL.md`](THREAT_MODEL.md)).
 **Judges:** start with [`JUDGES.md`](JUDGES.md) (5 minutes). Machine-readable: [`claims.json`](claims.json), [`llms.txt`](llms.txt).
 

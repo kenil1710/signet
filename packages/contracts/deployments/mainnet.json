@@ -3,8 +3,18 @@
   "chainId": 196,
   "rpcUrl": "https://xlayerrpc.okx.com",
   "rpcUrl2": "https://xlayer.drpc.org",
-  "contracts": {},
-  "gates": {},
+  "contracts": {
+    "registry": "0x98dB5B6B1545D0fb374da40a02045B93398E0589",
+    "factory": "0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986",
+    "gateImplementation": "0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D"
+  },
+  "gates": {
+    "site": {
+      "address": "0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503",
+      "domain": "signetguard.xyz",
+      "prefix": "signet/signetguard.xyz/"
+    }
+  },
   "tapeout": {
     "processor": "0x73153e5fd2Acac604D49d6ca9fea27b750718F22",
     "policyCircuitId": 6,
@@ -14,6 +24,15 @@
     "siteRegistry": "0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6",
     "containerOpener": "0x536adD8F30f03b69f6fbF29d425A816A0dC50106",
     "sharedCircuitId": 5,
-    "sharedContainer": "0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed"
-  }
+    "sharedContainer": "0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed",
+    "guardCircuitId": 7
+  },
+  "deployBlock": 76226335,
+  "deployTxs": [
+    "0x2cda992a97393d2d222f51918df0d9395433b4a78f975cd3a77cc77af17aec7c",
+    "0x92616ab4773a6bdc368420496b724a1d9efcb927b5ee6b0425b7e08dfaedc817",
+    "0x4fc13b49efd3150e231865da8c82d347386fab03c1605e0d4e3ca3b6f6b19ba5",
+    "0x5d9c3753da8dc0785df5cad2bf720923e5b2a8005cf455d19d33465adcb239c1",
+    "0x939aa45b92ff1bdc81f5a46dbce93b1f1ae9164177160d43c272ff2a4776eac4"
+  ]
 }

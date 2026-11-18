@@ -232,8 +232,10 @@ for (const c of CLAIMS.filter((x) => only.length === 0 || only.includes(x.id))) 
     r = fail(`error: ${(e as Error).message.split('\n')[0]}`);
   }
   if (r.status === 'FAIL') failed++;
-  results.push({ id: c.id, kind: c.kind, claim: c.text, status: r.status, detail: r.detail });
-  console.log(`${r.status.padEnd(7)} ${c.id} [${c.kind}] ${c.text}\n        ${r.detail}`);
+  // a "pending" claim that now passes is about something that is on mainnet: label and count it as mainnet
+  const kind = c.kind === 'pending' && r.status === 'PASS' ? 'mainnet' : c.kind;
+  results.push({ id: c.id, kind, claim: c.text, status: r.status, detail: r.detail });
+  console.log(`${r.status.padEnd(7)} ${c.id} [${kind}] ${c.text}\n        ${r.detail}`);
 }
 // every claim id must also be in CLAIMS.md
 const md = read('CLAIMS.md');
@@ -242,7 +244,7 @@ if (missing.length) {
   failed++;
   console.log(`FAIL    CLAIMS.md does not list ${missing.join(', ')}`);
 }
-const counts = (s: string) => CLAIMS.filter((c) => c.kind === s).length;
+const counts = (s: string) => results.filter((c) => c.kind === s).length;
 console.log(`\n${failed === 0 ? 'ALL CHECKS PASSED' : `${failed} FAILED`} (${counts('mainnet')} on mainnet, ${counts('repo')} from the repo, ${counts('pending')} pending deployment)`);
 if (writeJson) {
   // claims.json at the repo root: the same claims, their kind, and the result of this run (CLAIMS.md has the evidence)
