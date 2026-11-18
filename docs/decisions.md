@@ -341,3 +341,13 @@ Found while building it:
 | **Every verifier rebuilds the same leaves** from `files.json`: the CLI (`merkle.ts leavesOf`) and the shared extension library (`sealed.ts leavesOf`), used by Guard, the gateway, the dashboard and the watchtower. Cross-checked by a unit test on a build with a chunked file. | |
 
 Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unchanged. Staging was redeployed for the new registry.
+
+## 2026-11-18 — Landing page
+
+| Decision | Why |
+|---|---|
+| The landing page is `packages/dashboard/index.html`; the dashboard and `/prove` moved to `app.html` with the same hash routes, and old `index.html#/…` links redirect. | The design uses in-page anchors (`#rule`, `#proof`, …) that clash with the hash router. Two pages also keep viem (377 KB) off the landing page. |
+| The policy simulator looks every answer up in circuit #6's truth table (`policy.json` `expected`); the page code only maps controls to the 9 bits and words the answer. Tested on all 512 rows. | The page must show the real rule, not a re-implementation. The design's own function differed on UNFREEZE. |
+| The proof terminal shows lines copied from a real `pnpm verify:claims` run (`src/landing/verify-output.ts`). | No invented output. |
+| All outside links live in `src/landing/config.ts`; any `TODO` value renders as a disabled link. | We have no public repo, Web Store listing, X or Telegram yet. |
+| The 3D seal loads after first paint, draws only while the tab is visible and the seal is showing, caps the pixel ratio at 2, and builds in short steps. | Performance on phones. |

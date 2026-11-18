@@ -54,7 +54,7 @@ before(async () => {
   assert.equal(b.status, 0, b.stdout + b.stderr);
   const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
   server = http.createServer((req, res) => {
-    const rel = req.url!.split('?')[0] === '/' ? 'index.html' : req.url!.split('?')[0]!.slice(1);
+    const rel = req.url!.split('?')[0] === '/' ? 'app.html' : req.url!.split('?')[0]!.slice(1);
     const f = join(dist, rel);
     if (!existsSync(f)) return void ((res.statusCode = 404), res.end());
     res.setHeader('content-type', types[extname(f)] ?? 'application/octet-stream');

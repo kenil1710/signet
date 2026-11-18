@@ -1,13 +1,392 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Signet dashboard</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <div id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signet</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%23D63D27%27/%3E%3Ctext x=%2716%27 y=%2722%27 text-anchor=%27middle%27 font-family=%27Arial%27 font-weight=%27700%27 font-size=%2717%27 fill=%27%23fff%27%3ES%3C/text%3E%3C/svg%3E">
+<meta name="description" content="Signet seals every release of a dApp's website on X Layer; users who run Guard are refused anything the team didn't seal.">
+<script>/* old dashboard links (#/prove, #/p/…) now live on app.html */ if (location.hash.indexOf('#/') === 0) location.replace('app.html' + location.hash);</script>
+<script type="module" src="/src/landing/main.ts"></script>
+</head>
+<body>
+<div id="loader" aria-hidden="true"><b>Signet</b><span class="num" id="ldN">000</span><div class="bar"><i></i></div></div>
+
+<canvas id="seal-gl" aria-hidden="true"></canvas>
+<div class="heat" aria-hidden="true"></div>
+
+<header id="hdr">
+  <div class="wrap nav">
+    <a class="brand" href="#hero">
+      <svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#C8452F"/><circle cx="14" cy="14" r="10" fill="none" stroke="#8E2B1C" stroke-width="1" stroke-dasharray="2 2"/><path d="M17.5 9.5c-.8-1.3-2.1-2-3.6-2-2.2 0-3.7 1.3-3.7 3.1 0 1.8 1.4 2.6 3.9 3.2 1.9.5 2.8 1 2.8 2.2 0 1.2-1.2 2-2.8 2-1.7 0-3-.8-3.6-2.1" fill="none" stroke="#FFF4EC" stroke-width="2" stroke-linecap="round"/></svg>
+      Signet
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#attack">The attack</a>
+      <a href="#how">How it works</a>
+      <a href="#rule">The rule</a>
+      <a href="#proof">Proof</a>
+      <a href="#teams">For teams</a>
+    </nav>
+    <div class="nav-r">
+      <span class="chain"><i></i>X LAYER · 196</span>
+      <a class="btn btn-wax" href="#cta">Add Guard</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- HERO: pinned, three beats -->
+  <section id="hero" data-beat="0" aria-label="Signet">
+    <div class="h-type" aria-hidden="false">
+      <h1 class="stamp">
+        <span class="h-l1"><span>Your contracts are audited.</span></span>
+        <span class="h-l2"><span>Your website</span> <span><em>isn't.</em></span></span>
+      </h1>
+    </div>
+    <div class="h-ui">
+      <div class="hud l" aria-hidden="true">
+        <div class="hi"><span class="k">Release</span><span class="v" id="hRel">#42 · demoswap.xyz</span></div>
+        <div class="hi"><span class="k">Chain</span><span class="v">X Layer mainnet · 196</span></div>
+        <div class="hi alert"><span class="k">Files</span><span class="v" id="hFiles">7 / 7 match the seal</span></div>
+      </div>
+      <div class="hud r" aria-hidden="true">
+        <div class="hi"><span class="k">Policy</span><span class="v">TapeOut circuit #6</span></div>
+        <div class="beats" aria-hidden="true"><span class="on" data-b="0">01 SEALED</span><span data-b="1">02 TAMPERED</span><span data-b="2">03 BLOCKED</span></div>
+        <div class="hi alert safe"><span class="k">Status</span><span class="v" id="hStat">Sealed · 2 of 3 approved</span></div>
+      </div>
+      <div class="h-foot">
+        <div class="wrap">
+          <p class="lede" id="lede">Signet seals every release of your dApp's website on X Layer, so anyone can check that the page in front of them is the one the team approved.</p>
+          <div class="cta-row">
+            <a class="btn btn-wax" href="#cta" data-link="chromeWebStore">Add Guard to Chrome<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+            <a class="btn btn-line" href="#teams">Protect your dApp</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="h-prog" aria-hidden="true"><i></i></div>
+  </section>
+
+  <!-- INCIDENT TAPE -->
+  <div class="tape" aria-label="Past frontend attacks">
+    <div class="mq-track">
+      <div class="mq-item"><b>Bybit / Safe{Wallet}</b><span>tampered JavaScript</span><span class="tag">~$1.5B</span></div>
+      <div class="mq-item"><b>BadgerDAO</b><span>injected script</span><span class="tag">~$120M</span></div>
+      <div class="mq-item"><b>Ledger Connect Kit</b><span>poisoned npm package</span><span class="tag">wallet drainer</span></div>
+      <div class="mq-item"><b>Curve Finance</b><span>DNS hijack</span><span class="tag">frontend</span></div>
+      <div class="mq-item"><b>CoW Swap</b><span>domain hijack</span><span class="tag">frontend</span></div>
+      <div class="mq-item"><b>Aerodrome</b><span>DNS hijack</span><span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Bybit / Safe{Wallet}</b><span>tampered JavaScript</span><span class="tag">~$1.5B</span></div>
+      <div class="mq-item" aria-hidden="true"><b>BadgerDAO</b><span>injected script</span><span class="tag">~$120M</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Ledger Connect Kit</b><span>poisoned npm package</span><span class="tag">wallet drainer</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Curve Finance</b><span>DNS hijack</span><span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>CoW Swap</b><span>domain hijack</span><span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Aerodrome</b><span>DNS hijack</span><span class="tag">frontend</span></div>
+    </div>
+  </div>
+
+  <!-- ATTACK replay -->
+  <section id="attack" aria-label="What your users see">
+    <div class="wrap" style="padding-top:150px">
+      <div class="shead">
+        <span class="label">01 / What users see</span>
+        <div>
+          <h2 class="stamp h2">Same page.<br><em>Different code.</em></h2>
+          <p class="sub">A swapped file doesn't change how the site looks. Scroll to watch one attack from the user's side.</p>
+        </div>
+      </div>
+    </div>
+    <div class="atk-pin">
+      <div class="wrap atk">
+        <div class="atk-left">
+          <div class="rail"><i></i></div>
+          <div class="steps">
+            <div class="step"><span class="label">Step 1 of 4</span><h3 class="stamp">A normal release.</h3><p>The team ships version 42. Signet fingerprints every file and seals the set on X Layer.</p></div>
+            <div class="step"><span class="label">Step 2 of 4</span><h3 class="stamp">One file is swapped.</h3><p>A leaked CDN key, a hijacked domain, a poisoned package. One script changes and nobody on the team notices.</p></div>
+            <div class="step"><span class="label">Step 3 of 4</span><h3 class="stamp">The wallet asks to sign.</h3><p>The button still says Swap. The transaction underneath sends the tokens somewhere else.</p><div class="ticker num"><span id="tick">$0</span><small>left Bybit this way in February 2025</small></div></div>
+            <div class="step"><span class="label">Step 4 of 4</span><h3 class="stamp">Guard stops it.</h3><p>The page no longer matches its seal, so the request never reaches the wallet. The user gets the verified copy.</p><div class="ticker saved num">$0<small>sent by a user running Guard</small></div></div>
+          </div>
+        </div>
+        <div class="browser">
+          <div class="b-bar">
+            <div class="b-dots"><i></i><i></i><i></i></div>
+            <div class="b-url"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="5" width="8" height="6" rx="1.5" fill="#6E6560"/><path d="M4 5V3.5a2 2 0 014 0V5" stroke="#6E6560" stroke-width="1.3" fill="none"/></svg>app.demoswap.xyz</div>
+            <span class="badge badge-ok" id="bOk">● Sealed #42</span>
+            <span class="badge badge-bad" id="bBad">● Seal broken</span>
+          </div>
+          <div class="b-body">
+            <div class="dapp">
+              <h4>Swap</h4>
+              <div class="field"><div><small>You pay</small><b class="num">2,500.00</b></div><span class="tok">USDT</span></div>
+              <div class="field"><div><small>You receive</small><b class="num">≈ market</b></div><span class="tok">OKB</span></div>
+              <div class="swapbtn">Swap</div>
+            </div>
+            <div class="files">
+              <span class="ttl">Release #42 · sealed files</span>
+              <div class="frow"><span>index.html</span><span class="st">match</span></div>
+              <div class="frow" id="fApp"><span>assets/app-2aa5a3e0.js</span><span class="st" id="fAppSt">match</span></div>
+              <div class="frow"><span>assets/vendor-91c0.js</span><span class="st">match</span></div>
+              <div class="frow"><span>assets/style-77e1.css</span><span class="st">match</span></div>
+              <div class="frow"><span>manifest.json</span><span class="st">match</span></div>
+              <div class="frow bad new" id="fNew"><span>cdn-cgi/loader.js</span><span class="st">not sealed</span></div>
+            </div>
+          </div>
+          <div class="diff" id="diff">
+            <div class="hd"><span>assets/app-2aa5a3e0.js</span><span>+1 line</span></div>
+            <div class="rm">  const tx = buildSwap(route, amount);</div>
+            <div class="add">+ if (amount &gt; 1000) tx.to = "0x9f3c…e21a";</div>
+            <div class="rm">  return wallet.sendTransaction(tx);</div>
+          </div>
+          <div class="wallet" id="wallet">
+            <div class="wt"><span>Wallet</span><span>X Layer</span></div>
+            <h5>Confirm transaction</h5>
+            <div class="kv"><span>Action</span><span>Swap</span></div>
+            <div class="kv"><span>Send to</span><span>0x9f3c…e21a</span></div>
+            <div class="kv"><span>Amount</span><span class="num">2,500 USDT</span></div>
+            <div class="wb"><div>Reject</div><div>Confirm</div></div>
+          </div>
+          <div class="blocked" id="blocked">
+            <svg width="60" height="60" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4a28 28 0 1 0 0 56" fill="none" stroke="#FFF6F3" stroke-width="3"/><path d="M36 4.3A28 28 0 0 1 36 59.7" fill="none" stroke="#FFF6F3" stroke-width="3" opacity=".5"/><path d="M33 2l-4 14 6 6-6 10 5 8-4 22" fill="none" stroke="#FFF6F3" stroke-width="2.5" stroke-linejoin="round"/></svg>
+            <h4>Stop. This site's seal is broken.</h4>
+            <p>Signet stopped this page from asking your wallet to sign. Nothing was sent.</p>
+            <div class="bb"><span>Open the verified copy</span><span>Leave this site</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW -->
+  <section id="how" aria-label="How Signet works">
+    <div class="wrap how-head">
+      <div class="shead">
+        <span class="label">02 / How it works</span>
+        <div>
+          <h2 class="stamp h2">Seal. Approve.<br><em>Guard.</em></h2>
+          <p class="sub">Set it up once. After that, every release takes the same path, and your contracts don't change.</p>
+        </div>
+      </div>
+    </div>
+    <div class="h-pin">
+      <div class="h-track">
+        <article class="panel" id="p1">
+          <div class="pl">
+            <span class="idx">01</span>
+            <h3 class="stamp">Every build gets a fingerprint.</h3>
+            <p>Your CI hashes each file and lists the contracts the site may call. That set becomes a release proposal on X Layer.</p>
+            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="#D63D27" stroke-width="1.4"/><path d="M8 4.5v4M8 11v.5" stroke="#D63D27" stroke-width="1.6" stroke-linecap="round"/></svg><span>A stolen CI key can propose a release. It can never approve one.</span></div>
+          </div>
+          <div class="pr">
+            <div class="term" id="term1">
+              <div class="ln"><span class="p">$</span> signet seal dist</div>
+              <div class="ln dim">  hashing 7 files…</div>
+              <div class="ln"><span class="ok">  ✓</span> index.html             <span class="dim">9f2c…41aa</span></div>
+              <div class="ln"><span class="ok">  ✓</span> assets/app-2aa5a3e0.js <span class="dim">51d0…c3e9</span></div>
+              <div class="ln"><span class="ok">  ✓</span> assets/vendor-91c0.js  <span class="dim">0be4…77d2</span></div>
+              <div class="ln"><span class="ok">  ✓</span> allowlist              <span class="dim">3 contracts</span></div>
+              <div class="ln"><span class="ok">  ✓</span> origins                <span class="dim">no change</span></div>
+              <div class="ln"><span class="p">  →</span> proposed release #43 <span class="dim">· tier 00 · code only</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="panel" id="p2">
+          <div class="pl">
+            <span class="idx">02</span>
+            <h3 class="stamp">A TapeOut circuit makes the call.</h3>
+            <p>Approvals and waiting time go into circuit #6, a fixed NAND circuit on X Layer. Riskier changes need more people and a longer wait.</p>
+            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="#D63D27" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#D63D27" stroke-width="1.4" fill="none"/></svg><span>Its beacon has no owner. Nobody can change the rule, including us.</span></div>
+          </div>
+          <div class="pr">
+            <div class="appr">
+              <div class="who ci"><span class="av">CI</span>CI key proposed #43<span class="stt">can't approve</span></div>
+              <div class="who" id="wA"><span class="av">A</span>Approver A<span class="stt">waiting</span></div>
+              <div class="who" id="wB"><span class="av">B</span>Approver B<span class="stt">waiting</span></div>
+              <div class="who"><span class="av">C</span>Approver C<span class="stt">waiting</span></div>
+            </div>
+            <div class="lock">
+              <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="none" stroke="#2A2522" stroke-width="3"/><circle id="tlRing" cx="22" cy="22" r="19" fill="none" stroke="#D63D27" stroke-width="3" stroke-dasharray="119.4" stroke-dashoffset="119.4" transform="rotate(-90 22 22)"/></svg>
+              <div><b class="num" id="tlTxt">1:00:00</b><small>timelock for this risk tier</small></div>
+            </div>
+            <div class="out"><span>circuit #6 → PUBLISH</span><span class="lamp" id="pubLamp"><i></i><span id="pubVal">0</span></span></div>
+          </div>
+        </article>
+        <article class="panel" id="p3">
+          <div class="pl">
+            <span class="idx">03</span>
+            <h3 class="stamp">Users are checked as they sign.</h3>
+            <p>Guard reads the sealed release from two separate X Layer nodes, compares it with the page, and only then lets the wallet open.</p>
+            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l5.5 2v4c0 3.3-2.3 6-5.5 7-3.2-1-5.5-3.7-5.5-7v-4z" fill="none" stroke="#D63D27" stroke-width="1.4"/></svg><span>Built for browser wallets that use the standard EIP-1193 connection.</span></div>
+          </div>
+          <div class="pr">
+            <div class="nodes">
+              <div class="node"><small>Node 1</small>xlayerrpc.okx.com<span>release #43 · 0x51d0…</span></div>
+              <div class="node"><small>Node 2</small>xlayer.drpc.org<span>release #43 · 0x51d0…</span></div>
+            </div>
+            <div class="agree"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.8" fill="none"/></svg>both nodes agree</div>
+            <div class="checks">
+              <div class="chk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.2l3 3 6-6.5" stroke="#5AD9A0" stroke-width="1.8" fill="none"/></svg>7 of 7 files match the seal</div>
+              <div class="chk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.2l3 3 6-6.5" stroke="#5AD9A0" stroke-width="1.8" fill="none"/></svg>Contract is on the sealed allowlist</div>
+              <div class="chk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.2l3 3 6-6.5" stroke="#5AD9A0" stroke-width="1.8" fill="none"/></svg>Signature request passed to the wallet</div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- RULE -->
+  <section class="sec" id="rule">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">03 / The rule</span>
+        <div>
+          <h2 class="stamp h2">A rule nobody<br><em>can change.</em></h2>
+          <p class="sub">Pick who approved, what changed and how long it has waited. The release policy answers the way circuit #6 does on X Layer.</p>
+        </div>
+      </div>
+      <div class="sim">
+        <div class="ctrl">
+          <div class="cgroup"><span id="lblApp">Who approved</span>
+            <div class="toggles" role="group" aria-labelledby="lblApp">
+              <button class="tg" id="ap-a" aria-pressed="true" type="button">Approver A</button>
+              <button class="tg" id="ap-b" aria-pressed="false" type="button">Approver B</button>
+              <button class="tg" id="ap-c" aria-pressed="false" type="button">Approver C</button>
+            </div></div>
+          <div class="cgroup"><span id="lblTier">What changed</span>
+            <div class="seg" role="radiogroup" aria-labelledby="lblTier">
+              <button class="tg" id="tier-0" role="radio" aria-checked="true" type="button">Code only<small>tier 00</small></button>
+              <button class="tg" id="tier-1" role="radio" aria-checked="false" type="button">New origin<small>tier 01</small></button>
+              <button class="tg" id="tier-2" role="radio" aria-checked="false" type="button">New contract<small>tier 10</small></button>
+              <button class="tg" id="tier-3" role="radio" aria-checked="false" type="button">Admin<small>tier 11</small></button>
+            </div></div>
+          <div class="cgroup"><label for="wait">Time since approvals were reached</label>
+            <input class="range" id="wait" type="range" min="0" max="2" step="1" value="1">
+            <div class="rlabels"><span>under 1 h</span><span>1 h+</span><span>24 h+</span></div></div>
+          <div class="cgroup"><span id="lblSw">Switches</span>
+            <div class="toggles" role="group" aria-labelledby="lblSw">
+              <button class="tg" id="sw-f" aria-pressed="false" type="button">Frozen</button>
+              <button class="tg" id="sw-e" aria-pressed="false" type="button">Emergency</button>
+            </div></div>
+        </div>
+        <div class="board">
+          <div class="bits" id="bits"></div>
+          <canvas id="gates" aria-hidden="true"></canvas>
+          <div class="outs">
+            <div class="outbox" id="oPub"><b>PUBLISH</b><span id="oPubV">0</span></div>
+            <div class="outbox" id="oUnf"><b>UNFREEZE</b><span id="oUnfV">0</span></div>
+          </div>
+          <p class="why" id="why" aria-live="polite"></p>
+          <p class="fine">9 inputs, 34 NAND gates, 512 possible cases. UNFREEZE is 1 whenever two approve; the gate only uses it while frozen. The wiring above is drawn for clarity; the real netlist is public on X Layer.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENCH -->
+  <section class="sec" id="bench" style="padding-top:40px">
+    <div class="wrap bench">
+      <div>
+        <span class="label">04 / Benchmark</span>
+        <h2 class="stamp h2" style="margin-top:22px">12 attacks.<br><em>12 stopped.</em></h2>
+        <p class="sub">The same twelve attack types, run against three kinds of protection.</p>
+        <div class="statrow">
+          <div><b class="num">0</b><span>false blocks</span></div>
+          <div><b class="num">16</b><span>clean sessions tested</span></div>
+        </div>
+        <p class="limit">Guard protects people who have it installed. Visitors without it aren't blocked; the watchtower alerts the team instead.</p>
+      </div>
+      <div>
+        <div class="bars">
+          <div class="bar" style="--h:16.67%"><div class="val num"><span data-count="2">2</span><small>/12</small></div><div class="fill"></div></div>
+          <div class="bar" style="--h:58.33%"><div class="val num"><span data-count="7">7</span><small>/12</small></div><div class="fill"></div></div>
+          <div class="bar sig" style="--h:100%"><div class="val num"><span data-count="12">12</span><small>/12</small></div><div class="fill"></div></div>
+        </div>
+        <div class="blabels">
+          <div><b>Subresource Integrity</b>SRI tags only</div>
+          <div><b>Page hash check</b>hash-only extension</div>
+          <div><b>Signet</b>seal + Guard</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROOF -->
+  <section class="sec" id="proof" style="padding-top:60px">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">05 / Proof</span>
+        <div>
+          <h2 class="stamp h2">Don't trust us.<br><em>Check it.</em></h2>
+          <p class="sub">One read-only command checks the claims on this page: the on-chain ones against X Layer mainnet, the rest against this repo. No wallet, no keys.</p>
+        </div>
+      </div>
+      <div class="proof">
+        <div class="shell">
+          <div class="top"><i></i><i></i><i></i><span style="margin-left:8px">signet</span></div>
+          <pre id="shell"><span class="p">$</span> pnpm verify:claims</pre>
+        </div>
+        <div class="facts-list">
+          <div class="fl"><small>TapeOut processor #101 · X Layer mainnet</small>
+            <div class="addr"><span id="proc">0x73153e5fd2Acac604D49d6ca9fea27b750718F22</span><button class="copy" type="button" id="copyProc">Copy</button></div></div>
+          <div class="fl"><small>Release policy</small><b>Circuit #6 · 34 NAND · 9 inputs · 2 outputs</b></div>
+          <div class="fl"><small>Upgrade keys</small><b>None on the circuit. Its beacon owner is 0x0.</b></div>
+          <div class="fl"><small>In your browser</small><b><a href="#proof" data-link="prove">Open the proof page</a></b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEAMS -->
+  <section class="sec" id="teams" style="padding-top:60px">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">06 / For teams</span>
+        <div>
+          <h2 class="stamp h2">Ten minutes<br><em>to set up.</em></h2>
+          <p class="sub">Add one step to your deploy. Nothing changes in your contracts or your code. Always free for your users.</p>
+        </div>
+      </div>
+      <div class="plans">
+        <div class="plan"><h3 class="stamp">Free</h3><p>One domain, sealed releases, Guard protection for every visitor who has it, public alerts.</p><span class="pp">$0 · start now</span></div>
+        <div class="plan hl"><h3 class="stamp">Pro</h3><p>Three domains, a watchtower that checks every minute, private alerts, the release diff view, a verified copy hosted on X Layer and the "Sealed by Signet" badge.</p><span class="pp">early access</span></div>
+        <div class="plan"><h3 class="stamp">Enterprise</h3><p>Setup done with your team, incident support, five-approver policies and an API for wallets.</p><span class="pp">talk to us</span></div>
+      </div>
+      <div class="cta-row" style="margin-top:40px">
+        <a class="btn btn-wax" href="#teams" data-link="setupGuide">Read the setup guide<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+        <a class="btn btn-line" href="#teams" data-link="telegram">Talk to us on Telegram</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINALE -->
+  <section id="cta">
+    <span class="ring" id="ring" aria-hidden="true"></span>
+    <div class="wrap">
+      <h2 class="stamp h2">Seal your<br><em>next release.</em></h2>
+      <div class="cta-row">
+        <a class="btn btn-wax" href="#hero" data-link="chromeWebStore">Add Guard to Chrome, free<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+        <a class="btn btn-line" href="#teams">Protect your dApp</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="brand" href="#hero"><svg width="24" height="24" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#C8452F"/><path d="M17.5 9.5c-.8-1.3-2.1-2-3.6-2-2.2 0-3.7 1.3-3.7 3.1 0 1.8 1.4 2.6 3.9 3.2 1.9.5 2.8 1 2.8 2.2 0 1.2-1.2 2-2.8 2-1.7 0-3-.8-3.6-2.1" fill="none" stroke="#FFF4EC" stroke-width="2" stroke-linecap="round"/></svg>Signet</a>
+        <p style="color:var(--muted);font-size:14px;margin-top:14px;max-width:300px">Release protection for dApp websites. Built on X Layer and TapeOut.</p>
+      </div>
+      <div><h4>Product</h4><a href="#cta" data-link="chromeWebStore">Guard for Chrome</a><a href="#teams">For teams</a><a href="#rule">The rule</a></div>
+      <div><h4>Trust</h4><a href="#proof" data-link="prove">Proof page</a><a href="#proof" data-link="threatModel">Threat model</a><a href="#proof" data-link="claims">Claims</a></div>
+      <div><h4>Community</h4><a href="#hero" data-link="github">GitHub</a><a href="#hero" data-link="x">X</a><a href="#hero" data-link="telegram">Telegram</a></div>
+    </div>
+    <div class="bigword" aria-hidden="true">Signet</div>
+    <div class="legal"><span>Signet · 2026</span><span>Not affiliated with OKX. X Layer and TapeOut belong to their owners.</span></div>
+  </div>
+</footer>
+
+</body>
 </html>

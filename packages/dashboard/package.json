@@ -6,10 +6,15 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "@signet/circuit": "workspace:*",
     "@signet/cli": "workspace:*",
     "@signet/contracts": "workspace:*",
     "@signet/extension": "workspace:*",
+    "gsap": "3.12.5",
+    "lenis": "1.1.13",
+    "three": "0.160.0",
     "viem": "^2.57.20"
   },
   "scripts": {
@@ -17,10 +22,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts"
+    "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts",
+    "test": "node --test test/*.test.ts",
+    "site:check": "node test/site-check.ts"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.7",
+    "@types/three": "0.160.0",
     "playwright": "1.56.1",
     "typescript": "^5.6.3",
     "vite": "^8.3.8"
