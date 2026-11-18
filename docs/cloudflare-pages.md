@@ -14,8 +14,13 @@ npx wrangler@4 pages project create signet --production-branch main   # once
 npx wrangler@4 pages deploy dist --project-name signet --branch main --commit-dirty=true
 ```
 
-The deploy prints a `https://<hash>.signet-XXX.pages.dev` URL; the production alias is `https://signet-XXX.pages.dev`
-(Cloudflare picks the exact subdomain).
+**Live:** Cloudflare Pages project `signet`, production URL **https://signet-6l4.pages.dev** (first deployed
+2026-11-18). Each deploy also gets its own `https://<hash>.signet-6l4.pages.dev` URL.
+
+The project was created with `wrangler pages project create signet --production-branch main --force`.
+wrangler 4.164 otherwise routes new Pages projects to Workers, and that failed. `--force` is needed only for that
+first creation; later deploys don't use it. Cloudflare serves `/app.html` as `/app` (a 308 redirect that keeps the
+`#/…` part), so `/app.html#/prove` and `/#/prove` both end up on `/app#/prove`.
 
 ## Connect signetguard.xyz (bought on GoDaddy)
 
@@ -51,7 +56,7 @@ Cloudflare. So the domain moves its **nameservers** to Cloudflare: still free, a
 1. Cloudflare dashboard → **Workers & Pages** → the **signet** project → **Custom domains** → **Set up a custom
    domain**.
 2. Enter `signetguard.xyz` → **Continue** → **Activate domain**. Cloudflare creates the DNS record (a `CNAME`
-   `signetguard.xyz` → `signet-XXX.pages.dev`, proxied) and issues the HTTPS certificate. Status goes from
+   `signetguard.xyz` → `signet-6l4.pages.dev`, proxied) and issues the HTTPS certificate. Status goes from
    *Initializing* to **Active**, usually within a few minutes once the zone is active.
 3. Optional: repeat with `www.signetguard.xyz`. Then add a redirect from `www` to the apex (**Rules → Redirect
    Rules**, "Redirect from WWW to root" template).
@@ -64,5 +69,5 @@ dig +short NS signetguard.xyz            # the two *.ns.cloudflare.com names
 curl -sI https://signetguard.xyz | head -5    # HTTP/2 200, with the content-security-policy header
 ```
 
-Then open `https://signetguard.xyz/` and `https://signetguard.xyz/app.html#/prove`. /prove should end with
+Then open `https://signetguard.xyz/` and `https://signetguard.xyz/app#/prove`. /prove should end with
 "All checks passed (0 pending deployment)".

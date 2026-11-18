@@ -190,3 +190,12 @@ Rehearsed in full on a fork with the real inputs (all suites, attacks 12/12, rea
 - 7 transactions, 0.002171256509462825 OKB.
 
 `verify:claims`: 9 on mainnet, 10 from the repo, 0 pending; /prove on mainnet all verified. Fixed after the deploy: drpc's 3-call batch limit (it broke /prove and Guard's site check on mainnet). OKLink source verification is waiting for an API key.
+
+## Site on Cloudflare Pages (2026-11-18)
+
+Production URL **https://signet-6l4.pages.dev** (Pages project `signet`); signetguard.xyz is waiting on the GoDaddy nameserver change (`docs/cloudflare-pages.md`). Checks:
+- The mainnet build has no secrets or staging config in it.
+- Every live file is byte-identical to the checked build, and the CSP and immutable caching headers are served.
+- In a browser on the live URL: the landing page works and all four "Add Guard" buttons read "Coming soon", like every other unready link. /prove passes against mainnet ("All checks passed (0 pending deployment)").
+
+Nothing was uploaded to DeWEB and no transactions were sent.
