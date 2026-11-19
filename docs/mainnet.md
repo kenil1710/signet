@@ -47,6 +47,18 @@ Gas price paid: 0.020000001 gwei. The value in rows 6 and 7 is TapeOut's mint co
 (0.0013 OKB). signet-dev went from nonce 8 to 15, and its balance from 0.046635572562621784 to
 0.044464316053158959 OKB.
 
+## Circuit #5 moved into the site gate (2026-11-19, sent by the user from signet-dev)
+
+| Tx | Call | Block | Gas |
+|---|---|---|---|
+| `0x547047605047ba753f15a3cc41a9b29085efc9c08f332315d2ccb501e574714a` | `processor.safeTransferFrom(signet-dev, siteGate, 5)` | 76,306,374 | 77,034 |
+| `0xdcc4684be63c41c8e2c3c819d89871e4b50cc103715636d13e049a5498d9ede1` | `siteGate.renewOperator(processor, 5)` | 76,306,506 | 115,241 |
+
+After: `ownerOf(5)` = site gate `0xa3d4…4503`; `SiteRegistry.operatorOf(container #5)` = SignetRegistry;
+`operatorUntil` = 1797667542 (**2026-12-19 08:05 UTC**); `canEdit(SignetRegistry)` = true, `canEdit(signet-dev)` = false.
+Moving #5 out again needs the gate's tier-11 `TransferCircuit` (3 of 3 + 24 h). Fork-tested first (a full publish
+through the registry after the move wrote and read back its manifest files).
+
 ## Checks after the deploy
 
 - `record-mainnet` re-read all 7 receipts from xlayerrpc.okx.com and xlayer.drpc.org (both succeeded, both from
@@ -65,6 +77,6 @@ Gas price paid: 0.020000001 gwei. The value in rows 6 and 7 is TapeOut's mint co
 ## Still to do (no OKB unless stated)
 
 - Verify the source on OKX Explorer by hand: [`docs/verify/README.md`](verify/README.md) (OKLink's API login is no longer available; free, no wallet). Files checked against mainnet by `docs/verify/check.py`.
-- Renew the registry's operator grant on the shared container before **2026-12-18** (30 days; ≈ 0.000003 OKB, from signet-dev).
+- ~~Renew the registry's operator grant~~ Done differently, 2026-11-19: circuit #5 moved into the site gate (below). The grant now runs to **2026-12-19 08:05 UTC** and **anyone** can renew it with `siteGate.renewOperator(processor, 5)`. The watchtower will do it automatically (planned, `packages/watchtower/README.md`).
 - Signet's own site's first release (propose, 3 approvals, publish, upload): not done; DeWEB upload not approved.
 - Fund the CI proposer and approvers with a little OKB when they start acting (not done).

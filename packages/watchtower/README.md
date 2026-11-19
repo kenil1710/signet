@@ -31,5 +31,11 @@ seconds later. Only if that one is wrong too is the team alerted, once per disti
 when the site is clean again ("Recovered").
 
 **Not built yet:** 3 regions (it runs in one place; "two regions confirm" is two loads from the same place),
-TapeSend, X posts, the public status page, Guard telemetry, and renewing the registry's 30-day operator grant.
+TapeSend, X posts, the public status page, Guard telemetry.
+
+**Planned: auto-renew the operator grant.** Each round, read `SiteRegistry.operatorUntil(container #5)`; when fewer
+than **7 days** are left, send `siteGate.renewOperator(processor, 5)` (anyone may call it; ≈ 115k gas ≈ 0.0000024 OKB).
+Send from a **small dedicated renewer wallet** funded with a little OKB (`WATCHTOWER_RENEW_KEY`), **never signet-dev**
+or any approver/proposer key. Alert the team if the renewal fails or the wallet runs low. Current expiry:
+2026-12-19 08:05 UTC.
 See `docs/decisions.md`.

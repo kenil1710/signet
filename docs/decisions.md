@@ -385,3 +385,7 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 ## 2026-11-19: Domain proof enforced in every reader (no contract change)
 - **Decision:** Guard, the dashboard, `/prove`, the badge and the watchtower treat a domain as sealed only if it serves `/.well-known/signet.json` naming its bound gate (chain 196). Guard and the watchtower pin the confirmed gate (trust on first use); unconfirmed is grey and fail-open. Signatures on a sealed domain wait for the proof check. Our site serves the file with `Access-Control-Allow-Origin: *`; the CSP's connect-src is widened to `https:` so the dashboard can read other domains' proofs.
 - **Why:** anyone can bind an unbound domain on-chain (registry has no owner). Without the proof a squatter could turn a real site red and offer their own files as the "verified copy". Known limit: a first-time visitor during a proof-dropping hijack isn't protected. Recourse for squatted bindings (registry v2) is future work.
+
+## 2026-11-19: Circuit #5 (shared container) moved into the site gate
+- **Decision:** signet-dev transferred circuit #5 to the site gate and renewed SignetRegistry's operator grant through `renewOperator` (txs in `docs/mainnet.md`). The watchtower will auto-renew below 7 days left, from a dedicated small wallet, never signet-dev.
+- **Why:** no single human key controls every project's file store, and the 30-day grant no longer depends on one person remembering. Trade-off: a contract holder can't `publishKey`, so container #5 can't receive sealed TapeSend messages.
