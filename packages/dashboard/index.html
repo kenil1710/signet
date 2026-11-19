@@ -20,9 +20,13 @@
 
 <noscript><div class="nojs wrap">
   <h2>Signet in short</h2>
-  <p><b>Guard refuses wallet signatures your dApp's team didn't seal.</b> If a dApp's website is hacked (a swapped
-  script, a hijacked domain, a poisoned npm package), the page can't ask your wallet to approve, permit or transfer
-  to a contract or spender outside the release's sealed allowlist: Guard refuses it before the wallet opens.</p>
+  <p><b>Your contracts are audited. Your website isn't.</b> Signet protects what your users actually load: no single
+  hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign
+  anything your team didn't approve. The big front-end attacks (Bybit, BadgerDAO, Ledger Connect Kit, Curve, CoW
+  Swap) happened after GitHub: on the hosting, the CDN, a package or the domain.</p>
+  <p><b>What teams get:</b> release approvals and a timelock nobody can bypass (no single key: CI only proposes),
+  watchtower alerts, instant freeze, a verified copy (live with Pro), and a public proof and badge. <b>For users:</b>
+  Guard blocks the signature to any contract the team didn't approve.</p>
   <ul>
     <li><b>Seal:</b> CI hashes every file of a release and lists the contracts it may call; that becomes a proposal on X Layer. The CI key can only propose.</li>
     <li><b>Approve:</b> the team's approvers approve in their own wallets. TapeOut circuit #6 decides when it publishes: code only 1 approval + 1 h; a new origin 2 + 1 h; a new contract or spender 2 + 24 h; admin changes 3 of 3 + 24 h.</li>
@@ -32,6 +36,7 @@
   <p>Benchmark on a fork of X Layer: 12 of 12 attacks blocked, 0 false blocks in 16 clean sessions (SRI alone: 2/12; a hash-only checker: 7/12).</p>
   <p><a href="https://signetguard.xyz/app#/prove">Proof page</a> (re-checks the circuits on X Layer in your browser) ·
   <a href="https://signetguard.xyz/start">Setup guide for teams</a> ·
+  <a href="https://signetguard.xyz/check">Free risk check</a> ·
   <a href="https://signetguard.xyz/app">Dashboard</a> ·
   <a href="https://signetguard.xyz/docs/benchmark.md">Benchmark</a> ·
   <a href="https://signetguard.xyz/docs/THREAT_MODEL.md">Threat model</a> ·
@@ -48,11 +53,12 @@
       Signet
     </a>
     <nav class="nav-links" aria-label="Main">
-      <a href="#attack">The attack</a>
+      <a href="#path">The problem</a>
+      <a href="#get">What teams get</a>
+      <a href="#github">Why not GitHub</a>
       <a href="#how">How it works</a>
-      <a href="#rule">The rule</a>
       <a href="#proof">Proof</a>
-      <a href="#teams">For teams</a>
+      <a href="#teams">Pricing</a>
     </nav>
     <div class="nav-r">
       <span class="chain"><i></i>X LAYER · 196</span>
@@ -83,10 +89,10 @@
       </div>
       <div class="h-foot">
         <div class="wrap">
-          <p class="lede" id="lede">Guard refuses any wallet signature your team didn't seal. A hacked page can't ask for an approval, permit or transfer to a contract outside the release's allowlist, on your own domain, with approvals decided on X Layer.</p>
+          <p class="lede" id="lede">Signet protects what your users actually load: no single hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign anything your team didn't approve.</p>
           <div class="cta-row">
-            <a class="btn btn-wax" href="#cta" data-link="chromeWebStore" data-soon="Guard for Chrome: coming soon">Add Guard to Chrome<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
-            <a class="btn btn-line" href="#teams">Protect your dApp</a>
+            <a class="btn btn-wax" href="start">Protect your dApp<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+            <a class="btn btn-line" href="check">Check your site's risk, free</a>
           </div>
         </div>
       </div>
@@ -112,11 +118,79 @@
     </div>
   </div>
 
+
+  <!-- THE PROBLEM: where attacks happen -->
+  <section class="sec" id="path" aria-label="Where front-end attacks happen">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">01 / The problem</span>
+        <div>
+          <h2 class="stamp h2">GitHub was clean.<br><em>Users weren't.</em></h2>
+          <p class="sub">Your code passes review on GitHub. Then it's built, hosted, served through a CDN and a domain, and run in the browser. The big front-end attacks happened after GitHub, where nobody was looking.</p>
+        </div>
+      </div>
+      <ol class="path">
+        <li class="pn"><b>GitHub</b> <span>your reviewed code</span> <em class="ok">clean in every case below</em></li>
+        <li class="pn"><b>Build + packages</b> <span>npm dependencies</span> <em class="hit">Ledger Connect Kit, Dec 2023: a poisoned npm package drained wallets on many dApps</em></li>
+        <li class="pn"><b>Hosting / CDN</b> <span>files and scripts served</span> <em class="hit">Bybit / Safe{Wallet}, Feb 2025: one JavaScript file swapped on the hosting, ~$1.5B</em> <em class="hit">BadgerDAO, Dec 2021: a script injected through the CDN, ~$120M</em></li>
+        <li class="pn"><b>Domain / DNS</b> <span>where the name points</span> <em class="hit">Curve Finance and CoW Swap: domain hijacks sent users to a drainer</em></li>
+        <li class="pn"><b>Browser</b> <span>what your users actually load</span> <em class="ok">Signet checks here, against what your team sealed</em></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- WHAT TEAMS GET -->
+  <section class="sec" id="get" aria-label="What teams get">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">02 / What your team gets</span>
+        <div>
+          <h2 class="stamp h2">No single key.<br><em>No silent change.</em></h2>
+          <p class="sub">Signet works for your team even before any user installs anything. Your contracts don't change.</p>
+        </div>
+      </div>
+      <div class="gets">
+        <div class="gc"><h3>Release approvals nobody can bypass</h3><p>CI only proposes. Your approvers approve in their own wallets, and riskier changes wait longer. TapeOut circuit #6 on X Layer decides: no admin, no CI key and no Signet employee can skip it.</p></div>
+        <div class="gc"><h3>Watchtower alerts</h3><p>A checker loads your live site on a schedule and compares every file with the sealed release. A mismatch seen twice in a row alerts your team. Running for signetguard.xyz every 5 minutes; for your site with Pro.</p></div>
+        <div class="gc"><h3>Instant freeze</h3><p>Any one approver can freeze the gate: nothing publishes until two of three unfreeze. One transaction, from a wallet.</p></div>
+        <div class="gc"><h3>A verified copy</h3><p>When your live site doesn't match, users can be sent to a copy of the last sealed release, read from X Layer. Built and tested; live with Pro.</p></div>
+        <div class="gc"><h3>Public proof and a badge</h3><p>Every release, approval and timelock is on X Layer. Anyone can re-check it in the browser, and the "Sealed by Signet" badge links to it.</p></div>
+        <div class="gc guard"><h3>Plus, for your users: Guard</h3><p>The extra layer. Signet Guard checks the page against the seal and <b>blocks the signature</b> to any contract or spender your team didn't approve. Chrome Web Store listing coming soon.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY NOT JUST GITHUB -->
+  <section class="sec" id="github" aria-label="Why not just GitHub">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">03 / Why not just GitHub?</span>
+        <div>
+          <h2 class="stamp h2">Keep your reviews.<br><em>Then watch what ships.</em></h2>
+          <p class="sub">GitHub's required reviews and deployment environments (required reviewers, a wait timer) are good at approving code before it deploys. Use them. They can't see what happens after.</p>
+        </div>
+      </div>
+      <table class="tt gh">
+        <thead><tr><th></th><th>GitHub (reviews, environments)</th><th>Signet</th></tr></thead>
+        <tbody>
+          <tr><th>Approvals before deploy</th><td>Yes: required reviewers (one approval is enough) and a wait timer; on Free, Pro and Team plans, for public repositories</td><td>Yes, on X Layer, with more approvals and a longer wait for riskier changes</td></tr>
+          <tr><th>A compromised admin</th><td>Administrators can bypass the rules by default, and an admin can change them</td><td>No admin can skip the circuit. Changing approvers or waits takes 3 of 3 + 24 h, in public</td></tr>
+          <tr><th>Attacks after deploy (hosting, CDN, domain)</th><td>Not visible to GitHub</td><td>The watchtower and Guard compare the live files with the seal</td></tr>
+          <tr><th>Alerts when the live site changes</th><td>No</td><td>Yes: the watchtower</td></tr>
+          <tr><th>Users can verify what they load</th><td>No</td><td>Yes: Guard, /prove, the badge</td></tr>
+          <tr><th>Blocks the signature to an unapproved contract</th><td>No</td><td>Yes, with Guard</td></tr>
+          <tr><th>A public, permanent record</th><td>Logs visible to your organization</td><td>Every release and approval on X Layer</td></tr>
+        </tbody>
+      </table>
+      <p class="fine">From GitHub's documentation on deployment environments and protected branches, checked 2026-11-19.</p>
+    </div>
+  </section>
+
   <!-- ATTACK replay -->
   <section id="attack" aria-label="What your users see">
     <div class="wrap" style="padding-top:150px">
       <div class="shead">
-        <span class="label">01 / What users see</span>
+        <span class="label">04 / With Guard: what users see</span>
         <div>
           <h2 class="stamp h2">Same page.<br><em>Different code.</em></h2>
           <p class="sub">A swapped file doesn't change how the site looks. Scroll to watch one attack from the user's side.</p>
@@ -187,7 +261,7 @@
   <section id="how" aria-label="How Signet works">
     <div class="wrap how-head">
       <div class="shead">
-        <span class="label">02 / How it works</span>
+        <span class="label">05 / How it works</span>
         <div>
           <h2 class="stamp h2">Seal. Approve.<br><em>Guard.</em></h2>
           <p class="sub">Set it up once. After that, every release takes the same path, and your contracts don't change.</p>
@@ -265,7 +339,7 @@
   <section class="sec" id="rule">
     <div class="wrap">
       <div class="shead">
-        <span class="label">03 / The rule</span>
+        <span class="label">06 / The rule</span>
         <div>
           <h2 class="stamp h2">A rule nobody<br><em>can upgrade.</em></h2>
           <p class="sub">Pick who approved, what changed and how long it has waited. The release policy answers the way circuit #6 does on X Layer.</p>
@@ -326,7 +400,7 @@
   <section class="sec" id="bench" style="padding-top:40px">
     <div class="wrap bench">
       <div>
-        <span class="label">04 / Benchmark</span>
+        <span class="label">07 / Benchmark</span>
         <h2 class="stamp h2" style="margin-top:22px">12 attacks.<br><em>12 stopped.</em></h2>
         <p class="sub">The same twelve attack types, run on a fork of X Layer against three kinds of protection.</p>
         <div class="statrow">
@@ -385,7 +459,7 @@
   <section class="sec" id="proof" style="padding-top:60px">
     <div class="wrap">
       <div class="shead">
-        <span class="label">05 / Proof</span>
+        <span class="label">08 / Proof</span>
         <div>
           <h2 class="stamp h2">Don't trust us.<br><em>Check it.</em></h2>
           <p class="sub">One read-only command checks the claims on this page: the on-chain ones against X Layer mainnet, the rest against the repository. No wallet, no keys. No terminal: the proof page runs the circuit checks in your browser.</p>
@@ -412,7 +486,7 @@
   <section class="sec" id="teams" style="padding-top:60px">
     <div class="wrap">
       <div class="shead">
-        <span class="label">06 / For teams</span>
+        <span class="label">09 / For teams</span>
         <div>
           <h2 class="stamp h2">Set up in<br><em>an afternoon.</em></h2>
           <p class="sub">Five steps on the setup guide; one step added to your deploy. Nothing changes in your contracts. Your first release is tier 10: two approvals and 24 hours. After that, a code-only release needs one approval and one hour. Always free for your users.</p>

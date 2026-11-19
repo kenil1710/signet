@@ -7,6 +7,7 @@ import { makeCtx, readConfig, SignetError, CONFIG_NAME, statePath, newKeyFile, a
 import { seal } from './seal.ts';
 import { verifyDir, verifyUrl, formatReport } from './verify.ts';
 import * as cmd from './commands.ts';
+import { setup, HOSTS } from './setup.ts';
 import { loadNetwork } from './network.ts';
 
 const log = (line = '') => console.log(line);
@@ -27,8 +28,15 @@ const id = (v: string) => {
 };
 
 program.command('init')
-  .description('create the project\'s gate (3 approvers, CI proposer, recovery, guardian) and bind the domain')
+  .description('set up a project. Run bare in a terminal, or with --gate/--host: the setup (proposer key, gate from the dashboard, domain proof, host headers, GitHub workflow; no transaction). With --domain and the role flags: create the gate and bind the domain from this machine')
   .option('--domain <domain>', 'the domain to protect, e.g. app.example.org')
+  .option('--gate <address>', 'setup: the gate the dashboard created for the domain')
+  .option('--host <host>', `setup: where the site is hosted (${HOSTS.join(', ')})`)
+  .option('--public <dir>', 'setup: the folder your build copies to the site root (default public)')
+  .option('--out <dir>', 'setup: the build output folder (default dist)')
+  .option('--build <command>', 'setup: the build command (default "npm ci && npm run build")')
+  .option('--deploy <command>', "setup: your own deploy command (default: the host's)")
+  .option('--yes', 'setup: never ask; use the defaults for anything not given')
   .option('--approvers <a,b,c>', 'the 3 approver addresses')
   .option('--recovery <address>', 'recovery address (a key kept offline)')
   .option('--guardian <address>', 'optional key that can only freeze (the watchtower), or "none"')
@@ -36,6 +44,12 @@ program.command('init')
   .option('--no-wait', 'send the commitment and exit; run init again 2 blocks later to finish')
   .option('--wait-seconds <n>', 'how long to wait for the 2 blocks', '120')
   .action(async (o) => {
+    // the setup (no transaction) when asked for it (--gate / --host), or when run bare in a terminal; otherwise the
+    // original on-chain init (scripts and the staging harness pass --domain and the role flags)
+    const dir = resolve(program.opts().project);
+    // a started on-chain init (init.json) is finished by running init again: never the setup
+    const bare = !o.domain && !o.approvers && !o.recovery && !o.guardian && !o.proposer && !existsSync(statePath(dir, 'init.json'));
+    if (o.gate || o.host || (bare && process.stdin.isTTY)) return setup(dir, o, log);
     await cmd.init(ctx(), { ...o, waitSeconds: Number(o.waitSeconds) }, log);
   });
 

@@ -11,6 +11,31 @@ import type { Net, Sealed } from '@signet/extension/src/lib/types.ts';
 declare const __SIGNET_NET__: Net & { name: string; tapeout: Record<string, unknown>; explorer?: string };
 export const NET = __SIGNET_NET__;
 declare const __SIGNET_PROOF_ORIGIN__: string;
+declare const __SIGNET_WATCHTOWER_STATUS__: string;
+
+// ---- the watchtower's public status (written each round by .github/workflows/watchtower.yml)
+export interface WatchStatus { updatedAt: string; network: string; domains: { domain: string; status: string; checkedAt: string | null; release: number | null }[]; operator: { until: string; daysLeft: number } | null }
+export async function watchtowerStatus(): Promise<WatchStatus | null> {
+  if (!__SIGNET_WATCHTOWER_STATUS__) return null;
+  try {
+    const r = await fetch(__SIGNET_WATCHTOWER_STATUS__, { cache: 'no-store', credentials: 'omit' });
+    return r.ok ? ((await r.json()) as WatchStatus) : null;
+  } catch {
+    return null;
+  }
+}
+const ago = (iso: string) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 120 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+const WORDS: Record<string, string> = { ok: 'matches its sealed release', mismatch: 'DOES NOT MATCH its sealed release', unreachable: "couldn't be loaded", unchecked: 'not checked (no release published, or its manifest is not stored)', new: 'not checked yet' };
+/// One line for a domain (or the whole watchtower, without a domain), honest when there's no status.
+export function watchLine(s: WatchStatus | null, domain?: string): { cls: string; text: string } {
+  if (!s) return { cls: 'dim', text: 'Watchtower: no public status yet (it is published once the repository is public).' };
+  const stale = Date.now() - Date.parse(s.updatedAt) > 30 * 60000;
+  const head = `Watchtower: last round ${ago(s.updatedAt)}${stale ? ' (late: GitHub runs schedules on a best-effort basis)' : ''}`;
+  if (!domain) return { cls: stale ? 'warnsum' : 'ok', text: `${head}; watching ${s.domains.map((d) => d.domain).join(', ') || 'no domain'}${s.operator ? `; file-store operator grant valid for ${s.operator.daysLeft} more days` : ''}.` };
+  const d = s.domains.find((x) => x.domain === domain);
+  if (!d) return { cls: 'dim', text: `${head}; it doesn't watch ${domain} (watched with Pro).` };
+  return { cls: d.status === 'ok' ? 'ok' : d.status === 'mismatch' || d.status === 'unreachable' ? 'bad' : 'dim', text: `${head}: ${domain} ${WORDS[d.status] ?? d.status}${d.release ? ` (release #${d.release})` : ''}${d.checkedAt ? `, checked ${ago(d.checkedAt)}` : ''}.` };
+}
 
 // ---- the domain proof (docs/domain-ownership.md): the dashboard, /prove and the badge show a project as sealed
 // only if its domain names its gate in /.well-known/signet.json. Read cross-origin, so the domain must allow it

@@ -33,9 +33,15 @@ when the site is clean again ("Recovered").
 **Not built yet:** 3 regions (it runs in one place; "two regions confirm" is two loads from the same place),
 TapeSend, X posts, the public status page, Guard telemetry.
 
-**Planned: auto-renew the operator grant.** Each round, read `SiteRegistry.operatorUntil(container #5)`; when fewer
-than **7 days** are left, send `siteGate.renewOperator(processor, 5)` (anyone may call it; ≈ 115k gas ≈ 0.0000024 OKB).
-Send from a **small dedicated renewer wallet** funded with a little OKB (`WATCHTOWER_RENEW_KEY`), **never signet-dev**
-or any approver/proposer key. Alert the team if the renewal fails or the wallet runs low. Current expiry:
-2026-12-19 08:05 UTC.
+**Live (built 2026-11-19; switched on when the repository is public):** `.github/workflows/watchtower.yml` runs one
+round every 5 minutes for `signetguard.xyz` on GitHub Actions (free for public repositories; GitHub starts schedules
+on a best-effort basis, so a round can be late). State and the public `status.json` live on the `watchtower-status`
+branch (one commit, replaced each round); `/prove` and the dashboard read the status from there. Alerts go to
+Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` secrets).
+
+**Operator auto-renew (`src/renew.ts`):** each round reads `SiteRegistry.operatorUntil(container #5)`; with fewer than
+7 days left it calls `siteGate.renewOperator(processor, 5)` from a **dedicated renewer wallet**
+(`WATCHTOWER_RENEW_KEY`, never signet-dev or any gate role), after simulating it. ≈ 115k gas ≈ 0.0000025 OKB per
+renewal. It alerts once on a renewal, on a failure, and when the wallet falls below 0.00005 OKB. Tested on staging
+(`test/staging/watchtower.test.ts`, "operator grant").
 See `docs/decisions.md`.

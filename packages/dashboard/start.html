@@ -20,12 +20,18 @@
       <p class="lead">After these five steps, no single key can change what your website asks wallets to sign: your CI only <b>proposes</b> each release, your approvers <b>approve</b> it in their own wallets, and TapeOut circuit #6 decides when it may go live. Users who run Guard are checked against exactly what you sealed.</p>
       <p class="dim">You need: Node.js 18+, a static site built by GitHub Actions (output folder such as <code>dist/</code>), a wallet on X Layer with ~0.001 OKB, and three approver addresses.</p>
 
+      <section class="step quick" id="quick"><h2>Fastest: one command</h2>
+        <p>In your project folder. It asks for your domain, the gate address (it tells you how to create it in the dashboard), your host and your build command, then writes the proposer key, <code>signet.config.json</code>, the domain proof, your host's header file and <code>.github/workflows/signet.yml</code>. It sends no transaction.</p>
+        <pre data-copy>npx -y signetguard&#64;0.1.3 init</pre>
+        <p class="dim">Same thing without questions (CI, scripts): <code>signet init --domain app.example.org --gate 0x… --host cloudflare --yes</code>. Hosts: <code>cloudflare</code>, <code>netlify</code>, <code>vercel</code>, <code>github-pages</code>, <code>other</code>. Or follow the five steps below by hand.</p>
+      </section>
+
       <section class="step" id="install"><h2>1 · Install the CLI</h2>
         <p>In your project folder:</p>
         <pre data-copy>npm install -g signetguard
 signet --version
 signet keygen</pre>
-        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g {{ORIGIN}}/signetguard-0.1.2.tgz</code>.</p>
+        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g {{ORIGIN}}/signetguard-0.1.3.tgz</code>.</p>
         <p><code>signet keygen</code> creates your CI proposer key in <code>.signet/proposer.key</code> (git-ignored) and prints only its <b>address</b>. Keep the address for step 2. The key can propose and publish releases; it can never approve one.</p>
       </section>
 
@@ -66,7 +72,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci && npm run build            # your build; output in dist/
-      - run: npm install -g signetguard&#64;0.1.2
+      - run: npm install -g signetguard&#64;0.1.3
       - name: Seal and propose (the CI key can only propose)
         run: signet verify dist && signet seal dist && signet propose dist --reuse
         env:
@@ -81,10 +87,55 @@ jobs:
         <p class="dim">Deploy only after <code>signet wait</code> succeeds: that is what makes an unapproved build unable to go live. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
       </section>
 
+      <section class="step" id="hosts"><h2>Your host</h2>
+        <p>Whatever the host, the rule is the same: <b>deploy the exact folder you sealed</b>, after <code>signet wait</code> succeeds, with no build or rewriting on the host's side. <code>signet init</code> writes all of this for you.</p>
+        <details><summary><b>Cloudflare Pages</b></summary>
+          <p>Header for the proof, in <code>public/_headers</code>:</p>
+          <pre data-copy>/.well-known/signet.json
+  Access-Control-Allow-Origin: *</pre>
+          <p>Deploy step (secrets <code>CLOUDFLARE_API_TOKEN</code>, <code>CLOUDFLARE_ACCOUNT_ID</code>):</p>
+          <pre data-copy>npx -y wrangler@4 pages deploy dist --project-name YOUR_PROJECT --branch main</pre>
+          <p class="warn"><b>Turn off Email Obfuscation and Rocket Loader</b> for the site (Cloudflare dashboard), and anything else that rewrites HTML or scripts. They change the bytes after you sealed them, so Guard and the watchtower see a mismatch.</p>
+        </details>
+        <details><summary><b>Netlify</b></summary>
+          <p>Header for the proof, in <code>public/_headers</code> (same format as Cloudflare). Deploy step (secrets <code>NETLIFY_AUTH_TOKEN</code>, <code>NETLIFY_SITE_ID</code>):</p>
+          <pre data-copy>npx -y netlify-cli@17 deploy --dir=dist --prod --no-build</pre>
+          <p class="dim">Turn off Netlify's asset optimization / post processing if it's on: it rewrites files after the seal.</p>
+        </details>
+        <details><summary><b>Vercel</b></summary>
+          <p>Header for the proof, in <code>public/vercel.json</code> (deployed as a static folder, so the file goes inside it):</p>
+          <pre data-copy>{"headers":[{"source":"/.well-known/signet.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"}]}]}</pre>
+          <p>Deploy step (secrets <code>VERCEL_TOKEN</code>, <code>VERCEL_ORG_ID</code>, <code>VERCEL_PROJECT_ID</code>). Deploy the sealed folder, not the source, so Vercel doesn't rebuild it:</p>
+          <pre data-copy>npx -y vercel@39 deploy dist --prod --yes --token "$VERCEL_TOKEN"</pre>
+        </details>
+        <details><summary><b>GitHub Pages</b></summary>
+          <p>Pages already allows cross-origin reads. Add an empty <code>public/.nojekyll</code> so the <code>.well-known</code> folder is served. Settings → Pages → Source: <b>GitHub Actions</b>, then deploy the sealed folder:</p>
+          <pre data-copy>      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - uses: actions/deploy-pages@v4</pre>
+          <p class="dim">The job needs <code>permissions: pages: write, id-token: write</code> and <code>environment: github-pages</code>.</p>
+        </details>
+      </section>
+
       <section class="step" id="approve"><h2>5 · Approve your first release, add the badge</h2>
         <p>Push to <code>main</code>. The workflow proposes release #1. Two approvers open <a href="./app#/">the dashboard</a>, open your domain, read Diff Guard, and click <b>Approve</b> in their own wallets. After the timelock the workflow publishes and deploys.</p>
         <p>Then open <code>{{ORIGIN}}/app#/badge/&lt;your domain&gt;</code> and copy the "Sealed by Signet" badge into your site footer. It links to a live page that reads the chain.</p>
         <p class="dim">Your gate starts in observe mode (Guard reports, never blocks). Switch to enforce in the dashboard when your releases flow cleanly.</p>
+      </section>
+      <section class="step" id="faq"><h2>Questions</h2>
+        <dl class="faq">
+          <dt>Do my contracts change?</dt><dd>No. Signet seals your website's files and the list of contracts it may call; your contracts stay as they are.</dd>
+          <dt>What does it cost?</dt><dd>Gas on X Layer: about 0.000013 OKB to create the gate, and about 0.0001 OKB per release (propose, publish, the 3 manifest files). The Free plan is free; Pro (planned) adds a faster watchtower and the verified copy.</dd>
+          <dt>An approver loses their key?</dt><dd>The other two can still approve releases (no release needs all three, except admin changes). To replace approvers, your <b>recovery address</b> (kept offline) proposes a new set; it takes effect after 7 days unless two current approvers cancel it, and it works even while the gate is frozen.</dd>
+          <dt>Does it slow my site down?</dt><dd>No. Your site is served as before; nothing is added to your pages. Guard checks in the user's browser, and only on sealed domains.</dd>
+          <dt>What if my users don't install Guard?</dt><dd>Your team still gets the release approvals and timelock, watchtower alerts, instant freeze, and the public proof and badge. Guard is the extra layer that also blocks the signature for users who run it.</dd>
+          <dt>Is my first release slow?</dt><dd>Yes: every first release is tier 10 (2 approvals + 24 h). After that, a code-only release needs 1 approval + 1 h.</dd>
+        </dl>
+      </section>
+
+      <section class="step" id="help"><h2>Get free setup help</h2>
+        <p>We'll set up your first release with you, for free. <a data-link="telegram" href="#">Ask on Telegram</a> · <a data-link="x" href="#">Message us on X</a></p>
       </section>
     </main>
     <div id="toast" role="status" aria-live="polite"></div>

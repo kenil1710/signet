@@ -7,6 +7,8 @@ approvers and the on-chain rule (TapeOut circuit #6) allow. The CI key can propo
 
 ```
 npm install -g signetguard
+npx signetguard init           # interactive setup: proposer key, gate, domain proof, host headers, workflow
+# or step by step:
 signet keygen                  # the CI proposer key (it can propose and publish, never approve)
 signet link <domain> <gate>    # after creating your gate in the dashboard
 signet domain public           # the domain proof: public/.well-known/signet.json

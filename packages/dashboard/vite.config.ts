@@ -22,6 +22,10 @@ function staticSite(): Plugin {
     name: 'signet-static-site',
     transformIndexHtml(html) {
       const out = applyLinksHtml(html, links);
+      // Cloudflare's Email Obfuscation rewrites anything that looks like an email (it broke release 3's seal once):
+      // write the @ as &#64; in such text
+      const email = out.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '').match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+/);
+      if (email) throw new Error(`email-like text "${email[0]}" in the HTML: Cloudflare would rewrite it; write the @ as &#64;`);
       return n.name === 'mainnet' ? out.replaceAll('{{ORIGIN}}', links.domain) : out;
     },
     generateBundle() {
@@ -33,6 +37,6 @@ function staticSite(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [staticSite()],
-  define: { __SIGNET_NET__: JSON.stringify(net), __SIGNET_PROOF_ORIGIN__: JSON.stringify(process.env.SIGNET_PROOF_ORIGIN || 'https://{domain}') },
-  build: { target: 'es2022', rollupOptions: { input: { index: 'index.html', app: 'app.html', start: 'start.html' } } },
+  define: { __SIGNET_NET__: JSON.stringify(net), __SIGNET_PROOF_ORIGIN__: JSON.stringify(process.env.SIGNET_PROOF_ORIGIN || 'https://{domain}'), __SIGNET_WATCHTOWER_STATUS__: JSON.stringify(process.env.SIGNET_WATCHTOWER_STATUS ?? (n.name === 'mainnet' ? 'https://raw.githubusercontent.com/kenil1710/signet/watchtower-status/status.json' : '')) },
+  build: { target: 'es2022', rollupOptions: { input: { index: 'index.html', app: 'app.html', start: 'start.html', check: 'check.html' } } },
 });

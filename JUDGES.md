@@ -1,6 +1,7 @@
 # Signet in 5 minutes
 
-**Guard refuses any wallet signature your dApp's team didn't seal.** If the website is hacked (a swapped script, a hijacked domain, a poisoned npm package), the page can't get the wallet to approve, permit or transfer to a contract or spender outside the release's sealed allowlist. Signet **builds on TapeKit's on-chain file verification** and adds: that signing-time allowlist (TapeOut circuit #7), risk-tiered approvals with timelocks decided by TapeOut circuit #6, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; goes live with Pro).
+**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign anything your team didn't approve.
+**What teams get:** release approvals with a timelock nobody can bypass (no single key: CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts, instant freeze, a verified copy read from X Layer (built; live with Pro), and a public proof and badge. **For users:** Guard **blocks the signature** to any contract or spender the team didn't approve (circuit #7). Signet **builds on TapeKit's** on-chain file verification.
 
 **What it is.** A dApp team seals each release of its website on X Layer: the hash of every file, the contracts and
 spenders the site may ask a wallet to sign for, and the outside origins it may talk to. A TapeOut circuit decides

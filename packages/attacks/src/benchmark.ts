@@ -21,7 +21,7 @@ for (const d of DEFENDERS) {
   spawnSync('bash', [join(ROOT, 'staging/renew-operator.sh')], { stdio: 'inherit' });
   const r = spawnSync(process.execPath, [SUITE], { stdio: 'inherit', env: { ...process.env, SIGNET_DEFENDER: d.id, GUARD_MODE: d.id === 'hash-only' ? 'hash-only' : '' } });
   if (r.status !== 0) {
-    console.error(`the ${d.id} run failed`);
+    console.error(`the ${d.id} run failed (exit ${r.status}${r.signal ? `, killed by ${r.signal}` : ''}${r.error ? `, ${r.error.message}` : ''})`);
     process.exit(1);
   }
 }

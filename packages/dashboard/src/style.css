@@ -164,3 +164,19 @@ body.embed{background:transparent} body.embed .top{display:none} body.embed #app
 .static-intro h2{margin:22px 0 6px;font-size:18px}
 .static-intro code{font-size:12px;overflow-wrap:anywhere}
 .static-intro ul{padding-left:20px}
+
+.start .quick{border:1px solid var(--line);padding:18px 20px}
+.start details{border-top:1px solid var(--line);padding:12px 0}
+.start details summary{cursor:pointer}
+.start .warn{color:var(--warn)}
+.faq dt{font-weight:600;margin-top:14px}
+.faq dd{margin:4px 0 0;color:var(--muted);line-height:1.55}
+
+.chk-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:20px 0}
+.chk-form input{flex:1;min-width:220px;padding:10px 12px;font:inherit;background:transparent;color:inherit;border:1px solid var(--line)}
+.findings{list-style:none;padding:0}
+.fd{padding:8px 0;border-top:1px solid var(--line);line-height:1.5}
+.fd b{display:inline-block;min-width:70px}
+.fd.risk b{color:var(--wax-hi)}.fd.warn b{color:var(--warn)}.fd.ok b{color:var(--ok)}
+.fd .area{color:var(--muted);margin-right:6px}
+.summary.warnsum{color:var(--warn)}

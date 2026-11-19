@@ -1,0 +1,55 @@
+# The watchtower, live: every 5 minutes, load signetguard.xyz in a real browser, compare every file with the sealed
+# release on X Layer, alert the team on Telegram after two bad loads in a row, renew the shared container's operator
+# grant when fewer than 7 days are left, and publish status.json for /prove and the dashboard.
+# State and status live on the `watchtower-status` branch (one commit, replaced each round).
+# Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (alerts), WATCHTOWER_RENEW_KEY (a small dedicated renewer wallet,
+# never signet-dev). GitHub runs schedules on a best-effort basis: a round can start some minutes late.
+name: watchtower
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: watchtower
+  cancel-in-progress: false
+jobs:
+  round:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @signet/watchtower...
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-1.56.1
+      - run: pnpm --filter @signet/watchtower exec playwright install --with-deps chromium
+      - name: Fetch the last state
+        run: |
+          git fetch origin watchtower-status --depth=1 && git worktree add status origin/watchtower-status \
+            || { git worktree add --detach status && git -C status checkout --orphan watchtower-status && git -C status rm -rfq . ; }
+      - name: One round
+        env:
+          SIGNET_NETWORK: mainnet
+          WATCHTOWER_ONLY: signetguard.xyz
+          WATCHTOWER_STATE: ${{ github.workspace }}/status/state.json
+          WATCHTOWER_STATUS: ${{ github.workspace }}/status/status.json
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          WATCHTOWER_RENEW_KEY: ${{ secrets.WATCHTOWER_RENEW_KEY }}
+        run: node packages/watchtower/src/cli.ts --once
+      - name: Publish the status
+        run: |
+          cd status
+          git config user.name "signet-watchtower"
+          git config user.email "watchtower@users.noreply.github.com"
+          git add state.json status.json
+          git commit -qm "watchtower status" --allow-empty
+          git push -f origin HEAD:watchtower-status

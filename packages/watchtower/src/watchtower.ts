@@ -5,6 +5,7 @@
 //      a second time; only if the second load is wrong too is the team alerted (once per distinct mismatch).
 // State (what was already posted, the last verified manifests) is kept in a JSON file so a restart doesn't repeat.
 import { proofNames } from '@signet/extension/src/lib/proof.ts';
+import { renewIfDue, type RenewConfig } from './renew.ts';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium, type Browser } from 'playwright';
@@ -36,6 +37,8 @@ export interface Config {
   fromIndex?: number; // first run only: skip the registry's first N domains (default 0: watch them all)
   confirmDelayMs?: number; // pause before the confirming load (default 5 s)
   log?: (line: string) => void;
+  renew?: RenewConfig; // keep the shared container's operator grant alive (src/renew.ts)
+  statusPath?: string; // write a public status file after each round (for /prove and the dashboard)
 }
 
 interface DomainState {
@@ -47,8 +50,17 @@ interface DomainState {
   manifests: Record<string, Sealed>; // verified manifests by hash: the current one and the previous one
   status: 'new' | 'ok' | 'mismatch' | 'unreachable' | 'unchecked';
   checkedAt: number;
+  release?: number;
 }
-export interface State { nextIndex: number; domains: Record<string, DomainState> } // nextIndex: how far into the registry's domain list we have read
+export interface State { nextIndex: number; domains: Record<string, DomainState>; renew?: { error: string; low: boolean } }
+
+/// The public status file: what the watchtower saw last, per domain (no secrets, no alert texts).
+export interface Status {
+  updatedAt: string;
+  network: string;
+  domains: { domain: string; status: DomainState['status']; checkedAt: string | null; release: number | null }[];
+  operator: { until: string; daysLeft: number; renewedThisRound: boolean } | null;
+} // nextIndex: how far into the registry's domain list we have read
 
 export function loadState(path: string, fromIndex: number): State {
   return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as State) : { nextIndex: fromIndex, domains: {} };
@@ -75,6 +87,25 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
     else out.posts++;
   };
 
+  // 0. the shared container's operator grant: renew it when fewer than 7 days are left
+  let operator: Status['operator'] = null;
+  if (c.renew) {
+    const rs = (state.renew ??= { error: '', low: false });
+    try {
+      const r = await renewIfDue(c.renew);
+      operator = { until: new Date(r.until * 1000).toISOString(), daysLeft: Math.round(r.daysLeft * 10) / 10, renewedThisRound: r.renewed };
+      if (r.renewed) await post('private', 'Renewed the file store operator grant', [`SignetRegistry can write release manifests until ${when(r.until)}.`, `Tx ${r.tx}, sent by the renewer ${r.renewer} (balance ${r.balance} OKB).`]);
+      if (rs.error) await post('private', 'Operator renewal works again', [`Grant valid until ${when(r.until)}.`]);
+      rs.error = '';
+      if (r.low && !rs.low) await post('private', 'The renewer wallet is low on OKB', [`${r.renewer} holds ${r.balance} OKB. Each renewal costs ≈ 0.0000025 OKB; please top it up.`]);
+      rs.low = r.low;
+    } catch (e) {
+      const msg = (e as Error).message.split('\n')[0]!;
+      if (rs.error !== msg) await post('private', 'Operator renewal FAILED', [msg, 'Until it is renewed, new releases\' manifests may not be stored (Guard would show "could not check"). Anyone can call siteGate.renewOperator(processor, 5).']);
+      rs.error = msg;
+    }
+  }
+
   // 1. domains added to the registry's list since the last round
   const { domains, next } = await newDomains(c.net, state.nextIndex);
   for (const domain of domains) {
@@ -82,7 +113,7 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
     const g = await gateView(c.net, domain);
     if (!g) continue; // claimed and unbound again before we looked
     state.domains[domain] = { gate: g.gate, lastProposal: 0, alerted: null, note: '', manifests: {}, status: 'new', checkedAt: 0 };
-    await post('public', `New sealed domain: ${domain}`, [`Gate ${g.gate}.`, 'Signet now watches this site every minute. It starts in observe mode.']);
+    await post('public', `New sealed domain: ${domain}`, [`Gate ${g.gate}.`, 'Signet now watches this site. It starts in observe mode.']);
   }
   state.nextIndex = next;
 
@@ -173,6 +204,7 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
       }
       ds.status = r.status;
       ds.checkedAt = Date.now();
+      ds.release = g.release;
       if (r.status === 'ok') {
         if (ds.alerted) await post('private', `Recovered: ${domain} matches its sealed release again`, [`Release #${g.release}. ${r.checked} files compared.`]);
         ds.alerted = null;
@@ -196,6 +228,16 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
     }
   }
   saveState(c.statePath, state);
+  if (c.statusPath) {
+    const status: Status = {
+      updatedAt: new Date().toISOString(),
+      network: c.net.name,
+      domains: Object.entries(state.domains).filter(([d]) => watched(d)).map(([domain, d]) => ({ domain, status: d.status, checkedAt: d.checkedAt ? new Date(d.checkedAt).toISOString() : null, release: d.release ?? null })),
+      operator,
+    };
+    mkdirSync(dirname(c.statusPath), { recursive: true });
+    writeFileSync(c.statusPath, JSON.stringify(status, null, 2) + '\n');
+  }
   return out;
 }
 

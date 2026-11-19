@@ -2,7 +2,7 @@
 // published truth tables (all 512 inputs, through eval), the circuit beacon, and every sealed project's release
 // (the manifest files in the container must hash to what its gate published).
 import { keccak256, sha256, type Abi, type Address, type Hex } from 'viem';
-import { NET, read, enc, dec, domains, project, releaseLists, releaseOf, domainProof, PROOF_WORDS } from '../chain.ts';
+import { NET, read, enc, dec, domains, project, releaseLists, releaseOf, domainProof, PROOF_WORDS, watchtowerStatus, watchLine } from '../chain.ts';
 import policy from '@signet/circuit/artifacts/policy.json';
 import guard from '@signet/circuit/artifacts/guard.json';
 import { esc, view, $ } from '../ui.ts';
@@ -65,8 +65,10 @@ export async function provePage(): Promise<void> {
       <div><span class="label">Node 1</span><b>${esc(host(NET.rpcUrl))}</b></div>
       <div><span class="label">Node 2 (must agree)</span><b>${NET.rpcUrl2 ? esc(host(NET.rpcUrl2)) : 'none'}</b></div>
     </div>
+    <p id="watch" class="summary dim">Watchtower: …</p>
     <h2>Claims</h2>
     <ul class="claims" id="rows"></ul><p id="sum" class="summary">running…</p>`);
+  void watchtowerStatus().then((s) => { const w = watchLine(s); $('#watch', v).className = `summary ${w.cls}`; $('#watch', v).textContent = w.text; });
   void fetch(NET.rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }) })
     .then((r) => r.json()).then((j) => { $('#blk', v).textContent = BigInt(j.result).toLocaleString('en-US'); }).catch(() => { $('#blk', v).textContent = 'unknown'; });
   const render = () => {

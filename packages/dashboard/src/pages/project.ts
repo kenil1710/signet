@@ -1,6 +1,6 @@
 // A project: its release, roles and state; its proposals with approve / withdraw / cancel / publish; freeze,
 // unfreeze and revoke. Every action goes through the connected wallet; the contract and the circuit decide.
-import { project, status, span, TIERS, count, GATE_ABI, one, domainProof, PROOF_WORDS, type Project } from '../chain.ts';
+import { project, status, span, TIERS, count, GATE_ABI, one, domainProof, PROOF_WORDS, watchtowerStatus, watchLine, type Project } from '../chain.ts';
 import { connect, send, account } from '../wallet.ts';
 import { esc, short, view, $, action } from '../ui.ts';
 
@@ -34,6 +34,7 @@ export async function projectPage(domain: string): Promise<void> {
     <td>${st.open ? `<div class="ops">${x.kind === 1 ? `<a href="#/p/${esc(s.domain)}/proposal/${x.id}">Diff Guard</a> ` : ''}<button data-a="approve">Approve</button> <button data-a="withdrawApproval">Withdraw</button> <button data-a="cancel">Cancel</button> <button data-a="publish" ${st.publishable ? '' : 'disabled'}>Publish</button></div>` : ''}</td></tr>`;
   const v = view(`<a class="back" href="#/">← all projects</a>
     <h1>${esc(s.domain)} ${state} ${mode}${proof === 'confirmed' ? '' : ' <span class="pill bad">NOT VERIFIED</span>'}</h1>
+    <p id="watch" class="dim">Watchtower: …</p>
     ${proof === 'confirmed' ? '' : `<p class="bad">${esc(PROOF_WORDS[proof])} Guard, the badge and the watchtower ignore this gate until the domain serves <code>/.well-known/signet.json</code> naming <code>${esc(s.gate)}</code> (run <code>signet domain public</code> and deploy).</p>`}
     <div class="glance">
       <div><span class="label">State</span><b class="${s.revoked || s.frozen ? 'bad' : 'ok'}">${s.revoked ? 'Revoked' : s.frozen ? 'Frozen' : 'Active'}</b></div>
@@ -57,6 +58,7 @@ export async function projectPage(domain: string): Promise<void> {
       <a class="btn" href="#/badge/${esc(s.domain)}">Badge</a></div>
     <h2>Open proposals</h2>${open.length ? `<table class="props"><tbody>${open.map(row).join('')}</tbody></table>` : '<p class="dim">none</p>'}
     <h2>Recent</h2>${done.length ? `<table class="props"><tbody>${done.map(row).join('')}</tbody></table>` : '<p class="dim">none</p>'}`);
+  void watchtowerStatus().then((ws) => { const w = watchLine(ws, s.domain); const el = v.querySelector<HTMLElement>('#watch'); if (el) { el.className = w.cls; el.textContent = w.text; } });
   const reload = () => void projectPage(domain);
   action($('#connect', v) as HTMLButtonElement, async () => `connected ${short(await connect())}`, reload);
   action($('#freeze', v) as HTMLButtonElement, async () => `frozen (tx ${short(await send(s.gate, 'freeze'))})`, reload);

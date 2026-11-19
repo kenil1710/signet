@@ -1,6 +1,7 @@
 # Signet: the website can only ask your wallet for what its team sealed on X Layer
 
-**Guard refuses any wallet signature your dApp's team didn't seal.** If the website is hacked (a swapped script, a hijacked domain, a poisoned npm package), the page can't get the wallet to approve, permit or transfer to a contract or spender outside the release's sealed allowlist. Signet **builds on TapeKit's on-chain file verification** and adds: that signing-time allowlist (TapeOut circuit #7), risk-tiered approvals with timelocks decided by TapeOut circuit #6, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; goes live with Pro).
+**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign anything your team didn't approve.
+**What teams get:** release approvals with a timelock nobody can bypass (no single key: CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts, instant freeze, a verified copy read from X Layer (built; live with Pro), and a public proof and badge. **For users:** Guard **blocks the signature** to any contract or spender the team didn't approve (circuit #7). Signet **builds on TapeKit's** on-chain file verification.
 **What it is.** A dApp team seals each release of its website on X Layer; a TapeOut circuit decides when it may go live, and users who run the **Guard** extension get every page and every signature checked against it by a second TapeOut circuit.
 **Benchmark (staging):** against the same 12 attacks, SRI alone blocks 2, a hash-only checker 7, **Signet 12**, with **0 false blocks** ([`docs/benchmark.md`](docs/benchmark.md)).
 **Verify it yourself:** `pnpm install && pnpm verify:claims` (read-only, about 2 minutes, checks [`CLAIMS.md`](CLAIMS.md) against X Layer mainnet).
@@ -61,6 +62,25 @@ Not used yet (see the Roadmap): TapeSend, TapeCode, hosting the site itself on D
 | 11 | Admin: approvers, timelocks, domain binding, circuit copy | 3 of 3 + 24 h, no fast lane |
 
 Frozen: nothing publishes. Any one approver can freeze; unfreezing needs 2 of 3. The 1 h / 24 h waits are defaults.
+
+## Why not just GitHub?
+
+GitHub's required reviews and deployment environments (required reviewers, a wait timer) approve code **before**
+it deploys; use them. The big front-end attacks happened **after**: a file swapped on the hosting (Bybit /
+Safe{Wallet}), a script injected through the CDN (BadgerDAO), a poisoned npm package (Ledger Connect Kit), a hijacked
+domain (Curve, CoW Swap). GitHub never saw any of them.
+
+| | GitHub (reviews, environments) | Signet |
+|---|---|---|
+| Approvals before deploy | Yes: required reviewers (one approval is enough) and a wait timer; on Free, Pro and Team plans for public repositories | Yes, on X Layer, more approvals and a longer wait for riskier changes |
+| A compromised admin | Administrators can bypass the rules by default, and can change them | No admin can skip circuit #6; changing approvers or waits takes 3 of 3 + 24 h, in public |
+| Attacks after deploy (hosting, CDN, domain) | Not visible | The watchtower and Guard compare the live files with the seal |
+| Alerts when the live site changes | No | The watchtower |
+| Users can verify what they load | No | Guard, `/prove`, the badge |
+| Blocks the signature to an unapproved contract | No | Guard |
+| A public, permanent record | Logs visible to your organization | Every release and approval on X Layer |
+
+Sources: GitHub Docs, [deployments and environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments) and [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) (checked 2026-11-19).
 
 ## How is this different from TapeKit, Code Verify, WEBCAT or WAICT?
 

@@ -23,7 +23,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:staging": "node --test --test-concurrency=1 test/staging/*.test.ts",
-    "test": "node --test test/sim.test.ts test/chain-switch.test.ts",
+    "test": "node --test test/sim.test.ts test/chain-switch.test.ts test/risk-check.test.ts",
     "site:check": "node test/site-check.ts"
   },
   "devDependencies": {

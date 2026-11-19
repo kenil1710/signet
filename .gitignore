@@ -43,3 +43,6 @@ packages/contracts/broadcast/MainnetDeploy.s.sol/
 packages/contracts/broadcast/GuardTapeout.s.sol/
 packages/contracts/deployments/guard-*.json
 packages/contracts/deployments/rehearsal-*.json
+
+# the watchtower renewer wallet (never committed)
+packages/watchtower/.secrets/

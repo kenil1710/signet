@@ -216,3 +216,40 @@ test("squatting: a domain that never served the proof naming its gate is ignored
     site.tamper = false;
   }
 });
+
+test('operator grant: renewed by the renewer wallet when fewer than 7 days are left, once; the status file shows it', async () => {
+  const local = JSON.parse(readFileSync(new URL('../../../contracts/deployments/local.json', import.meta.url), 'utf8'));
+  const key = `0x${'5e'.repeat(32)}` as const; // a throwaway renewer, funded on the staging chain only
+  const { privateKeyToAccount } = await import('viem/accounts');
+  const renewer = privateKeyToAccount(key).address;
+  await anvil('anvil_setBalance', [renewer, '0x2386f26fc10000']);
+  const statusPath = join(mkdtempSync(join(tmpdir(), 'tower-status-')), 'status.json');
+  const rc = { rpcUrl: net.rpcUrl, chainId: 196, key, processor: local.tapeout.processor, circuitId: BigInt(local.tapeout.sharedCircuitId), container: local.tapeout.sharedContainer, siteRegistry: local.tapeout.siteRegistry };
+  const fresh: Config = { ...config, statePath: join(mkdtempSync(join(tmpdir(), 'tower-renew-')), 'state.json'), only: [domain], renew: rc, statusPath };
+  const before = { lines: lines.length, telegram: telegram.length };
+  try {
+    // plenty of time left: nothing is sent
+    await tick(fresh, browser);
+    assert.ok(!lines.slice(before.lines).some((l) => /Renewed the file store operator/.test(l)), 'not renewed with > 7 days left');
+    // 24 days later (the grant is 30 days): fewer than 7 left, so the next round renews it
+    await anvil('evm_increaseTime', [24 * 86400]);
+    await anvil('evm_mine', []);
+    await tick(fresh, browser);
+    const said = lines.slice(before.lines).join('\n');
+    assert.match(said, /Renewed the file store operator grant/);
+    const st = JSON.parse(readFileSync(statusPath, 'utf8'));
+    assert.equal(st.operator.renewedThisRound, true);
+    assert.ok(st.operator.daysLeft > 29, `renewed for 30 days (got ${st.operator.daysLeft})`);
+    assert.deepEqual(st.domains.map((d: { domain: string }) => d.domain), [domain]);
+    assert.ok(!JSON.stringify(st).includes(key.slice(2)), 'no key in the status file');
+    // the next round: nothing to do
+    const mid = lines.length;
+    await tick(fresh, browser);
+    assert.ok(!lines.slice(mid).some((l) => /Renewed the file store operator/.test(l)), 'renewed once');
+  } finally {
+    // the gate's renewOperator names the gate's own registry (mainnet's, on this fork): give the staging registry its
+    // grant back for the suites that run after this one
+    const { spawnSync } = await import('node:child_process');
+    spawnSync('bash', [fileURLToPath(new URL('../../../../staging/renew-operator.sh', import.meta.url))], { stdio: 'ignore' });
+  }
+});

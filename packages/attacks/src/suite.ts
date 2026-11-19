@@ -7,7 +7,7 @@
 // counts as a FALSE BLOCK if Guard refused any of the user's own actions, sent the tab to the warning page, or
 // showed a red badge.
 import http from 'node:http';
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, appendFileSync, mkdirSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -38,7 +38,22 @@ const ONLY = process.env.ATTACKS_ONLY?.split(',');
 export type Defender = 'signet' | 'hash-only' | 'sri-only';
 const DEFENDER = (process.env.SIGNET_DEFENDER ?? 'signet') as Defender;
 const hasGuard = DEFENDER !== 'sri-only';
-const want = (id: string) => !ONLY || ONLY.includes(id);
+let current = 'setup'; // the attack being run, named in the error if the run fails
+const T0 = Date.now();
+let lastMark = T0;
+// ATTACKS_TRACE=1: how long each attack took (to stderr, synchronously), to find slow or stuck steps
+const mark = (id: string) => {
+  if (process.env.ATTACKS_TRACE) writeSync(2, `  [trace +${((Date.now() - T0) / 1000).toFixed(0)}s] ${current} took ${((Date.now() - lastMark) / 1000).toFixed(1)}s; next: ${id}\n`);
+  lastMark = Date.now();
+};
+const want = (id: string) => {
+  const on = !ONLY || ONLY.includes(id);
+  if (on) {
+    mark(id);
+    current = id;
+  }
+  return on;
+};
 
 // ---------------------------------------------------------------- the web server: one host per project, plus the attacker's CDN
 
@@ -556,8 +571,10 @@ ${cleans.map((c, i) => `| ${i + 1} | ${c.name} | ${c.falseBlock ? `**false block
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // writeSync, not console.error: on macOS a pipe is written asynchronously, so process.exit could drop the message
+  // (a failed run then showed no error at all)
   run().then(() => process.exit(0), (e) => {
-    console.error(e);
+    writeSync(2, `\nthe attack suite failed during "${current}":\n${(e as Error)?.stack ?? String(e)}\n`);
     process.exit(1);
   });
 }
