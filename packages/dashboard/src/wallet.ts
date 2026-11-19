@@ -5,12 +5,75 @@
 import { decodeErrorResult, encodeFunctionData, type Abi, type Address, type Hex } from 'viem';
 import { NET, GATE_ABI } from './chain.ts';
 
-interface Eip1193 { request(a: { method: string; params?: unknown[] }): Promise<unknown> }
+interface Eip1193 { request(a: { method: string; params?: unknown[] }): Promise<unknown>; on?(event: string, cb: (...a: unknown[]) => void): void }
 let provider: Eip1193 | null = null;
+const listeners: (() => void)[] = [];
 window.addEventListener('eip6963:announceProvider', (e) => {
-  provider ??= (e as CustomEvent<{ provider: Eip1193 }>).detail.provider;
+  if (provider) return;
+  provider = (e as CustomEvent<{ provider: Eip1193 }>).detail.provider;
+  watch(provider);
 });
 window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+const found = (): Eip1193 | null => provider ?? (window as unknown as { ethereum?: Eip1193 }).ethereum ?? null;
+let watched: Eip1193 | null = null;
+function watch(p: Eip1193): void {
+  if (watched === p) return;
+  watched = p;
+  p.on?.('chainChanged', () => listeners.forEach((f) => f()));
+  listeners.forEach((f) => f());
+}
+/// Called whenever the wallet's chain may have changed (a wallet appearing, or its chainChanged event).
+export function onChainChange(f: () => void): void {
+  listeners.push(f);
+  const p = found();
+  if (p) watch(p);
+}
+
+/// X Layer as wallet_addEthereumChain expects it (EIP-3085). The mainnet build adds X Layer's public RPC.
+export const XLAYER = {
+  chainId: `0x${NET.chainId.toString(16)}`,
+  chainName: 'X Layer',
+  nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
+  rpcUrls: [NET.name === 'mainnet' ? 'https://xlayerrpc.okx.com' : NET.rpcUrl],
+  blockExplorerUrls: ['https://www.oklink.com/xlayer'],
+};
+
+/// The wallet's current chain, without asking for accounts; null when there is no wallet.
+export async function walletChain(): Promise<number | null> {
+  const p = found();
+  if (!p) return null;
+  try {
+    return parseInt((await p.request({ method: 'eth_chainId' })) as string, 16);
+  } catch {
+    return null;
+  }
+}
+
+/// MetaMask (extension), Rabby and most wallets answer 4902 for a chain they don't know; MetaMask Mobile wraps it
+/// in -32603 with data.originalError.code 4902; some only say so in the message.
+function unknownChain(e: unknown): boolean {
+  const x = e as { code?: number; message?: string; data?: { originalError?: { code?: number } } };
+  return x?.code === 4902 || x?.data?.originalError?.code === 4902 || /unrecognized chain|unknown chain|not (been )?added|4902/i.test(x?.message ?? '');
+}
+
+/// Switch the wallet to X Layer, adding X Layer to the wallet first if it doesn't know it.
+export async function switchToXLayer(): Promise<string> {
+  const p = found();
+  if (!p) throw new Error('No wallet found in this browser.');
+  try {
+    await p.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: XLAYER.chainId }] });
+  } catch (e) {
+    if (!unknownChain(e)) throw e; // e.g. 4001: the user said no
+    await p.request({ method: 'wallet_addEthereumChain', params: [XLAYER] });
+    // most wallets switch when the user approves the add; switch explicitly for those that don't
+    if ((await walletChain()) !== NET.chainId) await p.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: XLAYER.chainId }] });
+  }
+  const id = await walletChain();
+  if (id !== NET.chainId) throw new Error(`The wallet is still on chain ${id}.`);
+  listeners.forEach((f) => f());
+  return `switched to X Layer (chain ${NET.chainId})`;
+}
 export let account: Address | null = null;
 
 class RpcError extends Error {
@@ -35,12 +98,16 @@ function reason(e: unknown): Error {
 }
 
 export async function connect(): Promise<Address> {
-  const p = provider ?? (window as unknown as { ethereum?: Eip1193 }).ethereum;
+  const p = found();
   if (!p) throw new Error('No wallet found in this browser.');
   provider = p;
+  watch(p);
   account = ((await p.request({ method: 'eth_requestAccounts' })) as Address[])[0]!;
   const id = parseInt((await p.request({ method: 'eth_chainId' })) as string, 16);
-  if (id !== NET.chainId) throw new Error(`Your wallet is on chain ${id}; switch it to ${NET.chainId} (${NET.name}).`);
+  if (id !== NET.chainId) {
+    listeners.forEach((f) => f()); // shows the "Switch to X Layer" bar
+    throw new Error(`Your wallet is on chain ${id}. Use "Switch to X Layer" above, then try again.`);
+  }
   return account;
 }
 

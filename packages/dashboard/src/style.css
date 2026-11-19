@@ -136,3 +136,11 @@ table.props{border-bottom:1px solid var(--line)}
 .badge .dot{width:10px;height:10px;background:var(--dim)} .badge.ok .dot{background:var(--ok)} .badge.no .dot{background:var(--wax)}
 .badge small{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
 body.embed{background:transparent} body.embed .top{display:none} body.embed #app{padding:4px}
+
+/* the wrong-chain bar */
+#chainbar{background:rgba(214,61,39,.1);border-bottom:1px solid rgba(214,61,39,.55)}
+#chainbar[hidden]{display:none}
+#chainbar .cb-in{max-width:1180px;margin:0 auto;padding:12px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px}
+#chainbar b{font-family:var(--mono);font-weight:500}
+#chainbar button{min-height:38px}
+@media (max-width:640px){#chainbar .cb-in{padding:12px 18px}}

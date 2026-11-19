@@ -5,6 +5,21 @@ import { projectPage } from './pages/project.ts';
 import { proposalPage } from './pages/proposal.ts';
 import { provePage } from './pages/prove.ts';
 import { badgePage } from './pages/badge.ts';
+import { NET } from './chain.ts';
+import { onChainChange, switchToXLayer, walletChain } from './wallet.ts';
+import { action } from './ui.ts';
+
+// "Switch to X Layer": shown under the header whenever the wallet is on another chain
+const bar = document.getElementById('chainbar')!;
+const refreshChain = async () => {
+  const id = await walletChain();
+  const wrong = id !== null && id !== NET.chainId;
+  bar.hidden = !wrong;
+  if (wrong) bar.querySelector('.cb-now')!.textContent = String(id);
+};
+action(bar.querySelector('#switchchain') as HTMLButtonElement, switchToXLayer, () => void refreshChain());
+onChainChange(() => void refreshChain());
+void refreshChain();
 
 async function route(): Promise<void> {
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?');

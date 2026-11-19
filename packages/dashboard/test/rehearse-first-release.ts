@@ -138,7 +138,7 @@ const prof = mkdtempSync(join(tmpdir(), 'guard-prof-'));
 const gctx = await chromium.launchPersistentContext(prof, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, `--host-resolver-rules=MAP ${DOMAIN} 127.0.0.1`, `--unsafely-treat-insecure-origin-as-secure=${origin}`] });
 const sw = gctx.serviceWorkers()[0] ?? (await gctx.waitForEvent('serviceworker'));
 const extId = new URL(sw.url()).host;
-for (let i = 0; i < 300; i++) { const l = await sw.evaluate(async () => ((await chrome.storage.local.get('domains')).domains?.list ?? []) as string[]).catch(() => []); if (l.includes(DOMAIN)) break; await new Promise((r) => setTimeout(r, 200)); }
+for (let i = 0; i < 300; i++) { const l: string[] = await sw.evaluate(async () => (((await chrome.storage.local.get('domains')).domains as { list?: string[] } | undefined)?.list ?? [])).catch(() => []); if (l.includes(DOMAIN)) break; await new Promise((r) => setTimeout(r, 200)); }
 log(`   Guard's sealed-domain list: ${JSON.stringify(await sw.evaluate(async () => (await chrome.storage.local.get('domains')).domains ?? null))}`);
 const seen: Record<string, string> = {};
 for (const [path, swapped] of [['/', false], ['/app', false], ['/app', true]] as const) {
