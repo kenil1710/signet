@@ -37,6 +37,6 @@ function staticSite(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [staticSite()],
-  define: { __SIGNET_NET__: JSON.stringify(net), __SIGNET_PROOF_ORIGIN__: JSON.stringify(process.env.SIGNET_PROOF_ORIGIN || 'https://{domain}'), __SIGNET_WATCHTOWER_STATUS__: JSON.stringify(process.env.SIGNET_WATCHTOWER_STATUS ?? (n.name === 'mainnet' ? 'https://raw.githubusercontent.com/kenil1710/signet/watchtower-status/status.json' : '')) },
+  define: { __SIGNET_NET__: JSON.stringify(net), __SIGNET_PROOF_ORIGIN__: JSON.stringify(process.env.SIGNET_PROOF_ORIGIN || 'https://{domain}'), __SIGNET_WATCHTOWER_STATUS__: JSON.stringify(process.env.SIGNET_WATCHTOWER_STATUS ?? (n.name === 'mainnet' ? 'api/watchtower' : '')) },
   build: { target: 'es2022', rollupOptions: { input: { index: 'index.html', app: 'app.html', start: 'start.html', check: 'check.html' } } },
 });

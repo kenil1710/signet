@@ -22,7 +22,8 @@ const siteAbi = parseAbi(['function operatorOf(address) view returns (address)',
 const nftAbi = parseAbi(['function ownerOf(uint256) view returns (address)']);
 const gateAbi = parseAbi(['function renewOperator(address processor, uint256 tokenId)']);
 
-export async function renewIfDue(rc: RenewConfig, now = Math.floor(Date.now() / 1000)): Promise<RenewResult> {
+/// `now` defaults to the latest block's timestamp: the grant expires by chain time, not this machine's clock.
+export async function renewIfDue(rc: RenewConfig, nowArg?: number): Promise<RenewResult> {
   const chain = defineChain({ id: rc.chainId, name: `chain ${rc.chainId}`, nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 }, rpcUrls: { default: { http: [rc.rpcUrl] } } });
   const pub = createPublicClient({ chain, transport: http(rc.rpcUrl) });
   const account = privateKeyToAccount(rc.key);
@@ -31,6 +32,7 @@ export async function renewIfDue(rc: RenewConfig, now = Math.floor(Date.now() / 
     pub.readContract({ address: rc.processor, abi: nftAbi, functionName: 'ownerOf', args: [rc.circuitId] }),
     pub.getBalance({ address: account.address }),
   ]);
+  const now = nowArg ?? Number((await pub.getBlock({ blockTag: 'latest' })).timestamp);
   let until = Number(untilBig);
   const low = balance < (rc.lowBalanceWei ?? 50_000_000_000_000n);
   const base = { renewer: account.address, balance: formatEther(balance), low, holder };

@@ -43,7 +43,7 @@ contract OperatorForkTest is Test {
     function test_operatorSemantics() public {
         string memory rpc = vm.envOr("XLAYER_RPC_URL", string(""));
         if (bytes(rpc).length == 0) vm.skip(true);
-        vm.createSelectFork(rpc);
+        vm.createSelectFork(rpc, 76_306_000); // before circuit #5 moved into the site gate (block 76,306,374)
         Holder h = new Holder();
         vm.prank(DEV);
         I721(CPU).safeTransferFrom(DEV, address(h), 5);

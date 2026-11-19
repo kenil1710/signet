@@ -140,8 +140,23 @@ await wz.screenshot({ path: join(OUT, 'wizard-done.png'), fullPage: true });
 await step('2. the wizard shows the next commands with this domain and gate', () => (nextText.includes(`signet link ${DOMAIN} ${gate}`) ? 'yes' : Promise.reject(new Error(nextText.slice(0, 300)))));
 
 // 3. domain proof
-await step(`3. signet link ${DOMAIN} <gate>`, async () => (await run(`signet link ${DOMAIN} ${gate}`)).split('\n')[0]!);
-await step('3. signet domain public', async () => (await run('signet domain public')).split('\n')[0]!);
+if (process.env.STRANGER_INIT) {
+  // /start's fastest path: one command writes the config, the proof, the host's header file and the workflow
+  await step(`3. signet init --domain ${DOMAIN} --gate <gate> --host cloudflare --yes`, async () => (await run(`signet init --domain ${DOMAIN} --gate ${gate} --host cloudflare --yes`)).split('\n').filter((l) => /Wrote|CORS/.test(l)).join(' | '));
+  await step('3. init wrote the config, the proof, the _headers rule and the workflow', () => {
+    const cfg = JSON.parse(readFileSync(join(proj, 'signet.config.json'), 'utf8'));
+    const proof = JSON.parse(readFileSync(join(proj, 'public/.well-known/signet.json'), 'utf8'));
+    const headers = readFileSync(join(proj, 'public/_headers'), 'utf8');
+    const wf = readFileSync(join(proj, '.github/workflows/signet.yml'), 'utf8');
+    if (cfg.gate.toLowerCase() !== gate.toLowerCase() || proof.gate.toLowerCase() !== gate.toLowerCase()) throw new Error('gate mismatch');
+    if (!/\/\.well-known\/signet\.json\n  Access-Control-Allow-Origin: \*/.test(headers)) throw new Error('no CORS rule');
+    if (!wf.includes(`npm install -g signetguard@${latest}`) || !/signet wait dist --publish/.test(wf) || !/wrangler@4 pages deploy dist/.test(wf)) throw new Error(wf);
+    return `yes (workflow pins signetguard@${latest})`;
+  });
+} else {
+  await step(`3. signet link ${DOMAIN} <gate>`, async () => (await run(`signet link ${DOMAIN} ${gate}`)).split('\n')[0]!);
+  await step('3. signet domain public', async () => (await run('signet domain public')).split('\n')[0]!);
+}
 const build = () => { rmSync(join(proj, 'dist'), { recursive: true, force: true }); cpSync(join(proj, 'src'), join(proj, 'dist'), { recursive: true }); cpSync(join(proj, 'public'), join(proj, 'dist'), { recursive: true }); };
 build();
 const acme = await serve(join(proj, 'dist'), true, ACME_PORT);

@@ -46,7 +46,28 @@ async function syncDomains(): Promise<void> {
   }
   await local.set({ domains: { list, syncedAt: Date.now() } satisfies DomainList });
 }
-const sync = () => (syncing ??= syncDomains().catch(() => {}).finally(() => (syncing = null)));
+// A failed sync (an RPC down or the two RPCs disagreeing for a moment) is retried after 2, 5, 10 and 20 s, then by a
+// one-off alarm a minute later. Before 2026-11-19 a failure waited for the 5-minute alarm, leaving a fresh install
+// with an empty sealed list (no protection) for 5 minutes; under load the staging suites timed out on it.
+const RETRY_MS = [2000, 5000, 10000, 20000];
+async function syncWithRetry(): Promise<void> {
+  for (let i = 0; ; i++) {
+    try {
+      await syncDomains();
+      void local.remove('syncError');
+      return;
+    } catch (e) {
+      // kept for diagnosis (the popup and the tests can show why the list is stale); no browsing data in it
+      void local.set({ syncError: { at: Date.now(), attempt: i + 1, message: String((e as Error)?.message ?? e).slice(0, 300) } });
+      if (i >= RETRY_MS.length) {
+        void chrome.alarms.create('sync-retry', { delayInMinutes: 1 });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, RETRY_MS[i]));
+    }
+  }
+}
+const sync = () => (syncing ??= syncWithRetry().finally(() => (syncing = null)));
 
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.alarms.create('sync', { periodInMinutes: SYNC_MINUTES });
@@ -54,7 +75,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 chrome.runtime.onStartup.addListener(() => void sync());
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === 'sync') void sync();
+  if (a.name === 'sync' || a.name === 'sync-retry') void sync();
 });
 
 // ---------------------------------------------------------------- what the chain says about one domain

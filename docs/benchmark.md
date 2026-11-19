@@ -44,10 +44,17 @@ pnpm staging:up      # anvil fork of X Layer mainnet + Signet's contracts deploy
 pnpm benchmark       # the 3 defenders x (12 attacks + clean sessions); rewrites this file
 ```
 
-About 25 minutes on a laptop. Last rerun: 2026-11-19 on a fresh fork at block 76,309,421, the same results as above.
-The attacks, the clean sessions and the scoring are in `packages/attacks/src/suite.ts`; `benchmark.ts` runs it once per defender.
-One earlier rerun the same day stopped in the hash-only run after 6 attacks (exit 1, no error message); the next
-full run passed. It is intermittent, and we don't know the cause yet.
+About 11 minutes on a laptop. The attacks, the clean sessions and the scoring are in
+`packages/attacks/src/suite.ts`; `benchmark.ts` runs it once per defender. `ATTACKS_TRACE=1` prints how long each
+attack took; a failed run names the attack it failed in.
+
+**An intermittent failure, found and fixed (2026-11-19).** One rerun stopped after 6 attacks with no message. The
+message was lost because the suite exited before macOS flushed the pipe (now written synchronously). The failure
+itself: each attack starts a browser with Guard and waits for Guard's first sync of the sealed-domain list; when that
+sync failed (an RPC error or the two RPCs disagreeing for a moment), Guard waited for its 5-minute alarm. Saturating
+every CPU core reproduced it. This was a real Guard bug (a fresh install on a bad network had no protection for 5
+minutes): Guard now retries after 2, 5, 10 and 20 s, then by a one-minute alarm. Reruns after the fix:
+`docs/final-plan-report.md`.
 
 ## Reading it fairly
 

@@ -30,7 +30,7 @@ contract MirrorProbe {
 /// processor code hash, and the real SiteRegistry with SignetRegistry as operator of circuit #5's container.
 /// That one container holds Signet's own site under `signet/<domain>/` and free-tier projects under
 /// `projects/<domain>/`.
-/// Circuit #5 stays with its holder (the dev wallet; a multisig after the hackathon).
+/// Circuit #5 stays with its holder (the dev wallet until 2026-11-19, Signet's site gate since; read at the fork block).
 /// Nothing is broadcast. SKIPPED when XLAYER_RPC_URL is unset.
 contract CoreForkTest is Test {
     address constant CPU = 0x73153e5fd2Acac604D49d6ca9fea27b750718F22; // processor #101
@@ -39,7 +39,7 @@ contract CoreForkTest is Test {
     address constant IMPL = 0x977f217887E085D298Cb3819cDAD5A0ee35F29B2;
     address constant SITES = 0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6;
     address constant OPENER = 0x536adD8F30f03b69f6fbF29d425A816A0dC50106;
-    address constant DEV = 0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE; // holds circuits #5 and #6
+    address constant DEV = 0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE; // signet-dev: held circuits #5 and #6 (#5 moved to the site gate 2026-11-19)
     address constant SHARED = 0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed; // circuit #5's container
     string constant DOMAIN = "demo.signet.example";
     string constant SITE = "signet.example";
@@ -58,6 +58,7 @@ contract CoreForkTest is Test {
 
     bytes constant ALLOWLIST = bytes('{"196":{"targets":[],"spenders":[],"eip712":[]}}');
     bytes constant ORIGINS = bytes('["https://xlayerrpc.okx.com"]');
+    address holder; // circuit #5's holder at the fork block
 
     function setUp() public {
         string memory rpc = vm.envOr("XLAYER_RPC_URL", string(""));
@@ -80,7 +81,8 @@ contract CoreForkTest is Test {
             IMPL
         );
         require(address(factory) == predictedFactory, "factory address");
-        vm.prank(DEV); // the holder keeps circuit #5 and makes the registry the container's operator
+        holder = ICircuitNFT(CPU).ownerOf(5); // whoever holds circuit #5 at the fork block (the site gate since 2026-11-19)
+        vm.prank(holder); // the holder keeps circuit #5 and makes the registry the container's operator
         ISiteRegistryWriter(SITES).setOperator(SHARED, address(reg), 30 days);
         site = _newGate(SITE, address(0), 0); // the factory's first gate
         require(address(site) == reg.signetSiteGate(), "site gate address");
@@ -142,7 +144,7 @@ contract CoreForkTest is Test {
     function test_fork_endToEnd_realCircuit_realSiteRegistry() public {
         if (!forked) vm.skip(true);
         assertEq(reg.sharedContainer(), SHARED);
-        assertEq(ICircuitNFT(CPU).ownerOf(5), DEV); // never transferred
+        assertEq(ICircuitNFT(CPU).ownerOf(5), holder); // not transferred by any of this
 
         // release 1: the largest allowed file (48,000 bytes, 2 chunks) as the file list
         bytes memory filesJson = new bytes(48_000);
@@ -251,7 +253,7 @@ contract CoreForkTest is Test {
         (,,,, chunks) = ISiteRegistryWriter(SITES).fileInfo(SHARED, "signet/manifest-sample.json");
         assertEq(chunks, 1);
         assertEq(ISiteRead(SITES).fallbackPath(SHARED), "");
-        assertEq(ICircuitNFT(CPU).ownerOf(5), DEV);
+        assertEq(ICircuitNFT(CPU).ownerOf(5), holder);
     }
 
     function test_fork_fallbackToMirror_beaconChanged_orCircuitCallFails() public {

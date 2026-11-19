@@ -425,3 +425,6 @@ a.soon{cursor:default;pointer-events:none}
 .tt.gh thead th:first-child{width:26%}
 .tt.gh td:last-child,.tt.gh thead th:last-child{width:37%}
 @media (max-width:900px){.path{grid-template-columns:1fr}.pn:not(:last-child)::after{content:"↓";right:auto;left:18px;top:auto;bottom:-15px}.gets{grid-template-columns:1fr}}
+
+.tt.gh tbody th{overflow-wrap:normal;word-break:normal;hyphens:auto}
+@media (max-width:640px){.tt.gh tbody th,.tt.gh thead th:first-child{width:30%}.tt.gh{font-size:12.5px}}

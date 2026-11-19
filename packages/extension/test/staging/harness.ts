@@ -4,7 +4,26 @@
 // built extension loaded. Not product code.
 import http from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+
+// Every temp folder the harness makes (projects, builds, browser profiles) is removed when the test process exits,
+// so repeated runs don't fill the disk (a benchmark run made ~200). KEEP_TMP=1 keeps them for debugging.
+const made: string[] = [];
+const tmp = (prefix: string): string => {
+  const d = mkdtempSync(join(tmpdir(), prefix));
+  made.push(d);
+  return d;
+};
+process.on('exit', () => {
+  if (process.env.KEEP_TMP) return;
+  for (const d of made) {
+    try {
+      rmSync(d, { recursive: true, force: true });
+    } catch {
+      // best effort
+    }
+  }
+});
 import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,7 +63,7 @@ export interface Project { dir: string; dist: string; domain: string; gate: Addr
 
 /// init + first release of the demo dApp, published with a full on-chain copy. The gate starts in observe mode.
 export async function sealDemoDapp(domain: string, o: { spenders?: string[] } = {}): Promise<Project> {
-  const dir = mkdtempSync(join(tmpdir(), 'guard-project-'));
+  const dir = tmp('guard-project-');
   const dist = join(dir, 'dist');
   const b = spawnSync('pnpm', ['--filter', '@signet/demo-dapp', 'build'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'local' } });
   if (b.status !== 0) throw new Error(`demo-dapp build failed\n${b.stdout}${b.stderr}`);
@@ -172,7 +191,7 @@ export async function rpcProxy(): Promise<Proxy> {
 // ---------------------------------------------------------------- the extension build and the browser
 
 export function buildExtension(rpc1: string, rpc2: string, gateway?: { url: string; dist: string }): string {
-  const out = mkdtempSync(join(tmpdir(), 'guard-ext-'));
+  const out = tmp('guard-ext-');
   const r = spawnSync(process.execPath, [join(ROOT, 'packages/extension/scripts/build.mjs')], {
     cwd: join(ROOT, 'packages/extension'), encoding: 'utf8',
     env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL: rpc1, SIGNET_RPC_URL2: rpc2, GUARD_OUT: out, SIGNET_GATEWAY_URL: gateway?.url ?? '', SIGNET_GATEWAY_DIST: gateway?.dist ?? '' },
@@ -219,7 +238,7 @@ export async function installMockWallet(ctx: BrowserContext, late = false): Prom
 /// A fresh browser profile with Guard loaded and a mock wallet on every page (window.ethereum and one
 /// EIP-6963 provider). `late`: the wallet installs itself after the page's first script, as slow wallets do.
 export async function openBrowser(ext: string, o: { origin: string; late?: boolean }): Promise<Session> {
-  const profile = mkdtempSync(join(tmpdir(), 'guard-profile-'));
+  const profile = tmp('guard-profile-');
   const ctx = await chromium.launchPersistentContext(profile, {
     channel: 'chromium', headless: true, viewport: { width: 1100, height: 760 },
     args: [
@@ -230,7 +249,8 @@ export async function openBrowser(ext: string, o: { origin: string; late?: boole
     ],
   });
   const wallet = await installMockWallet(ctx, !!o.late);
-  const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker'));
+  // up to 90 s: on a fully loaded machine Chromium can take more than the default 30 s to start the worker
+  const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker', { timeout: 90000 }));
   const extId = new URL(sw.url()).host;
   return { ctx, sw, wallet, extId, close: () => ctx.close() };
 }
@@ -247,8 +267,15 @@ export async function until<T>(what: string, f: () => Promise<T | null | undefin
 }
 
 /// Guard downloads the list of sealed domains on its own schedule; wait until this one is on it.
-export const synced = (s: Session, domain: string) =>
-  until(`the sealed-domain list to include ${domain}`, () => s.sw.evaluate(async (d) => (((await chrome.storage.local.get('domains')).domains as { list?: string[] } | undefined)?.list ?? []).includes(d), domain));
+export const synced = async (s: Session, domain: string): Promise<true> => {
+  // up to 45 s: Guard retries a failed first sync after 2, 5, 10 and 20 s
+  try {
+    return await until(`the sealed-domain list to include ${domain}`, () => s.sw.evaluate(async (d) => (((await chrome.storage.local.get('domains')).domains as { list?: string[] } | undefined)?.list ?? []).includes(d), domain), 45000);
+  } catch (e) {
+    const why = await s.sw.evaluate(async () => (await chrome.storage.local.get(['syncError', 'domains'])) as Record<string, unknown>).catch(() => null);
+    throw new Error(`${(e as Error).message} (Guard's last sync error: ${JSON.stringify(why?.syncError ?? 'none')}; list has ${((why?.domains as { list?: string[] } | undefined)?.list ?? []).length} domains)`);
+  }
+};
 
 /// The tab a page lives in. Guard keeps per-tab state for sealed pages; an extension page carries it in its URL.
 export async function tabIdOf(s: Session, page: Page): Promise<number> {
@@ -270,7 +297,7 @@ export const signed = (s: Session) => s.wallet.filter((c) => /sendTransaction|si
 
 /// The gateway (packages/gateway) built for these RPCs and served locally: http://<label>.localhost:<port>/
 export async function startGateway(rpc1: string, rpc2: string): Promise<{ url: string; dist: string; port: number; log: string[]; close(): void }> {
-  const dist = mkdtempSync(join(tmpdir(), 'gateway-dist-'));
+  const dist = tmp('gateway-dist-');
   const r = spawnSync(process.execPath, [join(ROOT, 'packages/gateway/scripts/build.mjs')], { cwd: join(ROOT, 'packages/gateway'), encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL: rpc1, SIGNET_RPC_URL2: rpc2, GATEWAY_OUT: dist } });
   if (r.status !== 0) throw new Error(`gateway build failed\n${r.stdout}${r.stderr}`);
   const { serveGateway } = (await import(join(ROOT, 'packages/gateway/scripts/serve.mjs'))) as { serveGateway(d: string): Promise<{ port: number; log: string[]; close(): void }> };
