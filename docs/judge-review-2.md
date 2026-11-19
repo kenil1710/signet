@@ -34,6 +34,9 @@ after release #3 is published (Fri 20 Nov 2026, from 13:45 IST). No transactions
 |---|---|---|
 | 10 | `docs/business.md`: who pays (dApp teams, per domain; users never), Pro **$49 / month** for 3 domains, Enterprise from $500 / month (both planned; prices are our proposal), how we reach users (X Layer teams first, the badge, wallets later, npm / GitHub Action), why teams stay, and what would prove it wrong. The site's plans show the prices and say there are no paying customers yet | `docs/business.md`, site "For teams" |
 
-## Rerun
+## Rerun (item 7)
 
-See the end of this file (filled in after the rerun finished).
+`pnpm staging:up && pnpm benchmark` on a fresh fork at block 76,309,421 (2026-11-19), the documented command:
+**SRI 2/12, hash-only 7/12, Signet 12/12; 0 false blocks** (14, 16, 16 clean sessions), identical to the published
+table. One earlier attempt stopped in the hash-only run after 6 attacks with exit 1 and no error message; run alone
+it gave 7/12, and the next full run passed. It is recorded as intermittent in `docs/benchmark.md`.

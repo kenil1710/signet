@@ -230,7 +230,9 @@ test('/prove, with no wallet: both circuits re-checked on all 512 inputs, the be
   const t = await pg.locator('#app').innerText();
   assert.match(t, /All checks passed/);
   assert.match(t, /Verified\s+The release policy is circuit #6[\s\S]*34 NAND gates[\s\S]*all 512 rows equal the published truth table/i);
-  assert.match(t, /Verified\s+The Guard decision circuit[\s\S]*circuit #7: 22 NAND gates[\s\S]*all 512 rows/i);
+  // the staging fork tapes out its own Guard circuit, so its id depends on the fork block (#7 on mainnet)
+  const guardId = JSON.parse(readFileSync(new URL('../../../contracts/deployments/local.json', import.meta.url), 'utf8')).tapeout.guardCircuitId;
+  assert.match(t, new RegExp(`Verified\\s+The Guard decision circuit[\\s\\S]*circuit #${guardId}: 22 NAND gates[\\s\\S]*all 512 rows`, 'i'));
   assert.match(t, /Verified\s+A taped-out circuit's behavior can't be upgraded/i);
   assert.match(t, new RegExp(`Verified\\s+${domain.replace(/\./g, '\\.')}: the release files stored on-chain hash to what its gate published\\s+release #${published} is revoked`, 'i'));
   if (process.env.SIGNET_SAVE_DEMO) await pg.screenshot({ path: join(DEMO_DIR, 'dashboard-prove.png'), fullPage: true });
