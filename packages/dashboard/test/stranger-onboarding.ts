@@ -1,7 +1,7 @@
 // A stranger follows /start, word for word, on a throwaway fork of X Layer mainnet (the real Signet contracts),
 // with a made-up domain and fresh wallets. Nothing is sent to mainnet.
 //   node packages/dashboard/test/stranger-onboarding.ts
-// Steps: install the CLI from the site's own package (dist/signetguard-0.1.0.tgz), keygen, create the gate in the
+// Steps: install the CLI from the npm registry (`npm install -g signetguard`, a fresh npm cache, no repo), keygen, create the gate in the
 // dashboard's "Protect a site" wizard (a wallet in the page), link, domain proof (+ --check against a local copy of
 // the site), the workflow's commands (verify, seal, propose), two approvals in the dashboard, 24 h, `wait --publish`,
 // and the badge. Every step is logged as OK or FAILED; the first failure stops the run.
@@ -18,6 +18,7 @@ const DASH = join(ROOT, 'packages/dashboard');
 const NETF = JSON.parse(readFileSync(join(ROOT, 'packages/contracts/deployments/mainnet.json'), 'utf8'));
 const PORT = 8557, FORK = `http://127.0.0.1:${PORT}`;
 const DOMAIN = 'acme-swap.example';
+const ACME_PORT = 8598; // the stranger's own site (it serves their /.well-known/signet.json, as https://acme-swap.example would)
 const OUT = join(ROOT, 'staging/.run/stranger'); rmSync(OUT, { recursive: true, force: true }); mkdirSync(OUT, { recursive: true });
 const lines: string[] = [];
 const log = (s: string) => { console.log(s); lines.push(s); writeFileSync(join(OUT, 'log.txt'), lines.join('\n') + '\n'); };
@@ -50,7 +51,8 @@ const home = mkdtempSync(join(tmpdir(), 'stranger-'));
 const proj = join(home, 'acme-swap'); mkdirSync(join(proj, 'src'), { recursive: true }); mkdirSync(join(proj, 'public'));
 writeFileSync(join(proj, 'src/index.html'), '<!doctype html><title>Acme Swap</title><h1>Acme Swap</h1><script src="app.js"></script>');
 writeFileSync(join(proj, 'src/app.js'), 'document.title = "Acme Swap";');
-const env = { ...process.env, PATH: `${join(home, 'g/bin')}:${process.env.PATH}`, SIGNET_RPC_URL: FORK, SIGNET_NETWORK: '', SIGNET_PRIVATE_KEY: '', SIGNET_PROPOSER_KEY: '' };
+// a bare environment: no repo, nothing on PATH but the fresh npm prefix, node and the system; an empty npm cache
+const env: Record<string, string> = { HOME: home, TMPDIR: tmpdir(), npm_config_cache: join(home, '.npm'), PATH: `${join(home, 'g/bin')}:${join(process.execPath, '..')}:/usr/bin:/bin`, SIGNET_RPC_URL: FORK };
 // not spawnSync: this same process serves the site the commands download from (a sync call would deadlock)
 const run = (cmd: string, extra: Record<string, string> = {}) => new Promise<string>((res, rej) => {
   const c = spawn('bash', ['-c', cmd], { cwd: proj, env: { ...env, ...extra } });
@@ -61,16 +63,18 @@ const run = (cmd: string, extra: Record<string, string> = {}) => new Promise<str
 
 // ---- the site, built for this fork (the stranger's browser talks to "mainnet" = the fork)
 const dist = mkdtempSync(join(tmpdir(), 'site-'));
-const b = spawnSync('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir'], { cwd: DASH, encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'mainnet', SIGNET_RPC_URL: FORK, SIGNET_RPC_URL2: FORK } });
+const b = spawnSync('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir'], { cwd: DASH, encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'mainnet', SIGNET_RPC_URL: FORK, SIGNET_RPC_URL2: FORK, SIGNET_PROOF_ORIGIN: `http://127.0.0.1:${ACME_PORT}` } });
 if (b.status !== 0) throw new Error(b.stderr);
 const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.webp': 'image/webp', '.json': 'application/json', '.tgz': 'application/gzip' };
-const serve = (dir: string, clean = true) => new Promise<{ url: string; close(): void }>((res) => {
+const serve = (dir: string, clean = true, port = 0) => new Promise<{ url: string; close(): void }>((res) => {
   const s = http.createServer((q, r) => {
     let p = q.url!.split('?')[0]!.slice(1) || 'index.html';
     if (clean && !existsSync(join(dir, p)) && existsSync(join(dir, `${p}.html`))) p += '.html'; // clean URLs, as Cloudflare Pages
+    // the header /start tells teams to add, so the dashboard and badge can read the proof
+    if (p === '.well-known/signet.json') r.setHeader('access-control-allow-origin', '*');
     try { r.setHeader('content-type', types[extname(p)] ?? 'application/octet-stream'); r.end(readFileSync(join(dir, p))); } catch { r.statusCode = 404; r.end(); }
   });
-  s.listen(0, '127.0.0.1', () => res({ url: `http://127.0.0.1:${(s.address() as { port: number }).port}`, close: () => s.close() }));
+  s.listen(port, '127.0.0.1', () => res({ url: `http://127.0.0.1:${(s.address() as { port: number }).port}`, close: () => s.close() }));
 });
 const site = await serve(dist);
 
@@ -78,8 +82,10 @@ const site = await serve(dist);
 const startHtml = await (await fetch(`${site.url}/start`)).text();
 await step('/start is served at the clean URL /start', () => (/Protect your site/.test(startHtml) ? 'yes' : Promise.reject(new Error('no /start page'))));
 
-await step('1. npm install -g <site>/signetguard-0.1.0.tgz', async () => (await run(`npm install -g --prefix ${join(home, 'g')} ${site.url}/signetguard-0.1.0.tgz`)).split('\n').pop()!);
-await step('1. signet --version', () => run('signet --version'));
+const latest = (await (await fetch('https://registry.npmjs.org/signetguard')).json())['dist-tags'].latest as string;
+await step('1. npm install -g signetguard (from the npm registry)', async () => (await run(`npm install -g --prefix ${join(home, 'g')} signetguard`)).split('\n').pop()!);
+await step('1. `signet` is the one npm just installed', async () => { const w = await run('command -v signet'); if (!w.startsWith(join(home, 'g/bin'))) throw new Error(w); return w.replace(home, '~stranger'); });
+await step(`1. signet --version (npm latest is ${latest})`, async () => { const v = await run('signet --version'); if (v !== latest) throw new Error(v); return v; });
 const proposer = await step('1. signet keygen', async () => (await run('signet keygen')).match(/0x[0-9a-fA-F]{40}/)![0]);
 await step('1. the key file is git-ignored', () => (readFileSync(join(proj, '.signet/.gitignore'), 'utf8').includes('*') ? 'yes' : Promise.reject(new Error('no .gitignore'))));
 
@@ -136,7 +142,7 @@ await step(`3. signet link ${DOMAIN} <gate>`, async () => (await run(`signet lin
 await step('3. signet domain public', async () => (await run('signet domain public')).split('\n')[0]!);
 const build = () => { rmSync(join(proj, 'dist'), { recursive: true, force: true }); cpSync(join(proj, 'src'), join(proj, 'dist'), { recursive: true }); cpSync(join(proj, 'public'), join(proj, 'dist'), { recursive: true }); };
 build();
-const acme = await serve(join(proj, 'dist'));
+const acme = await serve(join(proj, 'dist'), true, ACME_PORT);
 await step('3. signet domain --check (the deployed site, served locally as the domain)', async () => (await run('signet domain --check', { SIGNET_DOMAIN_ORIGIN: acme.url })).split('\n').pop()!);
 
 // 4. the workflow's commands (what the GitHub job runs), with the secret as an env var
@@ -157,6 +163,9 @@ for (const [n, who] of [['A', W.a], ['B', W.b]] as const) {
 }
 await rpc('evm_increaseTime', [86400 + 60]); await rpc('evm_mine');
 await step('5. (after 24 h) signet wait dist --publish', async () => (await run('signet wait dist --publish --timeout 120 --interval 2', { SIGNET_PROPOSER_KEY: key })).split('\n').filter((l) => /Published|wrote|read back|ready/i.test(l)).slice(0, 4).join(' | '));
+// /start's workflow (release #3) has no upload step and `wait --publish` doesn't upload: without the 3 manifest files
+// Guard can't check the site. The fix path: `signet upload dist` (into the shared container, now held by Signet's gate)
+await step('5. signet upload dist (the manifest files Guard reads)', async () => (await run('signet upload dist', { SIGNET_PROPOSER_KEY: key })).split('\n').filter((l) => /wrote|read back/i.test(l)).join(' | '));
 const bp = await wallet(W.creator);
 await bp.goto(`${site.url}/app#/badge/${DOMAIN}`);
 await step('5. the badge page says "Sealed by Signet" for the domain', async () => { await bp.locator('.badge.ok').waitFor({ timeout: 30000 }); return (await bp.locator('.badge').innerText()).replace(/\s+/g, ' '); });
