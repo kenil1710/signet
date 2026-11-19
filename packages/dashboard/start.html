@@ -25,7 +25,7 @@
         <pre data-copy>npm install -g signetguard
 signet --version
 signet keygen</pre>
-        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g {{ORIGIN}}/signetguard-0.1.0.tgz</code>.</p>
+        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g {{ORIGIN}}/signetguard-0.1.2.tgz</code>.</p>
         <p><code>signet keygen</code> creates your CI proposer key in <code>.signet/proposer.key</code> (git-ignored) and prints only its <b>address</b>. Keep the address for step 2. The key can propose and publish releases; it can never approve one.</p>
       </section>
 
@@ -42,6 +42,7 @@ signet domain public</pre>
   Access-Control-Allow-Origin: *</pre>
         <p>(Vercel: the same header in <code>vercel.json</code>.) Deploy your site once with the file, then check:</p>
         <pre data-copy>signet domain --check</pre>
+        <p><b>Behind Cloudflare?</b> Turn off <b>Email Obfuscation</b> and <b>Rocket Loader</b> for your site, and anything else that rewrites HTML or scripts on the way out. They change the bytes your visitors get after you sealed them, so Guard shows the site as not matching its release. (Email Obfuscation rewrites any text that looks like an email address, even <code>name&#64;1.2.3</code>, and adds a script.) Check the live bytes against your build with <code>signet verify https://your-domain --build dist</code>.</p>
         <p class="dim">Only someone who controls the domain can publish this file. Guard, the dashboard, the badge and the watchtower ignore a gate until its domain serves this file naming it, so nobody can seal a domain they don't control.</p>
       </section>
 
@@ -65,17 +66,18 @@ jobs:
         with:
           node-version: 20
       - run: npm ci && npm run build            # your build; output in dist/
-      - run: npm install -g signetguard&#64;0.1.0
+      - run: npm install -g signetguard&#64;0.1.2
       - name: Seal and propose (the CI key can only propose)
         run: signet verify dist && signet seal dist && signet propose dist --reuse
         env:
           SIGNET_PROPOSER_KEY: ${{ secrets.SIGNET_PROPOSER_KEY }}
-      - name: Wait for the approvals and the timelock, then publish (the circuit decides)
+      - name: Wait for the approvals and the timelock, publish (the circuit decides), store the manifest Guard reads
         run: signet wait dist --publish --timeout 19800
         env:
           SIGNET_PROPOSER_KEY: ${{ secrets.SIGNET_PROPOSER_KEY }}
       - name: Deploy (only reached after the release is published)
         run: echo "your deploy command here"</pre>
+        <p><code>signet wait --publish</code> also writes the release's 3 manifest files on-chain (allowlist, origins, file list; ≈ 0.00003 OKB), which is what Guard checks your site against. A re-run skips files that are already stored.</p>
         <p class="dim">Deploy only after <code>signet wait</code> succeeds: that is what makes an unapproved build unable to go live. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
       </section>
 

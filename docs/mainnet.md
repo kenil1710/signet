@@ -80,3 +80,22 @@ through the registry after the move wrote and read back its manifest files).
 - ~~Renew the registry's operator grant~~ Done differently, 2026-11-19: circuit #5 moved into the site gate (below). The grant now runs to **2026-12-19 08:05 UTC** and **anyone** can renew it with `siteGate.renewOperator(processor, 5)`. The watchtower will do it automatically (planned, `packages/watchtower/README.md`).
 - Signet's own site's first release (propose, 3 approvals, publish, upload): not done; DeWEB upload not approved.
 - Fund the CI proposer and approvers with a little OKB when they start acting (not done).
+
+## Runbook: release #3 → #4 (Fri 20 Nov 2026)
+
+Prepared 2026-11-19 (commit after `de45bc7`); **not deployed**. The live site must stay byte-identical to release/3
+until #3 is published.
+
+1. **Publish #3** (from 13:45:22 IST / 08:15:22 UTC; proposal expires Thu 26 Nov 13:43:29 IST). CI proposer key;
+   ≈ 0.00006 OKB (publish 306k gas + 3 manifest writes ≈ 2.66M gas). Shown to the user and sent only on their yes:
+   `cd packages/dashboard && SIGNET_NETWORK=mainnet node ../cli/src/cli.ts -C . publish 3 release/3`
+   Check: `currentRelease() = 3`, the 3 files read back, Guard-style check of the live site = sealed #3.
+2. **Deploy the #4 site changes** (`/start`: `signetguard@0.1.2`, "publishing includes the upload", the Cloudflare
+   Email Obfuscation / Rocket Loader warning, tarball link 0.1.2; 0.1.0 and 0.1.1 tarballs removed):
+   `pnpm --filter @signet/dashboard build && npx -y wrangler@4 pages deploy dist --project-name signet --branch main`
+   Then fetch every live file from signetguard.xyz into `release/4` and require byte-identity with `dist`.
+3. **Seal and propose #4** from the live files: `seal release/4`, then `propose release/4`. Expected (fork-tested
+   2026-11-19): **tier 00 code only**, 1 approval + 1 h; allowlistHash `0x5a48…efc5` and originsHash `0xfa18…85cf`
+   unchanged from #3.
+4. **The user approves** (1 approval) in the dashboard.
+5. **Publish #4** after 1 h (+ its manifest upload), shown first and sent on the user's yes.
