@@ -68,6 +68,18 @@ team). Against the same attacks, SRI alone blocks 2 and a hash-only checker 7 ([
 | `diff-guard-poisoned.txt` | what approvers see for a build with a poisoned npm package |
 | `watchtower-hijack.txt` | the team's alert |
 
+## How is this different from Code Verify / WEBCAT, or a scam detector?
+
+- **Code Verify** (Meta) compares WhatsApp Web's code with a hash Meta publishes. **WEBCAT** (Freedom of the Press
+  Foundation, Firefox, developer preview) blocks pages that don't match a Sigstore-signed manifest.
+  - Signet adds: **no single key can publish** (CI proposes, humans approve, an unchangeable TapeOut circuit
+    decides, with on-chain risk tiers and timelocks), a **signing-time allowlist**, and a public on-chain record.
+  - They do better: WEBCAT blocks before any script runs and proves domain enrollment, which Signet doesn't yet.
+  - Details: [`docs/prior-art.md`](docs/prior-art.md).
+- **Scam detectors** (Blockaid in MetaMask, Wallet Guard, Pocket Universe, Scam Sniffer) flag *known-bad* sites and
+  addresses on every site. Signet *allowlists* what a team sealed, so it catches a hijacked **legitimate** site
+  sending to a fresh address. They're complementary: [`docs/vs-scam-detectors.md`](docs/vs-scam-detectors.md).
+
 ## Minute 4–5: read the limits
 
 [`THREAT_MODEL.md`](THREAT_MODEL.md), especially "Who is protected" and "Honest limits". In short: protection at

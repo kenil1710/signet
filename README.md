@@ -39,6 +39,34 @@ on-chain parts (C1–C9 in [`CLAIMS.md`](CLAIMS.md)).
 
 Not used yet (see the Roadmap): TapeSend, TapeCode, hosting the site itself on DeWEB.
 
+## How is this different from Code Verify or WEBCAT?
+
+[Meta Code Verify](https://engineering.fb.com/2022/03/10/security/code-verify/) checks that WhatsApp Web's code
+matches the hash Meta publishes to Cloudflare. [WEBCAT](https://github.com/freedomofpress/webcat) (Freedom of the
+Press Foundation; developer preview, Firefox) blocks a page whose assets don't match a manifest signed by the
+site's enrolled Sigstore identities.
+
+Signet adds three things for dApps:
+- **No single key can publish.** CI only proposes; humans approve in their own wallets; an on-chain timelock and
+  risk tier (computed from what changed) apply; and an unchangeable TapeOut circuit decides.
+- **A signing-time allowlist.** A wallet is refused contracts and spenders the team didn't seal.
+- **A public on-chain record** of every release and approval.
+
+They do some things better:
+- WEBCAT is fail-closed before any script runs, and proves domain enrollment with a cooldown. Signet doesn't yet
+  (`docs/domain-ownership.md`).
+- Code Verify ships at scale.
+
+Details: [`docs/prior-art.md`](docs/prior-art.md).
+
+## Why not just use a scam detector?
+
+Use one: they're complementary. Blockaid (MetaMask's security alerts), Wallet Guard, Pocket Universe and Scam
+Sniffer recognize known-bad sites and addresses, and simulate transactions on **any** site. Signet instead
+**allowlists** the exact code and contracts a team sealed. That catches a hijack of a **legitimate** site sending
+to an address nobody has flagged yet. It protects only sealed sites, and only users who run Guard. Details and a
+side-by-side test plan: [`docs/vs-scam-detectors.md`](docs/vs-scam-detectors.md).
+
 ## Roadmap (planned, not built)
 
 - **TapeSend alerts.** The watchtower would send alerts ("site doesn't match its seal", "new tier 10/11 proposal",
