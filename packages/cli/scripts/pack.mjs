@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 const out = `${ROOT}release/pkg`;
 rmSync(`${ROOT}release`, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
@@ -26,7 +26,7 @@ if (!js.startsWith('#!')) writeFileSync(`${out}/signet.mjs`, `#!/usr/bin/env nod
 chmodSync(`${out}/signet.mjs`, 0o755);
 writeFileSync(`${out}/package.json`, JSON.stringify({
   name: 'signetguard', version: VERSION, description: "Signet CLI: seal each release of your dApp's website on X Layer; a TapeOut circuit decides when it goes live.",
-  license: 'MIT', type: 'module', bin: { signet: './signet.mjs' }, files: ['signet.mjs', 'README.md'], engines: { node: '>=18' },
+  license: 'MIT', type: 'module', bin: { signet: 'signet.mjs' }, files: ['signet.mjs', 'README.md'], engines: { node: '>=18' },
   keywords: ['x-layer', 'tapeout', 'release', 'supply-chain', 'web3', 'security'],
 }, null, 2) + '\n');
 writeFileSync(`${out}/README.md`, `# signetguard
@@ -50,3 +50,6 @@ if (p.status !== 0) throw new Error(p.stderr);
 // the site serves it for /start until it is on npm
 copyFileSync(`${ROOT}release/signetguard-${VERSION}.tgz`, `${ROOT}../dashboard/public/signetguard-${VERSION}.tgz`);
 console.log(`built ${ROOT}release/signetguard-${VERSION}.tgz (${readFileSync(`${ROOT}release/signetguard-${VERSION}.tgz`).length} bytes)`);
+// release gate: a clean global install of the tarball must give a working `signet` (see docs/npm-release.md)
+const t = spawnSync(process.execPath, [`${ROOT}scripts/install-test.mjs`, `${ROOT}release/signetguard-${VERSION}.tgz`], { stdio: 'inherit' });
+if (t.status !== 0) process.exit(1);

@@ -31505,7 +31505,7 @@ async function domainProof(ctx, publicDir, o, log) {
 }
 // src/cli.ts
 var log = (line = "") => console.log(line);
-var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.1.0").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
+var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.1.1").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
 var ctx = () => {
 	const g = program.opts();
 	return makeCtx(resolve(g.project), g.as);

@@ -1,11 +1,11 @@
 {
   "name": "signetguard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Signet CLI: seal each release of your dApp's website on X Layer; a TapeOut circuit decides when it goes live.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "signet": "./signet.mjs"
+    "signet": "signet.mjs"
   },
   "files": [
     "signet.mjs",
