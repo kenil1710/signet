@@ -65,7 +65,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci && npm run build            # your build; output in dist/
-      - run: npm install -g signetguard@0.1.0
+      - run: npm install -g signetguard&#64;0.1.0
       - name: Seal and propose (the CI key can only propose)
         run: signet verify dist && signet seal dist && signet propose dist --reuse
         env:

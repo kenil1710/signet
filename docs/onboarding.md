@@ -1,6 +1,6 @@
 # Team onboarding: /start, the "Protect a site" wizard, the CLI package (Phase 0b, 2026-11-19)
 
-Built and tested; **not deployed**. The live site stays at release #2 until it is published. All of this goes out
+**Deployed 2026-11-19** to Cloudflare Pages (signetguard.xyz and signet-6l4.pages.dev) and sealed as release/3 (proposal pending approvals; tier 10). All of this goes out
 in release #3.
 
 ## What was built

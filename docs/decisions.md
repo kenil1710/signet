@@ -389,3 +389,7 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 ## 2026-11-19: Circuit #5 (shared container) moved into the site gate
 - **Decision:** signet-dev transferred circuit #5 to the site gate and renewed SignetRegistry's operator grant through `renewOperator` (txs in `docs/mainnet.md`). The watchtower will auto-renew below 7 days left, from a dedicated small wallet, never signet-dev.
 - **Why:** no single human key controls every project's file store, and the 30-day grant no longer depends on one person remembering. Trade-off: a contract holder can't `publishKey`, so container #5 can't receive sealed TapeSend messages.
+
+## 2026-11-19: Release #3 sealed from the live site; Cloudflare Email Obfuscation avoided
+- **Decision:** the final site (onboarding, positioning copy, domain proof) is deployed and sealed as `packages/dashboard/release/3` from the bytes signetguard.xyz serves (18/18 identical to the build). `https://www.npmjs.com` (a link on /start) is excluded from origins, so origins equal release/2; the allowlist gains the site gate and SignetFactory: tier 10. `signetguard@0.1.0` on /start is written `signetguard&#64;0.1.0`.
+- **Why:** Cloudflare's Email Obfuscation on the signetguard.xyz zone rewrote `signetguard@0.1.0` as an email and injected `/cdn-cgi/.../email-decode.min.js`, so the live page no longer matched its seal. Any team behind Cloudflare must turn Email Obfuscation (and Rocket Loader, etc.) off or avoid email-like text: to add to /start and `signet verify`.
