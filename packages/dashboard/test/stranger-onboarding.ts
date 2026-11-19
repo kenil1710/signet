@@ -82,10 +82,12 @@ const site = await serve(dist);
 const startHtml = await (await fetch(`${site.url}/start`)).text();
 await step('/start is served at the clean URL /start', () => (/Protect your site/.test(startHtml) ? 'yes' : Promise.reject(new Error('no /start page'))));
 
-const latest = (await (await fetch('https://registry.npmjs.org/signetguard')).json())['dist-tags'].latest as string;
-await step('1. npm install -g signetguard (from the npm registry)', async () => (await run(`npm install -g --prefix ${join(home, 'g')} signetguard`)).split('\n').pop()!);
+// STRANGER_CLI=<path to signetguard-x.y.z.tgz>: test a build before it is published (default: the npm registry)
+const local = process.env.STRANGER_CLI;
+const latest = local ? local.match(/signetguard-(\d+\.\d+\.\d+)\.tgz$/)![1]! : (await (await fetch('https://registry.npmjs.org/signetguard')).json())['dist-tags'].latest as string;
+await step(`1. npm install -g ${local ? local.split('/').pop() : 'signetguard (from the npm registry)'}`, async () => (await run(`npm install -g --prefix ${join(home, 'g')} ${local ?? 'signetguard'}`)).split('\n').pop()!);
 await step('1. `signet` is the one npm just installed', async () => { const w = await run('command -v signet'); if (!w.startsWith(join(home, 'g/bin'))) throw new Error(w); return w.replace(home, '~stranger'); });
-await step(`1. signet --version (npm latest is ${latest})`, async () => { const v = await run('signet --version'); if (v !== latest) throw new Error(v); return v; });
+await step(`1. signet --version (expected ${latest})`, async () => { const v = await run('signet --version'); if (v !== latest) throw new Error(v); return v; });
 const proposer = await step('1. signet keygen', async () => (await run('signet keygen')).match(/0x[0-9a-fA-F]{40}/)![0]);
 await step('1. the key file is git-ignored', () => (readFileSync(join(proj, '.signet/.gitignore'), 'utf8').includes('*') ? 'yes' : Promise.reject(new Error('no .gitignore'))));
 
@@ -162,10 +164,18 @@ for (const [n, who] of [['A', W.a], ['B', W.b]] as const) {
   await step(`5. Approver ${n} approves in the dashboard`, async () => { const t = await toastAfter(p, `tr[data-id="${id}"] button[data-a="approve"]`); if (!/^approved/.test(t)) throw new Error(t); return t; });
 }
 await rpc('evm_increaseTime', [86400 + 60]); await rpc('evm_mine');
-await step('5. (after 24 h) signet wait dist --publish', async () => (await run('signet wait dist --publish --timeout 120 --interval 2', { SIGNET_PROPOSER_KEY: key })).split('\n').filter((l) => /Published|wrote|read back|ready/i.test(l)).slice(0, 4).join(' | '));
-// /start's workflow (release #3) has no upload step and `wait --publish` doesn't upload: without the 3 manifest files
-// Guard can't check the site. The fix path: `signet upload dist` (into the shared container, now held by Signet's gate)
-await step('5. signet upload dist (the manifest files Guard reads)', async () => (await run('signet upload dist', { SIGNET_PROPOSER_KEY: key })).split('\n').filter((l) => /wrote|read back/i.test(l)).join(' | '));
+await step('5. (after 24 h) signet wait dist --publish', async () => {
+  const out = await run('signet wait dist --publish --timeout 120 --interval 2', { SIGNET_PROPOSER_KEY: key });
+  // a published release without its manifest stored on-chain is a FAILURE: Guard couldn't check the site
+  if (!/read back projects\/acme-swap\.example\/signet\/files\.json: matches/.test(out)) throw new Error(`published, but the manifest wasn't uploaded:\n${out}`);
+  return out.split('\n').filter((l) => /Published release|wrote|read back/i.test(l)).join(' | ');
+});
+await step('5. the 3 manifest files are on-chain (a second upload finds all of them stored, unchanged)', async () => {
+  const out = await run('signet upload dist', { SIGNET_PROPOSER_KEY: key });
+  const same = out.split('\n').filter((l) => /^\s+same\s/.test(l)).length;
+  if (same !== 3 || /wrote/.test(out)) throw new Error(out);
+  return '3 of 3 stored';
+});
 const bp = await wallet(W.creator);
 await bp.goto(`${site.url}/app#/badge/${DOMAIN}`);
 await step('5. the badge page says "Sealed by Signet" for the domain', async () => { await bp.locator('.badge.ok').waitFor({ timeout: 30000 }); return (await bp.locator('.badge').innerText()).replace(/\s+/g, ' '); });

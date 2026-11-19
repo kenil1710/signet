@@ -67,7 +67,8 @@ else
   group "Waiting for approvals and the timelock, then publishing release #$ID"
   if [ "${INPUT_PUBLISH:-true}" = "true" ]; then
     # publish is open to anyone and the policy circuit decides; the key adds nothing but the gas
-    SIGNET_PROPOSER_KEY="$KEY" signet wait "$BUILD" --publish --timeout "${INPUT_WAIT_TIMEOUT:-19800}" --interval "${INPUT_POLL_INTERVAL:-30}"
+    # --no-upload: the "upload-manifest" step below does it (and can be turned off)
+    SIGNET_PROPOSER_KEY="$KEY" signet wait "$BUILD" --publish --no-upload --timeout "${INPUT_WAIT_TIMEOUT:-19800}" --interval "${INPUT_POLL_INTERVAL:-30}"
   else
     signet wait "$BUILD" --timeout "${INPUT_WAIT_TIMEOUT:-19800}" --interval "${INPUT_POLL_INTERVAL:-30}"
   fi

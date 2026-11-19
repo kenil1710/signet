@@ -31003,6 +31003,7 @@ async function wait(ctx, buildDir, o, log) {
 	for (;;) {
 		if (await isCurrentRelease(ctx, cfg.gate, m)) {
 			log(`Published: this build is the current release of ${cfg.domain} (manifest ${m.manifestHash}).`);
+			if (o.publish && o.upload !== false) await upload(ctx, buildDir, {}, log);
 			return;
 		}
 		const s = await gateState(ctx, cfg.gate);
@@ -31505,7 +31506,7 @@ async function domainProof(ctx, publicDir, o, log) {
 }
 // src/cli.ts
 var log = (line = "") => console.log(line);
-var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.1.1").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
+var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.1.2").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
 var ctx = () => {
 	const g = program.opts();
 	return makeCtx(resolve(g.project), g.as);
@@ -31594,11 +31595,12 @@ program.command("propose <buildDir>").description("propose the sealed build as a
 program.command("diff <id> [buildDir]").description("Diff Guard: what proposal <id> changes compared with the current release, in plain words").option("--base <dir>", "the current release's sealed build dir (default: its sealed lists are read from the chain)").option("--json", "print the report as JSON (what the dashboard shows)").action(async (v, buildDir, o) => {
 	await diff(ctx(), id(v), buildDir ?? "dist", o, log);
 });
-program.command("wait <buildDir>").description("wait until this exact build is published on-chain (CI runs this before deploying)").option("--publish", "send the publish call once approvals and timelock allow it (anyone may; the policy circuit decides)").option("--timeout <seconds>", "give up after this long (exit code 3; the proposal stays open)", "19800").option("--interval <seconds>", "time between checks", "30").action(async (buildDir, o) => {
+program.command("wait <buildDir>").description("wait until this exact build is published on-chain (CI runs this before deploying)").option("--publish", "send the publish call once approvals and timelock allow it (anyone may; the policy circuit decides), then store the manifest files Guard reads").option("--timeout <seconds>", "give up after this long (exit code 3; the proposal stays open)", "19800").option("--interval <seconds>", "time between checks", "30").option("--no-upload", "with --publish: don't store the 3 manifest files Guard reads (then run signet upload yourself)").action(async (buildDir, o) => {
 	await wait(ctx(), buildDir, {
 		timeout: Number(o.timeout),
 		interval: Number(o.interval),
-		publish: o.publish
+		publish: o.publish,
+		upload: o.upload
 	}, log);
 });
 program.command("approve <id>").description("approve a proposal (approvers only)").action(async (v) => approve(ctx(), id(v), log));

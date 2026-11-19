@@ -139,11 +139,12 @@ program.command('diff <id> [buildDir]')
 
 program.command('wait <buildDir>')
   .description('wait until this exact build is published on-chain (CI runs this before deploying)')
-  .option('--publish', 'send the publish call once approvals and timelock allow it (anyone may; the policy circuit decides)')
+  .option('--publish', 'send the publish call once approvals and timelock allow it (anyone may; the policy circuit decides), then store the manifest files Guard reads')
   .option('--timeout <seconds>', 'give up after this long (exit code 3; the proposal stays open)', '19800')
   .option('--interval <seconds>', 'time between checks', '30')
-  .action(async (buildDir: string, o: { timeout: string; interval: string; publish?: boolean }) => {
-    await cmd.wait(ctx(), buildDir, { timeout: Number(o.timeout), interval: Number(o.interval), publish: o.publish }, log);
+  .option('--no-upload', "with --publish: don't store the 3 manifest files Guard reads (then run signet upload yourself)")
+  .action(async (buildDir: string, o: { timeout: string; interval: string; publish?: boolean; upload?: boolean }) => {
+    await cmd.wait(ctx(), buildDir, { timeout: Number(o.timeout), interval: Number(o.interval), publish: o.publish, upload: o.upload }, log);
   });
 
 program.command('approve <id>').description('approve a proposal (approvers only)').action(async (v: string) => cmd.approve(ctx(), id(v), log));

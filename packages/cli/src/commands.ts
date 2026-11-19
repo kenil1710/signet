@@ -254,7 +254,7 @@ export const WAIT_TIMEOUT = 3; // exit code: not published in time (the proposal
 /// With `publish` (what the GitHub Action uses) it also sends the `publish` call as soon as the approvals and
 /// the timelock are there. Anyone may send that call and the policy circuit decides: it gives the key no say
 /// over what gets published, and a call sent too early is simply refused.
-export async function wait(ctx: Ctx, buildDir: string, o: { timeout: number; interval: number; publish?: boolean }, log: Log): Promise<void> {
+export async function wait(ctx: Ctx, buildDir: string, o: { timeout: number; interval: number; publish?: boolean; upload?: boolean }, log: Log): Promise<void> {
   const cfg = needProject(ctx);
   const build = loadSealed(buildDir);
   checkBuild(build, cfg);
@@ -268,6 +268,10 @@ export async function wait(ctx: Ctx, buildDir: string, o: { timeout: number; int
   for (;;) {
     if (await isCurrentRelease(ctx, cfg.gate, m)) {
       log(`Published: this build is the current release of ${cfg.domain} (manifest ${m.manifestHash}).`);
+      // with --publish, also store the 3 manifest files Guard reads (as `signet publish` does). Files already stored
+      // unchanged are skipped, so a re-run, or a release someone else published, is fine. A failed upload fails the
+      // job: Guard can't check a release whose manifest isn't stored, and a re-run resumes it.
+      if (o.publish && o.upload !== false) await upload(ctx, buildDir, {}, log);
       return;
     }
     const s = await gateState(ctx, cfg.gate);

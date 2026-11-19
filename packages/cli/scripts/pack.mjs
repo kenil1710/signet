@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const VERSION = '0.1.1';
+const VERSION = '0.1.2';
 const out = `${ROOT}release/pkg`;
 rmSync(`${ROOT}release`, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
