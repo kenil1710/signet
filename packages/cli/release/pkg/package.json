@@ -1,7 +1,7 @@
 {
   "name": "signetguard",
   "version": "0.1.2",
-  "description": "Signet CLI: seal each release of your dApp's website on X Layer; a TapeOut circuit decides when it goes live.",
+  "description": "Signet CLI: seal each release of your dApp's website on X Layer, so Signet Guard refuses any wallet signature your team didn't seal. A TapeOut circuit decides when a release goes live.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -9,10 +9,20 @@
   },
   "files": [
     "signet.mjs",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18"
+  },
+  "homepage": "https://signetguard.xyz/start",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kenil1710/signet.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/kenil1710/signet/issues"
   },
   "keywords": [
     "x-layer",

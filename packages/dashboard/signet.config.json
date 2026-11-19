@@ -15,5 +15,12 @@
       "https://t.me",
       "https://www.npmjs.com"
     ]
+  },
+  "allowlist": {
+    "196": {
+      "exclude": [
+        "0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D"
+      ]
+    }
   }
 }

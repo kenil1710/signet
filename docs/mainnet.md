@@ -92,7 +92,10 @@ until #3 is published.
    Check: `currentRelease() = 3`, the 3 files read back, Guard-style check of the live site = sealed #3.
 2. **Deploy the #4 site changes** (`/start`: `signetguard@0.1.2`, "publishing includes the upload", the Cloudflare
    Email Obfuscation / Rocket Loader warning, tarball link 0.1.2; 0.1.0 and 0.1.1 tarballs removed):
-   `pnpm --filter @signet/dashboard build && npx -y wrangler@4 pages deploy dist --project-name signet --branch main`
+   `SIGNET_REPO_PUBLIC=1 pnpm --filter @signet/dashboard build && npx -y wrangler@4 pages deploy dist --project-name signet --branch main`
+   (`SIGNET_REPO_PUBLIC=1` only once the GitHub repo is public: it turns the GitHub link on. Checked 2026-11-19: with
+   or without it, #4's allowlist and origins equal #3's, so #4 is tier 00. The ReleaseGate implementation address
+   shown on /app is excluded from the allowlist in `signet.config.json`: it's displayed, never called.)
    Then fetch every live file from signetguard.xyz into `release/4` and require byte-identity with `dist`.
 3. **Seal and propose #4** from the live files: `seal release/4`, then `propose release/4`. Expected (fork-tested
    2026-11-19): **tier 00 code only**, 1 approval + 1 h; allowlistHash `0x5a48…efc5` and originsHash `0xfa18…85cf`

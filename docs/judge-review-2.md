@@ -40,3 +40,10 @@ after release #3 is published (Fri 20 Nov 2026, from 13:45 IST). No transactions
 **SRI 2/12, hash-only 7/12, Signet 12/12; 0 false blocks** (14, 16, 16 clean sessions), identical to the published
 table. One earlier attempt stopped in the hash-only run after 6 attacks with exit 1 and no error message; run alone
 it gave 7/12, and the next full run passed. It is recorded as intermittent in `docs/benchmark.md`.
+
+## Tier check for release #4
+
+The new static `/app` content lists the ReleaseGate implementation address, which the sealer would have added to the
+allowlist (making #4 tier 10). It is display-only, never called, so `signet.config.json` excludes it
+(`allowlist["196"].exclude`). Sealed against release/3, with and without `SIGNET_REPO_PUBLIC=1`: **allowlist and
+origins identical, so release #4 is tier 00** (1 approval + 1 h).
