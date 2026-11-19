@@ -365,3 +365,26 @@ a.soon{cursor:default;pointer-events:none}
 .btn .soon-tag{color:inherit;opacity:.8}
 
 .bigword::before{content:attr(data-word)} /* decorative: drawn by CSS so it is not read as low-contrast text */
+
+/* comparison block (inside the benchmark section) */
+.compare{margin-top:72px}
+.compare .label{display:block;padding-top:12px;border-top:1px solid var(--line);margin-bottom:18px}
+.cmp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:14px}
+.cmp th,.cmp td{text-align:left;vertical-align:top;padding:12px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.cmp thead th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.cmp thead th small{display:block;text-transform:none;letter-spacing:0;color:var(--dim);margin-top:4px;font-size:11px}
+.cmp tbody th{font-weight:600;color:var(--text);width:26%}
+.cmp td{color:#CFC7C1}
+.cmp .sig{color:var(--text);background:rgba(214,61,39,.07)}
+.cmp thead th.sig{color:var(--wax-hi, #FF8E77)}
+@media (max-width:760px){
+  .cmp,.cmp tbody,.cmp tr,.cmp th,.cmp td{display:block;width:auto}
+  .cmp thead{display:none}
+  .cmp tbody tr{border-top:1px solid var(--line);padding:10px 0}
+  .cmp tbody th{border:0;padding:6px 0;width:auto}
+  .cmp td{border:0;padding:3px 0 3px 12px;font-size:13px}
+  .cmp td:nth-of-type(1)::before{content:"DeWEB site: ";color:var(--dim)}
+  .cmp td:nth-of-type(2)::before{content:"Code-hash checkers: ";color:var(--dim)}
+  .cmp td:nth-of-type(3)::before{content:"Scam detectors: ";color:var(--dim)}
+  .cmp td:nth-of-type(4)::before{content:"Signet: ";color:var(--dim)}
+}

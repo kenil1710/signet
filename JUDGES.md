@@ -1,5 +1,7 @@
 # Signet in 5 minutes
 
+**Signet brings DeWEB's trust guarantee to every website: no migration, your own domain, plus approval rules for every release.**
+
 **What it is.** A dApp team seals each release of its website on X Layer: the hash of every file, the contracts and
 spenders the site may ask a wallet to sign for, and the outside origins it may talk to. A TapeOut circuit decides
 when a release may go live (CI can propose and publish but never approve; humans approve; risky changes wait). Users who run the **Guard**

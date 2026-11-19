@@ -1,5 +1,7 @@
 # Signet
 
+> Signet brings DeWEB's trust guarantee to every website: no migration, your own domain, plus approval rules for every release.
+>
 > Signet lets a dApp team seal each release of its website on X Layer (file hashes, the contracts and spenders the site may ask a wallet to sign for, the outside origins it may use). A TapeOut circuit decides when a release goes live (CI can propose and publish but never approve; humans approve; risky changes wait 24 h). Users who run the Guard browser extension have every page and every signature checked against the sealed release; the signing decision comes from a second TapeOut circuit. Users without Guard are NOT protected at signing; a watchtower alerts the team instead.
 
 Status (2026-11-18): live on X Layer mainnet (chain 196), deployed 2026-11-18 for 0.002171 OKB (docs/mainnet.md):

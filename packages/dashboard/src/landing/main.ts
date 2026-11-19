@@ -184,7 +184,7 @@ const shellText = shellLines.join('\n');
 const hero = $('#hero');
 const BEATS = [
   { files: '7 / 7 match the seal', stat: 'Sealed · 2 of 3 approved',
-    lede: "Signet seals every release of your dApp's website on X Layer, so anyone can check that the page in front of them is the one the team approved." },
+    lede: "Signet brings DeWEB's trust guarantee to every website: no migration, your own domain, plus approval rules for every release." },
   { files: '6 / 7 · app-2aa5a3e0.js changed', stat: 'Seal broken',
     lede: "<b>February 2025.</b> One tampered JavaScript file on Safe{Wallet}'s site, about $1.5B taken from Bybit. The smart contracts were never touched." },
   { files: '6 / 7 · verified copy available', stat: 'Signature refused · $0 sent',

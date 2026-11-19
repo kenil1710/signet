@@ -1,5 +1,6 @@
 # Signet: the website can only ask your wallet for what its team sealed on X Layer
 
+**Signet brings DeWEB's trust guarantee to every website: no migration, your own domain, plus approval rules for every release.**
 **What it is.** A dApp team seals each release of its website on X Layer; a TapeOut circuit decides when it may go live, and users who run the **Guard** extension get every page and every signature checked against it by a second TapeOut circuit.
 **Benchmark (staging):** against the same 12 attacks, SRI alone blocks 2, a hash-only checker 7, **Signet 12**, with **0 false blocks** ([`docs/benchmark.md`](docs/benchmark.md)).
 **Verify it yourself:** `pnpm install && pnpm verify:claims` (read-only, about 2 minutes, checks [`CLAIMS.md`](CLAIMS.md) against X Layer mainnet).
