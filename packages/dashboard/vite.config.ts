@@ -1,7 +1,10 @@
 // The dashboard is static: everything it knows about the network is injected here, at build time.
 //   SIGNET_NETWORK=local SIGNET_RPC_URL2=http://127.0.0.1:8546 pnpm --filter @signet/dashboard build
 // Two RPCs that must agree, as in Guard. base "./" so it works from any path (a DeWEB container, a subfolder).
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { applyLinksHtml, linksFor } from './src/landing/config.ts';
 import { loadNetwork } from '@signet/contracts/network';
 
 const n = loadNetwork();
@@ -9,9 +12,27 @@ const net = {
   name: n.name, chainId: n.chainId, rpcUrl: n.rpcUrl, rpcUrl2: process.env.SIGNET_RPC_URL2 || n.rpcUrl2 || null,
   registry: n.contracts.registry ?? null, factory: n.contracts.factory ?? null, siteRegistry: n.tapeout.siteRegistry, tapeout: n.tapeout,
 };
+// Static HTML that reads the same without JavaScript (crawlers, AI judges, reader modes): every outside link is
+// written into the HTML at build time, {{ORIGIN}} is filled in, and the trust documents are served by the site.
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const DOCS: Record<string, string> = { 'docs/THREAT_MODEL.md': 'THREAT_MODEL.md', 'docs/CLAIMS.md': 'CLAIMS.md', 'docs/benchmark.md': 'docs/benchmark.md' };
+function staticSite(): Plugin {
+  const links = linksFor(process.env.SIGNET_REPO_PUBLIC === '1');
+  return {
+    name: 'signet-static-site',
+    transformIndexHtml(html) {
+      const out = applyLinksHtml(html, links);
+      return n.name === 'mainnet' ? out.replaceAll('{{ORIGIN}}', links.domain) : out;
+    },
+    generateBundle() {
+      for (const [to, from] of Object.entries(DOCS)) this.emitFile({ type: 'asset', fileName: to, source: readFileSync(ROOT + from, 'utf8') });
+    },
+  };
+}
 // Two pages: index.html is the landing page (no viem, no chain reads); app.html is the dashboard and /prove.
 export default defineConfig({
   base: './',
+  plugins: [staticSite()],
   define: { __SIGNET_NET__: JSON.stringify(net), __SIGNET_PROOF_ORIGIN__: JSON.stringify(process.env.SIGNET_PROOF_ORIGIN || 'https://{domain}') },
   build: { target: 'es2022', rollupOptions: { input: { index: 'index.html', app: 'app.html', start: 'start.html' } } },
 });

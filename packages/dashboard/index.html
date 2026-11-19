@@ -3,15 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Signet</title>
+<title>Signet: Guard refuses wallet signatures your dApp team didn't seal</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%23D63D27%27/%3E%3Ctext x=%2716%27 y=%2722%27 text-anchor=%27middle%27 font-family=%27Arial%27 font-weight=%27700%27 font-size=%2717%27 fill=%27%23fff%27%3ES%3C/text%3E%3C/svg%3E">
-<meta name="description" content="Signet seals every release of a dApp's website on X Layer; users who run Guard are refused anything the team didn't seal.">
+<meta name="description" content="Signet Guard refuses any wallet signature to a contract or spender your dApp's team didn't seal. Each release of the site is sealed on X Layer, approved by people, and published by a TapeOut circuit. Built on TapeKit's on-chain file verification.">
+<link rel="canonical" href="https://signetguard.xyz/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://signetguard.xyz/">
+<meta property="og:title" content="Signet: Guard refuses wallet signatures your dApp team didn't seal">
+<meta property="og:description" content="A hacked dApp page can't ask your wallet to approve a contract or spender outside the team's sealed allowlist. Releases are approved on X Layer and published by TapeOut circuit #6.">
+<meta name="twitter:card" content="summary">
 <script>/* old dashboard links (#/prove, #/p/…) now live on app.html */ if (location.hash.indexOf('#/') === 0) location.replace('app.html' + location.hash);</script>
 <script type="module" src="/src/landing/main.ts"></script>
 </head>
 <body>
-<div id="loader" aria-hidden="true"><b>Signet</b><span class="num" id="ldN">000</span><div class="bar"><i></i></div></div>
+<div id="loader" aria-hidden="true"><b data-t="Signet"></b> <span class="num" id="ldN"></span><div class="bar"><i></i></div></div>
 
+<noscript><div class="nojs wrap">
+  <h2>Signet in short</h2>
+  <p><b>Guard refuses wallet signatures your dApp's team didn't seal.</b> If a dApp's website is hacked (a swapped
+  script, a hijacked domain, a poisoned npm package), the page can't ask your wallet to approve, permit or transfer
+  to a contract or spender outside the release's sealed allowlist: Guard refuses it before the wallet opens.</p>
+  <ul>
+    <li><b>Seal:</b> CI hashes every file of a release and lists the contracts it may call; that becomes a proposal on X Layer. The CI key can only propose.</li>
+    <li><b>Approve:</b> the team's approvers approve in their own wallets. TapeOut circuit #6 decides when it publishes: code only 1 approval + 1 h; a new origin 2 + 1 h; a new contract or spender 2 + 24 h; admin changes 3 of 3 + 24 h.</li>
+    <li><b>Guard:</b> a browser extension (Chrome Web Store listing coming soon) checks the page against the sealed release, read from two X Layer nodes, and checks every signature request against the sealed allowlist (circuit #7).</li>
+    <li><b>Builds on TapeKit:</b> TapeKit already verifies DeWEB files on-chain. Signet adds the signing-time allowlist, risk-tiered approvals with timelocks, CI that can only propose, a domain proof, and a verified copy read from X Layer.</li>
+  </ul>
+  <p>Benchmark on a fork of X Layer: 12 of 12 attacks blocked, 0 false blocks in 16 clean sessions (SRI alone: 2/12; a hash-only checker: 7/12).</p>
+  <p><a href="https://signetguard.xyz/app#/prove">Proof page</a> (re-checks the circuits on X Layer in your browser) ·
+  <a href="https://signetguard.xyz/start">Setup guide for teams</a> ·
+  <a href="https://signetguard.xyz/app">Dashboard</a> ·
+  <a href="https://signetguard.xyz/docs/benchmark.md">Benchmark</a> ·
+  <a href="https://signetguard.xyz/docs/THREAT_MODEL.md">Threat model</a> ·
+  <a href="https://signetguard.xyz/docs/CLAIMS.md">Claims</a></p>
+</div></noscript>
 <canvas id="seal-gl" aria-hidden="true"></canvas>
 <img id="seal-still" src="/src/landing/seal-still.webp" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
 <div class="heat" aria-hidden="true"></div>
@@ -31,7 +56,7 @@
     </nav>
     <div class="nav-r">
       <span class="chain"><i></i>X LAYER · 196</span>
-      <a class="btn btn-wax" href="#cta" data-link="chromeWebStore">Add Guard</a>
+      <a class="btn btn-wax" href="#cta" data-link="chromeWebStore" data-soon="Guard: coming soon">Add Guard</a>
     </div>
   </div>
 </header>
@@ -47,20 +72,20 @@
     </div>
     <div class="h-ui">
       <div class="hud l" aria-hidden="true">
-        <div class="hi"><span class="k">Release</span><span class="v" id="hRel">#42 · demoswap.xyz</span></div>
-        <div class="hi"><span class="k">Chain</span><span class="v">X Layer mainnet · 196</span></div>
-        <div class="hi alert"><span class="k">Files</span><span class="v" id="hFiles">7 / 7 match the seal</span></div>
+        <div class="hi"><span class="k">Example release</span> <span class="v" id="hRel">#42 · demoswap.xyz</span></div>
+        <div class="hi"><span class="k">Chain</span> <span class="v">X Layer mainnet · 196</span></div>
+        <div class="hi alert"><span class="k">Files</span> <span class="v" id="hFiles">7 / 7 match the seal</span></div>
       </div>
       <div class="hud r" aria-hidden="true">
-        <div class="hi"><span class="k">Policy</span><span class="v">TapeOut circuit #6</span></div>
-        <div class="beats" aria-hidden="true"><span class="on" data-b="0">01 SEALED</span><span data-b="1">02 TAMPERED</span><span data-b="2">03 BLOCKED</span></div>
-        <div class="hi alert safe"><span class="k">Status</span><span class="v" id="hStat">Sealed · 2 of 3 approved</span></div>
+        <div class="hi"><span class="k">Policy</span> <span class="v">TapeOut circuit #6</span></div>
+        <div class="beats" aria-hidden="true"><span class="on" data-b="0">01 SEALED</span> <span data-b="1">02 TAMPERED</span> <span data-b="2">03 BLOCKED</span></div>
+        <div class="hi alert safe"><span class="k">Status</span> <span class="v" id="hStat">Sealed · 2 of 3 approved</span></div>
       </div>
       <div class="h-foot">
         <div class="wrap">
-          <p class="lede" id="lede">Signet brings DeWEB's trust guarantee to every website: no migration, your own domain, plus approval rules for every release.</p>
+          <p class="lede" id="lede">Guard refuses any wallet signature your team didn't seal. A hacked page can't ask for an approval, permit or transfer to a contract outside the release's allowlist, on your own domain, with approvals decided on X Layer.</p>
           <div class="cta-row">
-            <a class="btn btn-wax" href="#cta" data-link="chromeWebStore">Add Guard to Chrome<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+            <a class="btn btn-wax" href="#cta" data-link="chromeWebStore" data-soon="Guard for Chrome: coming soon">Add Guard to Chrome<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
             <a class="btn btn-line" href="#teams">Protect your dApp</a>
           </div>
         </div>
@@ -72,18 +97,18 @@
   <!-- INCIDENT TAPE -->
   <div class="tape" aria-label="Past frontend attacks">
     <div class="mq-track">
-      <div class="mq-item"><b>Bybit / Safe{Wallet}</b><span>tampered JavaScript</span><span class="tag">~$1.5B</span></div>
-      <div class="mq-item"><b>BadgerDAO</b><span>injected script</span><span class="tag">~$120M</span></div>
-      <div class="mq-item"><b>Ledger Connect Kit</b><span>poisoned npm package</span><span class="tag">wallet drainer</span></div>
-      <div class="mq-item"><b>Curve Finance</b><span>DNS hijack</span><span class="tag">frontend</span></div>
-      <div class="mq-item"><b>CoW Swap</b><span>domain hijack</span><span class="tag">frontend</span></div>
-      <div class="mq-item"><b>Aerodrome</b><span>DNS hijack</span><span class="tag">frontend</span></div>
-      <div class="mq-item" aria-hidden="true"><b>Bybit / Safe{Wallet}</b><span>tampered JavaScript</span><span class="tag">~$1.5B</span></div>
-      <div class="mq-item" aria-hidden="true"><b>BadgerDAO</b><span>injected script</span><span class="tag">~$120M</span></div>
-      <div class="mq-item" aria-hidden="true"><b>Ledger Connect Kit</b><span>poisoned npm package</span><span class="tag">wallet drainer</span></div>
-      <div class="mq-item" aria-hidden="true"><b>Curve Finance</b><span>DNS hijack</span><span class="tag">frontend</span></div>
-      <div class="mq-item" aria-hidden="true"><b>CoW Swap</b><span>domain hijack</span><span class="tag">frontend</span></div>
-      <div class="mq-item" aria-hidden="true"><b>Aerodrome</b><span>DNS hijack</span><span class="tag">frontend</span></div>
+      <div class="mq-item"><b>Bybit / Safe{Wallet}</b> <span>tampered JavaScript</span> <span class="tag">~$1.5B</span></div>
+      <div class="mq-item"><b>BadgerDAO</b> <span>injected script</span> <span class="tag">~$120M</span></div>
+      <div class="mq-item"><b>Ledger Connect Kit</b> <span>poisoned npm package</span> <span class="tag">wallet drainer</span></div>
+      <div class="mq-item"><b>Curve Finance</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item"><b>CoW Swap</b> <span>domain hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item"><b>Aerodrome</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Bybit / Safe{Wallet}</b> <span>tampered JavaScript</span> <span class="tag">~$1.5B</span></div>
+      <div class="mq-item" aria-hidden="true"><b>BadgerDAO</b> <span>injected script</span> <span class="tag">~$120M</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Ledger Connect Kit</b> <span>poisoned npm package</span> <span class="tag">wallet drainer</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Curve Finance</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>CoW Swap</b> <span>domain hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Aerodrome</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
     </div>
   </div>
 
@@ -105,8 +130,8 @@
           <div class="steps">
             <div class="step"><span class="label">Step 1 of 4</span><h3 class="stamp">A normal release.</h3><p>The team ships version 42. Signet fingerprints every file and seals the set on X Layer.</p></div>
             <div class="step"><span class="label">Step 2 of 4</span><h3 class="stamp">One file is swapped.</h3><p>A leaked CDN key, a hijacked domain, a poisoned package. One script changes and nobody on the team notices.</p></div>
-            <div class="step"><span class="label">Step 3 of 4</span><h3 class="stamp">The wallet asks to sign.</h3><p>The button still says Swap. The transaction underneath sends the tokens somewhere else.</p><div class="ticker num"><span id="tick">$0</span><small>left Bybit this way in February 2025</small></div></div>
-            <div class="step"><span class="label">Step 4 of 4</span><h3 class="stamp">Guard stops it.</h3><p>The page no longer matches its seal, so the request never reaches the wallet. The user gets the verified copy.</p><div class="ticker saved num">$0<small>sent by a user running Guard</small></div></div>
+            <div class="step"><span class="label">Step 3 of 4</span><h3 class="stamp">The wallet asks to sign.</h3><p>The button still says Swap. The transaction underneath sends the tokens somewhere else.</p><div class="ticker num"><span id="tick">~$1.5B</span> <small>left Bybit this way in February 2025</small></div></div>
+            <div class="step"><span class="label">Step 4 of 4</span><h3 class="stamp">Guard stops it.</h3><p>The signature names a contract that isn't on the sealed allowlist, so it never reaches the wallet, and the page is marked as not matching its seal. A verified copy read from X Layer is built and tested; it goes live with Pro.</p><div class="ticker saved num">$0 <small>sent by a user running Guard</small></div></div>
           </div>
         </div>
         <div class="browser">
@@ -119,39 +144,39 @@
           <div class="b-body">
             <div class="dapp">
               <h4>Swap</h4>
-              <div class="field"><div><small>You pay</small><b class="num">2,500.00</b></div><span class="tok">USDT</span></div>
-              <div class="field"><div><small>You receive</small><b class="num">≈ market</b></div><span class="tok">OKB</span></div>
+              <div class="field"><div><small>You pay</small> <b class="num">2,500.00</b></div><span class="tok">USDT</span></div>
+              <div class="field"><div><small>You receive</small> <b class="num">≈ market</b></div><span class="tok">OKB</span></div>
               <div class="swapbtn">Swap</div>
             </div>
             <div class="files">
               <span class="ttl">Release #42 · sealed files</span>
-              <div class="frow"><span>index.html</span><span class="st">match</span></div>
-              <div class="frow" id="fApp"><span>assets/app-2aa5a3e0.js</span><span class="st" id="fAppSt">match</span></div>
-              <div class="frow"><span>assets/vendor-91c0.js</span><span class="st">match</span></div>
-              <div class="frow"><span>assets/style-77e1.css</span><span class="st">match</span></div>
-              <div class="frow"><span>manifest.json</span><span class="st">match</span></div>
-              <div class="frow bad new" id="fNew"><span>cdn-cgi/loader.js</span><span class="st">not sealed</span></div>
+              <div class="frow"><span>index.html</span> <span class="st">match</span></div>
+              <div class="frow" id="fApp"><span>assets/app-2aa5a3e0.js</span> <span class="st" id="fAppSt">match</span></div>
+              <div class="frow"><span>assets/vendor-91c0.js</span> <span class="st">match</span></div>
+              <div class="frow"><span>assets/style-77e1.css</span> <span class="st">match</span></div>
+              <div class="frow"><span>manifest.json</span> <span class="st">match</span></div>
+              <div class="frow bad new" id="fNew"><span>cdn-cgi/loader.js</span> <span class="st">not sealed</span></div>
             </div>
           </div>
           <div class="diff" id="diff">
-            <div class="hd"><span>assets/app-2aa5a3e0.js</span><span>+1 line</span></div>
+            <div class="hd"><span>assets/app-2aa5a3e0.js</span> <span>+1 line</span></div>
             <div class="rm">  const tx = buildSwap(route, amount);</div>
             <div class="add">+ if (amount &gt; 1000) tx.to = "0x9f3c…e21a";</div>
             <div class="rm">  return wallet.sendTransaction(tx);</div>
           </div>
           <div class="wallet" id="wallet">
-            <div class="wt"><span>Wallet</span><span>X Layer</span></div>
+            <div class="wt"><span>Wallet</span> <span>X Layer</span></div>
             <h5>Confirm transaction</h5>
-            <div class="kv"><span>Action</span><span>Swap</span></div>
-            <div class="kv"><span>Send to</span><span>0x9f3c…e21a</span></div>
-            <div class="kv"><span>Amount</span><span class="num">2,500 USDT</span></div>
+            <div class="kv"><span>Action</span> <span>Swap</span></div>
+            <div class="kv"><span>Send to</span> <span>0x9f3c…e21a</span></div>
+            <div class="kv"><span>Amount</span> <span class="num">2,500 USDT</span></div>
             <div class="wb"><div>Reject</div><div>Confirm</div></div>
           </div>
           <div class="blocked" id="blocked">
             <svg width="60" height="60" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4a28 28 0 1 0 0 56" fill="none" stroke="#FFF6F3" stroke-width="3"/><path d="M36 4.3A28 28 0 0 1 36 59.7" fill="none" stroke="#FFF6F3" stroke-width="3" opacity=".5"/><path d="M33 2l-4 14 6 6-6 10 5 8-4 22" fill="none" stroke="#FFF6F3" stroke-width="2.5" stroke-linejoin="round"/></svg>
             <h4>Stop. This site's seal is broken.</h4>
             <p>Signet stopped this page from asking your wallet to sign. Nothing was sent.</p>
-            <div class="bb"><span>Open the verified copy</span><span>Leave this site</span></div>
+            <div class="bb"><span>Open the verified copy</span> <span>Leave this site</span></div>
           </div>
         </div>
       </div>
@@ -196,20 +221,20 @@
             <span class="idx">02</span>
             <h3 class="stamp">A TapeOut circuit makes the call.</h3>
             <p>Approvals and waiting time go into circuit #6, a fixed NAND circuit on X Layer. Riskier changes need more people and a longer wait.</p>
-            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="#D63D27" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#D63D27" stroke-width="1.4" fill="none"/></svg><span>Its beacon has no owner. Nobody can change the rule, including us.</span></div>
+            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="#D63D27" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#D63D27" stroke-width="1.4" fill="none"/></svg><span>The circuit's beacon has no owner, so nobody can upgrade the rule, including us.</span></div>
           </div>
           <div class="pr">
             <div class="appr">
-              <div class="who ci"><span class="av">CI</span>CI key proposed #43<span class="stt">can't approve</span></div>
-              <div class="who" id="wA"><span class="av">A</span>Approver A<span class="stt">waiting</span></div>
-              <div class="who" id="wB"><span class="av">B</span>Approver B<span class="stt">waiting</span></div>
-              <div class="who"><span class="av">C</span>Approver C<span class="stt">waiting</span></div>
+              <div class="who ci"><span class="av">CI</span> CI key proposed #43 <span class="stt">can't approve</span></div>
+              <div class="who" id="wA"><span class="av">A</span> Approver A <span class="stt">waiting</span></div>
+              <div class="who" id="wB"><span class="av">B</span> Approver B <span class="stt">waiting</span></div>
+              <div class="who"><span class="av">C</span> Approver C <span class="stt">waiting</span></div>
             </div>
             <div class="lock">
               <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="none" stroke="#2A2522" stroke-width="3"/><circle id="tlRing" cx="22" cy="22" r="19" fill="none" stroke="#D63D27" stroke-width="3" stroke-dasharray="119.4" stroke-dashoffset="119.4" transform="rotate(-90 22 22)"/></svg>
-              <div><b class="num" id="tlTxt">1:00:00</b><small>timelock for this risk tier</small></div>
+              <div><b class="num" id="tlTxt">1:00:00</b> <small>timelock for this risk tier</small></div>
             </div>
-            <div class="out"><span>circuit #6 → PUBLISH</span><span class="lamp" id="pubLamp"><i></i><span id="pubVal">0</span></span></div>
+            <div class="out"><span>circuit #6 → PUBLISH</span> <span class="lamp" id="pubLamp"><i></i> <span id="pubVal">0</span></span></div>
           </div>
         </article>
         <article class="panel" id="p3">
@@ -221,8 +246,8 @@
           </div>
           <div class="pr">
             <div class="nodes">
-              <div class="node"><small>Node 1</small>xlayerrpc.okx.com<span>release #43 · 0x51d0…</span></div>
-              <div class="node"><small>Node 2</small>xlayer.drpc.org<span>release #43 · 0x51d0…</span></div>
+              <div class="node"><small>Node 1</small> xlayerrpc.okx.com <span>release #43 · 0x51d0…</span></div>
+              <div class="node"><small>Node 2</small> xlayer.drpc.org <span>release #43 · 0x51d0…</span></div>
             </div>
             <div class="agree"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.8" fill="none"/></svg>both nodes agree</div>
             <div class="checks">
@@ -242,7 +267,7 @@
       <div class="shead">
         <span class="label">03 / The rule</span>
         <div>
-          <h2 class="stamp h2">A rule nobody<br><em>can change.</em></h2>
+          <h2 class="stamp h2">A rule nobody<br><em>can upgrade.</em></h2>
           <p class="sub">Pick who approved, what changed and how long it has waited. The release policy answers the way circuit #6 does on X Layer.</p>
         </div>
       </div>
@@ -256,14 +281,14 @@
             </div></div>
           <div class="cgroup"><span id="lblTier">What changed</span>
             <div class="seg" role="radiogroup" aria-labelledby="lblTier">
-              <button class="tg" id="tier-0" role="radio" aria-checked="true" type="button">Code only<small>tier 00</small></button>
-              <button class="tg" id="tier-1" role="radio" aria-checked="false" type="button">New origin<small>tier 01</small></button>
-              <button class="tg" id="tier-2" role="radio" aria-checked="false" type="button">New contract<small>tier 10</small></button>
-              <button class="tg" id="tier-3" role="radio" aria-checked="false" type="button">Admin<small>tier 11</small></button>
+              <button class="tg" id="tier-0" role="radio" aria-checked="true" type="button">Code only <small>tier 00</small></button>
+              <button class="tg" id="tier-1" role="radio" aria-checked="false" type="button">New origin <small>tier 01</small></button>
+              <button class="tg" id="tier-2" role="radio" aria-checked="false" type="button">New contract <small>tier 10</small></button>
+              <button class="tg" id="tier-3" role="radio" aria-checked="false" type="button">Admin <small>tier 11</small></button>
             </div></div>
           <div class="cgroup"><label for="wait">Time since approvals were reached</label>
             <input class="range" id="wait" type="range" min="0" max="2" step="1" value="1">
-            <div class="rlabels"><span>under 1 h</span><span>1 h+</span><span>24 h+</span></div></div>
+            <div class="rlabels"><span>under 1 h</span> <span>1 h+</span> <span>24 h+</span></div></div>
           <div class="cgroup"><span id="lblSw">Switches</span>
             <div class="toggles" role="group" aria-labelledby="lblSw">
               <button class="tg" id="sw-f" aria-pressed="false" type="button">Frozen</button>
@@ -274,12 +299,25 @@
           <div class="bits" id="bits"></div>
           <canvas id="gates" aria-hidden="true"></canvas>
           <div class="outs">
-            <div class="outbox" id="oPub"><b>PUBLISH</b><span id="oPubV">0</span></div>
-            <div class="outbox" id="oUnf"><b>UNFREEZE</b><span id="oUnfV">0</span></div>
+            <div class="outbox" id="oPub"><b>PUBLISH</b> <span id="oPubV">0</span></div>
+            <div class="outbox" id="oUnf"><b>UNFREEZE</b> <span id="oUnfV">0</span></div>
           </div>
           <p class="why" id="why" aria-live="polite"></p>
           <p class="fine">9 inputs, 34 NAND gates, 512 possible cases. UNFREEZE is 1 whenever two approve; the gate only uses it while frozen. The wiring above is drawn for clarity; the real netlist is public on X Layer.</p>
         </div>
+      </div>
+      <div class="tiers" aria-label="The four risk tiers">
+        <table class="tt">
+          <thead><tr><th>Tier</th><th>What changed <small>(computed on-chain)</small></th><th>To publish</th></tr></thead>
+          <tbody>
+            <tr><th>00</th><td>Code only</td><td>1 approval + 1 h, or 3 of 3 with the emergency flag</td></tr>
+            <tr><th>01</th><td>A new external origin, or a changed SRI hash of a cross-origin script</td><td>2 approvals + 1 h</td></tr>
+            <tr><th>10</th><td>A new contract or spender. <b>Every team's first release is tier 10.</b></td><td>2 approvals + 24 h, or 3 of 3 with the emergency flag</td></tr>
+            <tr><th>11</th><td>Admin: approvers, timelocks, domain binding, circuit copy</td><td>3 of 3 + 24 h, no fast lane</td></tr>
+          </tbody>
+        </table>
+        <p class="fine">Frozen: nothing publishes. Any one approver can freeze; unfreezing needs 2 of 3. The 1 h and 24 h waits are the defaults; a team can change them (10 min to 5 days) only through a tier-11 change.</p>
+        <p class="fine"><b>Where the decision is made.</b> On every publish and unfreeze, the gate calls circuit #6 on X Layer. It uses a Solidity copy of the same 34 gates (checked equal on all 512 inputs) only if that call fails or returns a malformed answer, or if the circuit's implementation is no longer the one pinned when the gate was made; each fallback emits an on-chain event. Why a circuit: its beacon has no owner, so its logic can't be upgraded, and a gate can only ever point at a copy of the same netlist. The team can change who approves and how long it waits, never the rule.</p>
       </div>
     </div>
   </section>
@@ -292,21 +330,38 @@
         <h2 class="stamp h2" style="margin-top:22px">12 attacks.<br><em>12 stopped.</em></h2>
         <p class="sub">The same twelve attack types, run on a fork of X Layer against three kinds of protection.</p>
         <div class="statrow">
-          <div><b class="num">0</b><span>false blocks</span></div>
-          <div><b class="num">16</b><span>clean sessions tested</span></div>
+          <div><b class="num">0</b> <span>false blocks</span></div>
+          <div><b class="num">16</b> <span>clean sessions tested</span></div>
         </div>
         <p class="limit">Guard protects people who have it installed. Visitors without it aren't blocked; the watchtower alerts the team instead.</p>
+        <details class="atk-list"><summary>The 12 attacks, and how to rerun them</summary>
+          <ol>
+            <li>DNS / registrar hijack: whole site replaced, drainer on load</li>
+            <li>One lazy-loaded JS chunk swapped on the CDN</li>
+            <li>Bundle tampered for one request, then swapped back (as at Bybit)</li>
+            <li>A script from an unsealed origin injected into the HTML</li>
+            <li>Code built from data with eval / new Function (no file changed)</li>
+            <li>A malicious service worker that outlives the hijack</li>
+            <li>A swap on the sealed router with the attacker as recipient</li>
+            <li>Permit2 and EIP-2612 permits naming the attacker as spender</li>
+            <li>A poisoned dependency the approvers publish anyway</li>
+            <li>Rollback to an older release inside its 6 h grace window</li>
+            <li>Rollback after the grace window</li>
+            <li>Signing on a release the approvers revoked</li>
+          </ol>
+          <p>Setup: an anvil fork of X Layer mainnet, fresh projects sealed with the real CLI, headless Chromium and a mock wallet that records every request. An attack counts as blocked only if the attacker's request never reached the wallet. Rerun: <code>pnpm install &amp;&amp; pnpm staging:up &amp;&amp; pnpm benchmark</code>. <a href="https://signetguard.xyz/docs/benchmark.md">Full results</a></p>
+        </details>
       </div>
       <div>
         <div class="bars">
-          <div class="bar" style="--h:16.67%"><div class="val num"><span data-count="2">2</span><small>/12</small></div><div class="fill"></div></div>
-          <div class="bar" style="--h:58.33%"><div class="val num"><span data-count="7">7</span><small>/12</small></div><div class="fill"></div></div>
-          <div class="bar sig" style="--h:100%"><div class="val num"><span data-count="12">12</span><small>/12</small></div><div class="fill"></div></div>
+          <div class="bar" style="--h:16.67%"><div class="val num"><span data-count="2">2</span> <small>/12</small></div><div class="fill"></div></div>
+          <div class="bar" style="--h:58.33%"><div class="val num"><span data-count="7">7</span> <small>/12</small></div><div class="fill"></div></div>
+          <div class="bar sig" style="--h:100%"><div class="val num"><span data-count="12">12</span> <small>/12</small></div><div class="fill"></div></div>
         </div>
         <div class="blabels">
-          <div><b>Subresource Integrity</b>SRI tags only</div>
-          <div><b>Page hash check</b>hash-only extension</div>
-          <div><b>Signet</b>seal + Guard</div>
+          <div><b>Subresource Integrity</b> SRI tags only</div>
+          <div><b>Page hash check</b> hash-only extension</div>
+          <div><b>Signet</b> seal + Guard</div>
         </div>
       </div>
     </div>
@@ -314,10 +369,11 @@
     <div class="wrap compare" aria-label="How Signet compares">
       <span class="label">How it compares</span>
       <table class="cmp">
-        <thead><tr><th></th><th>DeWEB site</th><th>Code-hash checkers<small>Code Verify, WEBCAT</small></th><th>Scam detectors<small>Blockaid, Wallet Guard…</small></th><th class="sig">Signet</th></tr></thead>
+        <thead><tr><th></th><th>DeWEB site <small>verified by TapeKit</small></th><th>Code-hash checkers <small>Code Verify, WEBCAT, WAICT</small></th><th>Scam detectors <small>Blockaid, Wallet Guard…</small></th><th class="sig">Signet <small>builds on TapeKit</small></th></tr></thead>
         <tbody>
+          <tr><th>Refuses a signature to a contract the team didn't seal</th><td>No</td><td>No</td><td>Warns on known-bad addresses</td><td class="sig">Yes, before the wallet opens</td></tr>
           <tr><th>Your own domain, no migration</th><td>No: the site moves on-chain</td><td>Yes</td><td>Any site</td><td class="sig">Yes</td></tr>
-          <tr><th>Page files checked against a public record</th><td>Yes, in TapeKit</td><td>Yes</td><td>No</td><td class="sig">Yes, with Guard</td></tr>
+          <tr><th>Page files checked against a public record</th><td>Yes: TapeKit checks each file on X Layer</td><td>Yes</td><td>No</td><td class="sig">Yes: the same on-chain check, by Guard</td></tr>
           <tr><th>Approval rules for every release</th><td>No: the holder publishes</td><td>Signers only</td><td>No</td><td class="sig">Yes: on-chain tiers, timelocks, a TapeOut circuit</td></tr>
           <tr><th>What a wallet may sign, per site</th><td>No</td><td>No</td><td>Known-bad lists, simulation</td><td class="sig">Sealed allowlist</td></tr>
         </tbody>
@@ -332,20 +388,21 @@
         <span class="label">05 / Proof</span>
         <div>
           <h2 class="stamp h2">Don't trust us.<br><em>Check it.</em></h2>
-          <p class="sub">One read-only command checks the claims on this page: the on-chain ones against X Layer mainnet, the rest against this repo. No wallet, no keys.</p>
+          <p class="sub">One read-only command checks the claims on this page: the on-chain ones against X Layer mainnet, the rest against the repository. No wallet, no keys. No terminal: the proof page runs the circuit checks in your browser.</p>
         </div>
       </div>
       <div class="proof">
         <div class="shell">
-          <div class="top"><i></i><i></i><i></i><span style="margin-left:8px">signet</span></div>
+          <div class="top"><i></i><i></i><i></i> <span style="margin-left:8px">signet</span></div>
           <pre id="shell"><span class="p">$</span> pnpm verify:claims</pre>
         </div>
         <div class="facts-list">
           <div class="fl"><small>TapeOut processor #101 · X Layer mainnet</small>
             <div class="addr"><span id="proc">0x73153e5fd2Acac604D49d6ca9fea27b750718F22</span><button class="copy" type="button" id="copyProc">Copy</button></div></div>
-          <div class="fl"><small>Release policy</small><b>Circuit #6 · 34 NAND · 9 inputs · 2 outputs</b></div>
-          <div class="fl"><small>Upgrade keys</small><b>None on the circuit. Its beacon owner is 0x0.</b></div>
-          <div class="fl"><small>In your browser</small><b><a href="#proof" data-link="prove">Open the proof page</a></b></div>
+          <div class="fl"><small>Release policy</small> <b>Circuit #6 · 34 NAND · 9 inputs · 2 outputs</b></div>
+          <div class="fl"><small>Upgrade keys</small> <b>None on the circuit. Its beacon owner is 0x0.</b></div>
+          <div class="fl"><small>Fallback</small> <b>A Solidity copy of the same gates, used only if the circuit call fails (emits an event)</b></div>
+          <div class="fl"><small>In your browser</small> <b><a href="#proof" data-link="prove">Open the proof page</a></b></div>
         </div>
       </div>
     </div>
@@ -358,14 +415,15 @@
         <span class="label">06 / For teams</span>
         <div>
           <h2 class="stamp h2">Set up in<br><em>an afternoon.</em></h2>
-          <p class="sub">Five steps on the setup guide; one step added to your deploy. Nothing changes in your contracts. Your first release goes live after two approvals and 24 hours. Always free for your users.</p>
+          <p class="sub">Five steps on the setup guide; one step added to your deploy. Nothing changes in your contracts. Your first release is tier 10: two approvals and 24 hours. After that, a code-only release needs one approval and one hour. Always free for your users.</p>
         </div>
       </div>
       <div class="plans">
         <div class="plan"><h3 class="stamp">Free</h3><p>One domain, sealed releases with on-chain approvals, Diff Guard, the "Sealed by Signet" badge, and Guard protection for every visitor who has it.</p><span class="pp">$0 · start now</span></div>
-        <div class="plan hl"><h3 class="stamp">Pro</h3><p>Three domains, a watchtower that checks every minute, private alerts and a verified copy hosted on X Layer.</p><span class="pp">planned · early access</span></div>
-        <div class="plan"><h3 class="stamp">Enterprise</h3><p>Setup done with your team, incident support, and an API for wallets.</p><span class="pp">planned · talk to us</span></div>
+        <div class="plan hl"><h3 class="stamp">Pro</h3><p>Three domains, a watchtower that checks every minute, private alerts, automatic renewal of on-chain storage, and a verified copy hosted on X Layer.</p><span class="pp">$49 / month · planned, early access</span></div>
+        <div class="plan"><h3 class="stamp">Enterprise</h3><p>Setup done with your team, incident support, and an API for wallets.</p><span class="pp">from $500 / month · planned</span></div>
       </div>
+      <p class="fine" style="margin-top:20px">Who pays: dApp teams, per domain. Users never pay, and Guard is free. Pro and Enterprise prices are planned, not yet sold; there are no paying customers yet.</p>
       <div class="cta-row" style="margin-top:40px">
         <a class="btn btn-wax" href="#teams" data-link="setupGuide">Read the setup guide<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
         <a class="btn btn-line" href="#teams" data-link="telegram">Talk to us on Telegram</a>
@@ -379,7 +437,7 @@
     <div class="wrap">
       <h2 class="stamp h2">Seal your<br><em>next release.</em></h2>
       <div class="cta-row">
-        <a class="btn btn-wax" href="#hero" data-link="chromeWebStore">Add Guard to Chrome, free<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+        <a class="btn btn-wax" href="#hero" data-link="chromeWebStore" data-soon="Guard for Chrome: coming soon">Add Guard to Chrome<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
         <a class="btn btn-line" href="#teams">Protect your dApp</a>
       </div>
     </div>
@@ -398,7 +456,7 @@
       <div><h3>Community</h3><a href="#hero" data-link="github">GitHub</a><a href="#hero" data-link="x">X</a><a href="#hero" data-link="telegram">Telegram</a></div>
     </div>
     <div class="bigword" aria-hidden="true" data-word="Signet"></div>
-    <div class="legal"><span>Signet · 2026</span><span>Not affiliated with OKX. X Layer and TapeOut belong to their owners.</span></div>
+    <div class="legal"><span>Signet · 2026</span> <span>Not affiliated with OKX. X Layer and TapeOut belong to their owners.</span></div>
   </div>
 </footer>
 

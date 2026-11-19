@@ -16,7 +16,7 @@ const refreshChain = async () => {
   const id = await walletChain();
   const wrong = id !== null && id !== NET.chainId;
   bar.hidden = !wrong;
-  if (wrong) bar.querySelector('.cb-now')!.textContent = String(id);
+  if (wrong) bar.querySelector('.cb-now')!.textContent = `chain ${id}`;
 };
 action(bar.querySelector('#switchchain') as HTMLButtonElement, switchToXLayer, () => void refreshChain());
 onChainChange(() => void refreshChain());

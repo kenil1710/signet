@@ -12,7 +12,6 @@ import Lenis from 'lenis';
 import { expected as POLICY_TABLE } from '@signet/circuit/artifacts/policy.json';
 import { makeSim, INPUT_NAMES, type SimState } from './sim.ts';
 import { VERIFY_OUTPUT } from './verify-output.ts';
-import { applyLinks } from './config.ts';
 
 export interface Seal { x: number; y: number; scale: number; opacity: number; spin: number; tilt: number; crack: number; ready: boolean; mobile: boolean; fade: number; thud?: () => void }
 declare global {
@@ -25,7 +24,6 @@ const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = <T extends HTMLElement = HTMLElement>(q: string, r: ParentNode = document) => r.querySelector<T>(q)!;
 const $$ = <T extends HTMLElement = HTMLElement>(q: string, r: ParentNode = document) => Array.from(r.querySelectorAll<T>(q));
 
-applyLinks();
 
 // The 3D seal starts after the first paint, so it never delays the text. (Two frames: the first runs before paint.)
 // The seal shows at once as a still image rendered from the real 3D scene (test/render-still.ts), placed and sized

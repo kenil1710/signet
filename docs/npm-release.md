@@ -8,7 +8,7 @@ if any fails.
 2. `package.json` is what npm would publish: `bin` is exactly `{"signet": "signet.mjs"}` (no `./`), `signet.mjs`
    starts with `#!/usr/bin/env node`, `npm pkg fix` changes nothing, and `npm publish --dry-run` prints no
    "cleaned" / "invalid" / "removed" warning.
-3. `npm pack`: exactly 3 files: `README.md`, `package.json`, `signet.mjs`.
+3. `npm pack`: exactly 4 files: `LICENSE`, `README.md`, `package.json`, `signet.mjs`; `package.json` has `repository`, `homepage` and `bugs`.
 4. **Install test** (`packages/cli/scripts/install-test.mjs`): `npm install -g --prefix <empty temp dir> <the .tgz>`
    from an empty folder, with a bare PATH, then the installed `signet --version` (must print the version) and
    `signet --help` (must list the commands).

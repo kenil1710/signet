@@ -18,10 +18,28 @@
       </div>
     </header>
     <div id="chainbar" role="alert" hidden>
-      <div class="cb-in"><span>Your wallet is on chain <b class="cb-now"></b>. Signet's contracts are on <b>X Layer (chain 196)</b>.</span>
+      <div class="cb-in"><span>Your wallet is on <b class="cb-now">another network</b>. Signet's contracts are on <b>X Layer (chain 196)</b>.</span>
         <button id="switchchain" class="primary">Switch to X Layer</button></div>
     </div>
-    <div id="app"></div>
+    <div id="app"><section class="static-intro">
+      <h1>Signet dashboard</h1>
+      <p>Every website sealed with Signet on X Layer mainnet (chain 196), read live from the chain in your browser. No account; a wallet is needed only to approve, freeze or create a gate.</p>
+      <h2>Projects</h2>
+      <p>For each sealed domain: its gate, the current release and its risk tier, the three approvers, open proposals with their approvals and timelocks, observe or enforce mode, and whether the domain confirms its gate (<code>/.well-known/signet.json</code>). Approvers approve, cancel, freeze and publish here, in their own wallets. <a href="app#/p/signetguard.xyz">signetguard.xyz</a> is Signet's own site.</p>
+      <h2>Proof</h2>
+      <p>The <a href="app#/prove">proof page</a> needs no wallet. It re-runs release-policy circuit #6 and Guard circuit #7 on all 512 inputs against their reference functions, checks the circuit beacon has no owner, and recomputes the file, allowlist and origins hashes of every recent release from the files stored on X Layer.</p>
+      <h2>Live contracts (X Layer mainnet)</h2>
+      <ul>
+        <li><a href="https://www.oklink.com/xlayer/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589" target="_blank" rel="noopener">SignetRegistry</a> <code>0x98dB5B6B1545D0fb374da40a02045B93398E0589</code>: domain → gate bindings</li>
+        <li><a href="https://www.oklink.com/xlayer/address/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986" target="_blank" rel="noopener">SignetFactory</a> <code>0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986</code>: creates a team's gate</li>
+        <li><a href="https://www.oklink.com/xlayer/address/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D" target="_blank" rel="noopener">ReleaseGate implementation</a> <code>0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D</code>: each gate is a non-upgradeable clone of it</li>
+        <li><a href="https://www.oklink.com/xlayer/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503" target="_blank" rel="noopener">Site gate of signetguard.xyz</a> <code>0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503</code>: also holds the shared file container (circuit #5)</li>
+        <li><a href="https://www.oklink.com/xlayer/address/0x73153e5fd2Acac604D49d6ca9fea27b750718F22" target="_blank" rel="noopener">TapeOut processor #101</a> <code>0x73153e5fd2Acac604D49d6ca9fea27b750718F22</code>: circuit #6 (release policy) and circuit #7 (Guard decision)</li>
+        <li><a href="https://www.oklink.com/xlayer/address/0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6" target="_blank" rel="noopener">SiteRegistry</a> <code>0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6</code> and <a href="https://www.oklink.com/xlayer/address/0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed" target="_blank" rel="noopener">shared container</a> <code>0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed</code>: where each release's manifest is stored</li>
+      </ul>
+      <p><a href="start">Protect your own site</a> · <a href="./">About Signet</a> · <a href="docs/THREAT_MODEL.md">Threat model</a></p>
+      <p class="dim">This page needs JavaScript to read the chain; the summary above is static.</p>
+    </section></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

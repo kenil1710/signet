@@ -13,7 +13,7 @@ LOCAL="http://127.0.0.1:$PORT"
 FORK_URL="${XLAYER_RPC_URL:?set XLAYER_RPC_URL in .env (the mainnet RPC to fork from)}"
 OUT="$ROOT/packages/contracts/deployments/local.json"
 
-DEV=0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE          # holds circuit #5 on mainnet
+PROCESSOR=0x73153e5fd2Acac604D49d6ca9fea27b750718F22
 SITES=0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6
 SHARED=0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed
 
@@ -63,7 +63,9 @@ echo "deploying registry and factory..."
 run "deploy()"
 REG=$(jq -r '.contracts.registry // empty' "$OUT"); [ -n "$REG" ] || { echo "deploy failed; see output above"; exit 1; }
 
-# The holder of circuit #5 (the dev wallet on mainnet) makes the registry the shared container's operator.
+# The holder of circuit #5 makes the registry the shared container's operator. Read at the fork block: since
+# 2026-11-19 Signet's site gate holds it on mainnet (before that, the dev wallet); anvil impersonates either.
+DEV=$(cast call $PROCESSOR "ownerOf(uint256)(address)" 5 --rpc-url "$LOCAL")
 # On the fork we impersonate it; on mainnet this is a real transaction from that wallet (or the multisig).
 cast rpc anvil_setBalance $DEV 0x8ac7230489e80000 --rpc-url "$LOCAL" >/dev/null
 cast rpc anvil_impersonateAccount $DEV --rpc-url "$LOCAL" >/dev/null

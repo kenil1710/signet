@@ -388,3 +388,22 @@ a.soon{cursor:default;pointer-events:none}
   .cmp td:nth-of-type(3)::before{content:"Scam detectors: ";color:var(--dim)}
   .cmp td:nth-of-type(4)::before{content:"Signet: ";color:var(--dim)}
 }
+
+#loader b::before{content:attr(data-t)}
+.nojs{position:relative;z-index:5;padding:120px 24px 40px;max-width:760px;color:var(--text);line-height:1.6}
+.nojs a{color:var(--text);text-decoration:underline}
+.tiers{margin-top:56px}
+.tt{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+.tt th,.tt td{text-align:left;vertical-align:top;padding:12px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.tt thead th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.tt thead th small{text-transform:none;letter-spacing:0}
+.tt tbody th{font-family:var(--mono);width:64px}
+.tt thead th:first-child{width:64px}
+.tt td:last-child,.tt thead th:last-child{width:38%}
+@media (max-width:640px){.tt{font-size:13px}.tt th,.tt td{padding:10px 6px}.tt tbody th,.tt thead th:first-child{width:50px}.tt thead th{letter-spacing:.04em}}
+.atk-list{margin-top:28px;font-size:14px;color:var(--muted);line-height:1.6}
+.atk-list summary{cursor:pointer;color:var(--text);font-weight:600}
+.atk-list ol{margin:12px 0 12px 20px}
+.atk-list code{font-family:var(--mono);font-size:12.5px;color:var(--text)}
+.atk-list a{color:var(--text)}
+.cmp th small,.cmp thead th small{display:block}

@@ -13,3 +13,7 @@
 
 /.well-known/signet.json
   Access-Control-Allow-Origin: *
+
+/docs/*
+  Content-Type: text/markdown; charset=utf-8
+  X-Content-Type-Options: nosniff

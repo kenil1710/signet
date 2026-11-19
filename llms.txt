@@ -1,6 +1,6 @@
 # Signet
 
-> Signet brings DeWEB's trust guarantee to every website: no migration, your own domain, plus approval rules for every release.
+> Guard refuses any wallet signature a dApp's team didn't seal: a hacked page can't get the wallet to approve, permit or transfer to a contract or spender outside the release's sealed allowlist. Signet builds on TapeKit's on-chain file verification and adds the signing-time allowlist (circuit #7), risk-tiered approvals with timelocks decided by circuit #6, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; live with Pro).
 >
 > Signet lets a dApp team seal each release of its website on X Layer (file hashes, the contracts and spenders the site may ask a wallet to sign for, the outside origins it may use). A TapeOut circuit decides when a release goes live (CI can propose and publish but never approve; humans approve; risky changes wait 24 h). Users who run the Guard browser extension have every page and every signature checked against the sealed release; the signing decision comes from a second TapeOut circuit. Users without Guard are NOT protected at signing; a watchtower alerts the team instead.
 
@@ -12,8 +12,8 @@ Status (2026-11-18): live on X Layer mainnet (chain 196), deployed 2026-11-18 fo
 - Not live: the Guard extension (not in the Chrome Web Store; tested with a mock wallet, not MetaMask), the gateway (staging only), the watchtower (one region, Telegram, staging).
 
 ## Built on TapeOut (what is really used)
-- Two TapeOut circuits on processor #101: #6 decides when a release may publish (ReleaseGate calls it on every publish and unfreeze); #7 decides Guard's allow/warn/block at signing.
-- The Circuit Container of circuit #5 (0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed, opened) + TapeOut's SiteRegistry (0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6, the storage behind DeWEB) hold each release's sealed manifest and the files of the verified copy; SignetRegistry writes only files an approved release lists, as the container's 30-day SiteRegistry operator.
+- Two TapeOut circuits on processor #101: #6 decides when a release may publish (ReleaseGate calls it on every publish and unfreeze; a Solidity copy of the same gates decides only if that call fails or returns a malformed answer, with an on-chain event; the circuit's beacon has no owner, so the rule can't be upgraded); #7 decides Guard's allow/warn/block at signing.
+- The Circuit Container of circuit #5 (0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed, opened) + TapeOut's SiteRegistry (0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6, the storage behind DeWEB) hold each release's sealed manifest (and, once Pro is live, the files of the verified copy); SignetRegistry writes only files an approved release lists, as the container's 30-day SiteRegistry operator.
 - Files over 48,000 bytes are stored in 24,000-byte pieces, one proved piece per transaction (SignetRegistry.writeChunk on top of SiteRegistry.appendChunk).
 - Reading and checking follow TapeKit / TAP-10: every file's size and SHA-256 checked against the chain, two independent RPCs that must agree; the gateway reuses TapeKit's service-worker design.
 
