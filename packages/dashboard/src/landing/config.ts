@@ -14,7 +14,7 @@ export const SITE = {
   /** The wallet-free proof page of this same app. */
   prove: 'app.html#/prove',
   /** The setup guide for teams. Until the repo is public, it points at the doc inside it. */
-  setupGuide: 'TODO: <github>/blob/main/packages/cli/README.md',
+  setupGuide: 'start',
   /** Threat model and claims, until the repo is public. */
   threatModel: 'TODO: <github>/blob/main/THREAT_MODEL.md',
   claims: 'TODO: <github>/blob/main/CLAIMS.md',

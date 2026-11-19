@@ -144,3 +144,17 @@ body.embed{background:transparent} body.embed .top{display:none} body.embed #app
 #chainbar b{font-family:var(--mono);font-weight:500}
 #chainbar button{min-height:38px}
 @media (max-width:640px){#chainbar .cb-in{padding:12px 18px}}
+
+/* "Protect a site" form */
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 24px;margin:26px 0 6px}
+.fld{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fld input{min-width:0;width:100%}
+.fld small{font-size:12.5px;line-height:1.45}
+@media (max-width:760px){.formgrid{grid-template-columns:1fr}}
+
+/* /start */
+.start .step{border-top:1px solid var(--line);margin-top:36px;padding-top:8px;position:relative}
+.start .step h2{border:0;padding:0;margin:18px 0 12px;font-family:var(--display);font-stretch:125%;font-weight:800;font-size:20px;letter-spacing:-.01em;text-transform:uppercase;color:var(--text)}
+.start ol{padding-left:20px;max-width:72ch} .start li{margin:6px 0}
+.start pre{margin:10px 0 14px}
+.start button.copy{float:right;min-height:30px;padding:0 10px;font-size:12px;margin:-2px 0 6px 10px}

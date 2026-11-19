@@ -5,6 +5,7 @@ import { projectPage } from './pages/project.ts';
 import { proposalPage } from './pages/proposal.ts';
 import { provePage } from './pages/prove.ts';
 import { badgePage } from './pages/badge.ts';
+import { newPage } from './pages/new.ts';
 import { NET } from './chain.ts';
 import { onChainChange, switchToXLayer, walletChain } from './wallet.ts';
 import { action } from './ui.ts';
@@ -27,6 +28,7 @@ async function route(): Promise<void> {
   for (const a of document.querySelectorAll<HTMLElement>('.top nav a[data-nav]')) a.classList.toggle('on', a.dataset.nav === (parts[0] === 'prove' ? 'prove' : 'home'));
   try {
     if (parts[0] === 'prove') await provePage();
+    else if (parts[0] === 'new') await newPage();
     else if (parts[0] === 'badge' && parts[1]) await badgePage(parts[1], new URLSearchParams(query).has('embed'));
     else if (parts[0] === 'p' && parts[1] && parts[2] === 'proposal' && parts[3]) await proposalPage(parts[1], Number(parts[3]));
     else if (parts[0] === 'p' && parts[1]) await projectPage(parts[1]);

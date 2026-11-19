@@ -88,11 +88,11 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T> {
 }
 
 /// "refused by the contract: <ErrorName>" when the revert data decodes against the gate's ABI.
-function reason(e: unknown): Error {
+function reason(e: unknown, abi: Abi = GATE_ABI as Abi): Error {
   const raw = e instanceof RpcError ? e.data : (e as { data?: unknown })?.data;
   const data = typeof raw === 'string' ? raw : typeof (raw as { data?: unknown })?.data === 'string' ? (raw as { data: string }).data : undefined;
   if (data && /^0x[0-9a-f]{8}/i.test(data)) {
-    try { return new Error(`refused by the contract: ${decodeErrorResult({ abi: GATE_ABI as Abi, data: data as Hex }).errorName}`); } catch { /* not one of ours */ }
+    try { return new Error(`refused by the contract: ${decodeErrorResult({ abi, data: data as Hex }).errorName}`); } catch { /* not one of ours */ }
   }
   return e instanceof Error ? e : new Error(String(e));
 }
@@ -111,15 +111,15 @@ export async function connect(): Promise<Address> {
   return account;
 }
 
-export async function send(to: Address, functionName: string, args: unknown[] = [], pad = false): Promise<string> {
+export async function send(to: Address, functionName: string, args: unknown[] = [], pad = false, abi: Abi = GATE_ABI as Abi): Promise<string> {
   await connect(); // the wallet's current account every time: the user may have switched accounts since
-  const tx = { from: account!, to, data: encodeFunctionData({ abi: GATE_ABI as Abi, functionName, args }) };
+  const tx = { from: account!, to, data: encodeFunctionData({ abi, functionName, args }) };
   let gas: bigint;
   try {
     await rpc('eth_call', [tx, 'latest']);
     gas = BigInt(await rpc<string>('eth_estimateGas', [tx]));
   } catch (e) {
-    throw reason(e);
+    throw reason(e, abi);
   }
   gas = pad ? (gas * 3n) / 2n + 400_000n : (gas * 6n) / 5n;
   const hash = (await provider!.request({ method: 'eth_sendTransaction', params: [{ ...tx, gas: `0x${gas.toString(16)}` }] }).catch((e) => { throw reason(e); })) as Hex;

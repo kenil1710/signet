@@ -1,7 +1,7 @@
 // Everything the dashboard reads from the chain. Chain facts come from two RPCs at the same block that must agree
 // (the same rule as Guard); file bytes from either, and they only count if they hash to the on-chain values.
 import { decodeFunctionResult, encodeFunctionData, hexToBytes, zeroAddress, type Abi, type Address, type Hex } from 'viem';
-import { gateAbi } from '@signet/cli/src/abi.ts';
+import { gateAbi, factoryAbi } from '@signet/cli/src/abi.ts';
 import { registryAbi, siteAbi } from '@signet/extension/src/lib/abi.ts';
 import { agree, either, type Call } from '@signet/extension/src/lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from '@signet/extension/src/lib/sealed.ts';
@@ -10,6 +10,7 @@ import type { Net, Sealed } from '@signet/extension/src/lib/types.ts';
 declare const __SIGNET_NET__: Net & { name: string; tapeout: Record<string, unknown>; explorer?: string };
 export const NET = __SIGNET_NET__;
 export const GATE_ABI = gateAbi as unknown as Abi;
+export const FACTORY_ABI = factoryAbi as unknown as Abi;
 
 export const enc = (to: Address, abi: Abi, functionName: string, args: unknown[] = []): Call => ({ to, data: encodeFunctionData({ abi, functionName, args }) });
 export const dec = <T>(abi: Abi, functionName: string, data: string): T => {

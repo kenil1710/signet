@@ -5,7 +5,7 @@ export async function home(): Promise<void> {
   const v = view(`<div class="kicker">Dashboard · ${esc(NET.name)} · chain ${NET.chainId}</div>
     <h1>Sealed projects</h1>
     <p class="lead">Releases, approvals, timelocks and freezes for every domain sealed with Signet. Everything here is read from the chain; actions go through your own wallet.</p>
-    <div class="actions"><a class="btn btn-wax" href="#/prove">Prove it: check Signet's claims in your browser</a>
+    <div class="actions"><a class="btn btn-wax" href="#/new">Protect a site</a><a class="btn" href="#/prove">Prove it: check Signet's claims in your browser</a>
       <form id="go"><input id="d" placeholder="app.example.org" autocomplete="off" spellcheck="false" required> <button>Open project</button></form></div>
     <p class="mono dim">registry ${esc(NET.registry ?? 'not deployed')}</p>
     <h2>Sealed domains</h2><ul id="list" class="domains"><li class="dim">reading the registry…</li></ul>`);

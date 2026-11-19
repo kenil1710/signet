@@ -1,8 +1,8 @@
 // The commands that talk to the chain: init, propose, approve, publish (+ upload), status, freeze, unfreeze, cancel.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { parseEventLogs, getAddress, zeroAddress, formatEther, type Address, type Hex, type TransactionReceipt } from 'viem';
+import { parseEventLogs, getAddress, isAddress, zeroAddress, formatEther, type Address, type Hex, type TransactionReceipt } from 'viem';
 import { gateAbi, factoryAbi, registryAbi, siteReadAbi } from './abi.ts';
 import {
   SignetError, CONFIG_NAME, needDeployed, needProject, signerFor, resolveAddress, newKeyFile, addressOfKeyFile, statePath,
@@ -590,4 +590,56 @@ export async function unfreeze(ctx: Ctx, log: Log): Promise<void> {
     if (errorName(e) === 'PolicyDenied' || (e instanceof SignetError && e.code === 'PolicyDenied')) throw new SignetError('PolicyDenied', 'the policy circuit refused to unfreeze: it needs 2 of 3 approvers');
     throw e;
   }
+}
+
+// ---------------------------------------------------------------- link and domain proof (onboarding)
+
+/// For a gate made in the dashboard's "Protect a site" wizard: write signet.config.json after checking that the
+/// registry binds `domain` to `gate`.
+export async function link(ctx: Ctx, domain: string, gate: Address, log: Log): Promise<void> {
+  const { registry } = needDeployed(ctx);
+  if (!isAddress(gate)) throw new SignetError('gate', `"${gate}" is not an address`);
+  const [bound] = await read<[Address, Address, string]>(ctx, { address: registry, abi: registryAbi, functionName: 'bindingOf', args: [domain] });
+  if (bound === zeroAddress) throw new SignetError('NotBound', `${domain} is not bound to any gate on ${ctx.net.name}. Create the gate first (dashboard: Protect a site).`);
+  if (getAddress(bound) !== getAddress(gate)) throw new SignetError('OtherGate', `${domain} is bound to ${bound}, not ${gate}.`);
+  const file = join(ctx.dir, CONFIG_NAME);
+  if (existsSync(file)) throw new SignetError('exists', `${showPath(file)} already exists. Nothing changed.`);
+  writeFileSync(file, JSON.stringify({ network: ctx.net.name, chainId: ctx.net.chainId, domain, gate: getAddress(gate) }, null, 2) + '\n');
+  log(`Wrote ${showPath(file)}: ${domain} → gate ${getAddress(gate)} on ${ctx.net.name}`);
+  log(`Next: signet domain <your public/static folder>   (publishes the proof that you control ${domain})`);
+}
+
+export const WELL_KNOWN = '.well-known/signet.json';
+
+/// The domain proof: /.well-known/signet.json names the gate. Without --check, write it into `publicDir` (a folder
+/// whose files your build copies to the site root, e.g. public/). With --check, fetch it from the live domain.
+export async function domainProof(ctx: Ctx, publicDir: string | undefined, o: { check?: boolean }, log: Log): Promise<void> {
+  const cfg = needProject(ctx);
+  const want = { signet: 1, chainId: ctx.net.chainId, gate: getAddress(cfg.gate) };
+  if (!o.check) {
+    if (!publicDir) throw new SignetError('dir', 'Give the folder your build copies to the site root (e.g. public), or use --check');
+    const file = join(publicDir, WELL_KNOWN);
+    mkdirSync(join(publicDir, '.well-known'), { recursive: true });
+    writeFileSync(file, JSON.stringify(want, null, 2) + '\n');
+    log(`Wrote ${showPath(file)}. Deploy it so https://${cfg.domain}/${WELL_KNOWN} names gate ${want.gate}.`);
+    log(`Then check: signet domain --check`);
+    return;
+  }
+  const { registry } = needDeployed(ctx);
+  // SIGNET_DOMAIN_ORIGIN: tests and staging only (a local server standing in for https://<domain>)
+  const url = `${process.env.SIGNET_DOMAIN_ORIGIN || `https://${cfg.domain}`}/${WELL_KNOWN}`;
+  let got: { signet?: number; chainId?: number; gate?: string };
+  try {
+    const r = await fetch(url, { redirect: 'follow' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    got = (await r.json()) as typeof got;
+  } catch (e) {
+    throw new SignetError('NoProof', `${url} could not be read (${(e as Error).message}). Deploy the file: signet domain <public folder>`);
+  }
+  const [bound] = await read<[Address, Address, string]>(ctx, { address: registry, abi: registryAbi, functionName: 'bindingOf', args: [cfg.domain] });
+  const ok = got.chainId === ctx.net.chainId && typeof got.gate === 'string' && isAddress(got.gate) && getAddress(got.gate) === want.gate && getAddress(bound) === want.gate;
+  log(`${url}: names gate ${got.gate ?? '(none)'} on chain ${got.chainId ?? '?'}`);
+  log(`registry: ${cfg.domain} → ${bound}`);
+  if (!ok) throw new SignetError('ProofMismatch', `The domain's file, the registry and ${CONFIG_NAME} must all name gate ${want.gate}.`);
+  log(`OK: ${cfg.domain} confirms gate ${want.gate}.`);
 }

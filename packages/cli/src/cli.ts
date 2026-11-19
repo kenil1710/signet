@@ -10,8 +10,10 @@ import * as cmd from './commands.ts';
 import { loadNetwork } from './network.ts';
 
 const log = (line = '') => console.log(line);
+declare const __SIGNET_CLI_VERSION__: string | undefined;
 const program = new Command('signet')
   .description("Signet: decide what your dApp's website is allowed to do")
+  .version(typeof __SIGNET_CLI_VERSION__ === 'string' ? __SIGNET_CLI_VERSION__ : 'dev')
   .option('-C, --project <dir>', `project directory (where ${CONFIG_NAME} lives)`, '.')
   .option('--as <who>', 'local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)');
 
@@ -36,6 +38,15 @@ program.command('init')
   .action(async (o) => {
     await cmd.init(ctx(), { ...o, waitSeconds: Number(o.waitSeconds) }, log);
   });
+
+program.command('link <domain> <gate>')
+  .description('write signet.config.json for a gate made in the dashboard (checks the registry binds the domain to it)')
+  .action(async (domain: string, gate: string) => cmd.link(ctx(), domain, gate as `0x${string}`, log));
+
+program.command('domain [publicDir]')
+  .description('prove you control the domain: write .well-known/signet.json naming your gate into publicDir, or --check the live file')
+  .option('--check', 'fetch https://<domain>/.well-known/signet.json and check it names your gate')
+  .action(async (dir: string | undefined, o: { check?: boolean }) => cmd.domainProof(ctx(), dir, o, log));
 
 program.command('keygen')
   .description('create a CI proposer key in .signet/proposer.key (private, git-ignored); prints only its address')

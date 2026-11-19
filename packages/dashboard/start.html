@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Protect your site with Signet: setup</title>
+    <meta name="description" content="Five steps to seal your dApp's website on X Layer: install the CLI, create your gate, prove your domain, add the GitHub workflow, approve your first release." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%23D63D27%27/%3E%3Ctext x=%2716%27 y=%2722%27 text-anchor=%27middle%27 font-family=%27Arial%27 font-weight=%27700%27 font-size=%2717%27 fill=%27%23fff%27%3ES%3C/text%3E%3C/svg%3E">
+  </head>
+  <body>
+    <header class="top">
+      <div class="top-in">
+        <a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#C8452F"/><circle cx="14" cy="14" r="10" fill="none" stroke="#8E2B1C" stroke-width="1" stroke-dasharray="2 2"/><path d="M17.5 9.5c-.8-1.3-2.1-2-3.6-2-2.2 0-3.7 1.3-3.7 3.1 0 1.8 1.4 2.6 3.9 3.2 1.9.5 2.8 1 2.8 2.2 0 1.2-1.2 2-2.8 2-1.7 0-3-.8-3.6-2.1" fill="none" stroke="#FFF4EC" stroke-width="2" stroke-linecap="round"/></svg> Signet</a>
+        <nav aria-label="Site"><a href="./start" class="on">Setup</a><a href="./app#/">Projects</a><a href="./app#/prove">Proof</a></nav>
+      </div>
+    </header>
+    <main id="app" class="start">
+      <div class="kicker">Setup · X Layer mainnet · about 15 minutes of your time</div>
+      <h1>Protect your site</h1>
+      <p class="lead">After these five steps, no single key can change what your website asks wallets to sign: your CI only <b>proposes</b> each release, your approvers <b>approve</b> it in their own wallets, and TapeOut circuit #6 decides when it may go live. Users who run Guard are checked against exactly what you sealed.</p>
+      <p class="dim">You need: Node.js 18+, a static site built by GitHub Actions (output folder such as <code>dist/</code>), a wallet on X Layer with ~0.001 OKB, and three approver addresses.</p>
+
+      <section class="step" id="install"><h2>1 · Install the CLI</h2>
+        <p>In your project folder:</p>
+        <pre data-copy>npm install -g {{ORIGIN}}/signetguard-0.1.0.tgz
+signet --version
+signet keygen</pre>
+        <p><code>signet keygen</code> creates your CI proposer key in <code>.signet/proposer.key</code> (git-ignored) and prints only its <b>address</b>. Keep the address for step 2. The key can propose and publish releases; it can never approve one.</p>
+      </section>
+
+      <section class="step" id="gate"><h2>2 · Create your gate</h2>
+        <p>Open <a href="./app#/new"><b>Protect a site</b></a> in the dashboard, connect your wallet (it offers to switch to X Layer), and enter your domain, three approver addresses, the CI proposer address from step 1, a recovery address kept offline and, optionally, a guardian that can only freeze. Two transactions: <b>1. Reserve the domain</b>, then, two blocks later, <b>2. Create the gate</b> (≈ 0.000013 OKB of gas). The page then shows your gate address.</p>
+      </section>
+
+      <section class="step" id="domain"><h2>3 · Prove you control the domain</h2>
+        <p>In your project folder, with your domain and the gate address from step 2:</p>
+        <pre data-copy>signet link app.example.org 0xYourGateAddress
+signet domain public</pre>
+        <p><code>signet link</code> writes <code>signet.config.json</code> (commit it). <code>signet domain public</code> writes <code>public/.well-known/signet.json</code> naming your gate; use the folder your build copies to the site root. Deploy your site once with that file, then check:</p>
+        <pre data-copy>signet domain --check</pre>
+        <p class="dim">Only someone who controls the domain can publish this file. Today <code>signet domain --check</code> verifies it; Guard and the dashboard will require it before showing "Sealed" (rolling out, see <code>docs/domain-ownership.md</code>).</p>
+      </section>
+
+      <section class="step" id="ci"><h2>4 · Add the GitHub workflow</h2>
+        <ol>
+          <li>Repository → Settings → Secrets and variables → Actions → New secret <code>SIGNET_PROPOSER_KEY</code> = the content of <code>.signet/proposer.key</code>. Then delete the file from your machine.</li>
+          <li>Send the CI proposer address ≈ 0.0005 OKB on X Layer for gas (propose + publish + the release's manifest files).</li>
+          <li>Add <code>.github/workflows/signet.yml</code>, with your own build and deploy commands:</li>
+        </ol>
+        <pre data-copy>name: Signet release
+on:
+  push:
+    branches: [main]
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci && npm run build            # your build; output in dist/
+      - run: npm install -g {{ORIGIN}}/signetguard-0.1.0.tgz
+      - name: Seal and propose (the CI key can only propose)
+        run: signet verify dist && signet seal dist && signet propose dist --reuse
+        env:
+          SIGNET_PROPOSER_KEY: ${{ secrets.SIGNET_PROPOSER_KEY }}
+      - name: Wait for the approvals and the timelock, then publish (the circuit decides)
+        run: signet wait dist --publish --timeout 19800
+        env:
+          SIGNET_PROPOSER_KEY: ${{ secrets.SIGNET_PROPOSER_KEY }}
+      - name: Deploy (only reached after the release is published)
+        run: echo "your deploy command here"</pre>
+        <p class="dim">Deploy only after <code>signet wait</code> succeeds: that is what makes an unapproved build unable to go live. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
+      </section>
+
+      <section class="step" id="approve"><h2>5 · Approve your first release, add the badge</h2>
+        <p>Push to <code>main</code>. The workflow proposes release #1. Two approvers open <a href="./app#/">the dashboard</a>, open your domain, read Diff Guard, and click <b>Approve</b> in their own wallets. After the timelock the workflow publishes and deploys.</p>
+        <p>Then open <code>{{ORIGIN}}/app#/badge/&lt;your domain&gt;</code> and copy the "Sealed by Signet" badge into your site footer. It links to a live page that reads the chain.</p>
+        <p class="dim">Your gate starts in observe mode (Guard reports, never blocks). Switch to enforce in the dashboard when your releases flow cleanly.</p>
+      </section>
+    </main>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/src/start.ts"></script>
+  </body>
+</html>

@@ -20,5 +20,8 @@
   },
   "bin": {
     "signet": "./bin/signet.mjs"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
   }
 }
