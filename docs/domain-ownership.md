@@ -1,5 +1,11 @@
 # Domain ownership: can someone seal a domain they don't own? (Phase 0a, 2026-11-19)
 
+> **Update 2026-11-19: layer 1 is built** (no contract change). Guard, the dashboard, `/prove`, the badge and the
+> watchtower ignore any gate whose domain doesn't serve `/.well-known/signet.json` naming it. Tested: Guard staging
+> (squatting with no proof, with another gate's proof, a pinned domain hijacked, a first-time visitor during a
+> proof-dropping hijack), the dashboard staging suite (the badge says "Not verified"), and the watchtower (no checks
+> or alerts for an unconfirmed gate). Details under "Built" at the end.
+
 ## Answer: TRUE, they can. Signet doesn't check domain control today.
 
 **The code path.**
@@ -69,3 +75,22 @@ contracts can't read DNS or HTTPS.
 
 **Recommendation:** build Layer 1 before Guard is published or a second team binds a domain. Write Layer 2 down as
 a known limit (THREAT_MODEL) until then.
+
+## Built (2026-11-19)
+
+| Reader | Behavior | Where |
+|---|---|---|
+| **Guard** | On a sealed domain, the content script reads `/.well-known/signet.json` **same-origin**. The background accepts it only from a page of that very domain (never from the gateway's copy, whose files come from the chain) and only if it names the bound gate on chain 196; then it **pins** that gate. Until then the site is **`unconfirmed`**: grey badge, popup "Not verified: this site hasn't confirmed this gate", no page verdict, no red page, no verified copy, signatures fail-open. Signatures on a sealed domain **wait** for this step (no fail-open window while the file loads). A pinned domain stays protected if a later hijack drops or changes the file; a different gate bound on-chain needs a new confirmation | `extension/src/background.ts` (`siteFor`, `proof` message), `extension/src/content.ts`, `extension/src/lib/proof.ts` |
+| **Dashboard, `/prove`, badge** | Read the file cross-origin (the domain must send `Access-Control-Allow-Origin: *`). Not confirmed: a "NOT VERIFIED" chip and explanation on the project page; the badge says "Not verified", never "Sealed by Signet"; `/prove` marks the project "Not verified" (not a failure) | `dashboard/src/chain.ts` (`domainProof`), `pages/project.ts`, `pages/badge.ts`, `pages/prove.ts` |
+| **Watchtower** | Loads the file with its browser; a gate the domain never confirmed gets **no checks and no alerts**. Pinned like Guard (a site that goes down, or a hijack that drops the file, is still checked and alerted) | `watchtower/src/watchtower.ts` |
+| **CLI** | `signet domain <dir>` writes the file and prints the CORS header to add; `signet domain --check` verifies it and warns if the header is missing | `cli/src/commands.ts` |
+
+**Honest limit (tested):** a user whose Guard has **never** seen the domain confirm its gate, visiting **during** a
+hijack that also removes or changes the file, isn't protected: Guard can't tell a squatted domain from a hijacked
+one on a first visit, and fails open. Returning visitors are protected (pinned). Closing this needs the
+confirmation to come from somewhere the hijacker doesn't control: confirmations recorded on-chain (registry v2,
+below) or a preload list (as WEBCAT does).
+
+**Future work (contract change):** a SignetRegistry v2 where a claim records the domain's confirmation (attested by
+independent checkers), and a squatted domain can be taken over by the gate its `signet.json` names after a dispute
+window. Deploy ≈ 0.0002 OKB plus migration. Not started.

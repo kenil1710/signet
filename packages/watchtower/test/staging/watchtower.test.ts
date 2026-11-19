@@ -201,3 +201,18 @@ test('the command: one round from the environment; the Telegram token never reac
   assert.equal(telegram.length - n, 4);
   if (process.env.SIGNET_SAVE_DEMO) writeFileSync(fileURLToPath(new URL('../../../../docs/demo/watchtower-hijack.txt', import.meta.url)), r.stdout.replaceAll(domain, 'demo.signet.test'));
 });
+
+test("squatting: a domain that never served the proof naming its gate is ignored (no checks, no alerts)", async () => {
+  site.proof = 'drop'; // the domain doesn't confirm this gate
+  site.tamper = true; // and its pages don't match the seal
+  try {
+    // a watchtower that has never seen the domain confirm its gate
+    const fresh: Config = { ...config, statePath: join(mkdtempSync(join(tmpdir(), 'tower-squat-')), 'state.json'), only: [domain] };
+    await tick(fresh, browser); // first sight of the domain
+    const r = await tick(fresh, browser);
+    assert.deepEqual([r.checked, r.alerts], [0, 0], 'an unconfirmed gate gets no checks and no alerts');
+  } finally {
+    site.proof = undefined;
+    site.tamper = false;
+  }
+});

@@ -1,13 +1,15 @@
 // "Sealed by Signet": a live status card for a domain, and the snippets a project can put on its site.
 // The badge on a site proves nothing by itself (an attacker can copy it); it links to this page, which reads the chain.
-import { project } from '../chain.ts';
+import { project, domainProof, type Proof } from '../chain.ts';
 import { esc, view } from '../ui.ts';
 
 export async function badgePage(domain: string, embed: boolean): Promise<void> {
   const p = await project(domain).catch(() => null);
-  const ok = !!p && p.currentRelease > 0 && !p.revoked;
+  // "Sealed" needs the domain itself to confirm the gate (a squatter's gate is never shown as sealed)
+  const proof: Proof | null = p ? await domainProof(domain, p.gate) : null;
+  const ok = !!p && p.currentRelease > 0 && !p.revoked && proof === 'confirmed';
   const card = `<a class="badge ${ok ? 'ok' : 'no'}" href="${esc(location.origin + location.pathname)}#/p/${esc(domain)}" target="_blank" rel="noopener">
-    <span class="dot"></span><span><b>${ok ? 'Sealed by Signet' : 'Not sealed'}</b><br><small>${esc(domain)}${ok ? ` · release #${p!.currentRelease} · ${p!.enforced ? 'enforce' : 'observe'}${p!.frozen ? ' · frozen' : ''}` : p?.revoked ? ' · release revoked' : ''}</small></span></a>`;
+    <span class="dot"></span><span><b>${ok ? 'Sealed by Signet' : p && proof !== 'confirmed' ? 'Not verified' : 'Not sealed'}</b><br><small>${esc(domain)}${ok ? ` · release #${p!.currentRelease} · ${p!.enforced ? 'enforce' : 'observe'}${p!.frozen ? ' · frozen' : ''}` : p && proof !== 'confirmed' ? " · this site hasn't confirmed this gate" : p?.revoked ? ' · release revoked' : ''}</small></span></a>`;
   if (embed) {
     document.body.classList.add('embed');
     view(card);

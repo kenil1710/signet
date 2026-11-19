@@ -1,6 +1,6 @@
 // A project: its release, roles and state; its proposals with approve / withdraw / cancel / publish; freeze,
 // unfreeze and revoke. Every action goes through the connected wallet; the contract and the circuit decide.
-import { project, status, span, TIERS, count, GATE_ABI, one, type Project } from '../chain.ts';
+import { project, status, span, TIERS, count, GATE_ABI, one, domainProof, PROOF_WORDS, type Project } from '../chain.ts';
 import { connect, send, account } from '../wallet.ts';
 import { esc, short, view, $, action } from '../ui.ts';
 
@@ -21,6 +21,7 @@ export async function projectPage(domain: string): Promise<void> {
     return;
   }
   const s = p;
+  const proof = await domainProof(domain, s.gate);
   const state = s.revoked ? '<span class="pill bad">release revoked</span>' : s.frozen ? '<span class="pill bad">FROZEN</span>' : '<span class="pill ok">active</span>';
   const mode = s.enforced ? '<span class="pill ok">enforce</span>' : '<span class="pill">observe</span>';
   const me = (a: string) => (account && a.toLowerCase() === account.toLowerCase() ? ' <b>(you)</b>' : '');
@@ -32,7 +33,8 @@ export async function projectPage(domain: string): Promise<void> {
     <td class="state">${esc(st.text)} ${st.at && st.at > s.chainTime ? `<b class="cd" data-at="${st.at}">${span(st.at - s.chainTime)}</b>` : ''}</td>
     <td>${st.open ? `<div class="ops">${x.kind === 1 ? `<a href="#/p/${esc(s.domain)}/proposal/${x.id}">Diff Guard</a> ` : ''}<button data-a="approve">Approve</button> <button data-a="withdrawApproval">Withdraw</button> <button data-a="cancel">Cancel</button> <button data-a="publish" ${st.publishable ? '' : 'disabled'}>Publish</button></div>` : ''}</td></tr>`;
   const v = view(`<a class="back" href="#/">← all projects</a>
-    <h1>${esc(s.domain)} ${state} ${mode}</h1>
+    <h1>${esc(s.domain)} ${state} ${mode}${proof === 'confirmed' ? '' : ' <span class="pill bad">NOT VERIFIED</span>'}</h1>
+    ${proof === 'confirmed' ? '' : `<p class="bad">${esc(PROOF_WORDS[proof])} Guard, the badge and the watchtower ignore this gate until the domain serves <code>/.well-known/signet.json</code> naming <code>${esc(s.gate)}</code> (run <code>signet domain public</code> and deploy).</p>`}
     <div class="glance">
       <div><span class="label">State</span><b class="${s.revoked || s.frozen ? 'bad' : 'ok'}">${s.revoked ? 'Revoked' : s.frozen ? 'Frozen' : 'Active'}</b></div>
       <div><span class="label">Release</span><b>${s.currentRelease ? `#${s.currentRelease}` : 'None'}</b></div>

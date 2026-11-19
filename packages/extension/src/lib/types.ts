@@ -36,7 +36,9 @@ export interface Sealed {
 ///   revoked     the team revoked the current release
 ///   unbound     in the local list of sealed domains, but the registry no longer binds it
 ///   unverified  could not check (RPCs down or disagreeing, manifest missing or not matching): fail-open
-export type SiteStatus = 'sealed' | 'no-release' | 'revoked' | 'unbound' | 'unverified';
+///   unconfirmed the domain hasn't confirmed this gate (/.well-known/signet.json): treated as not sealed, fail-open,
+///               never red, no verified copy. Stops a gate bound to a domain its owner doesn't control (squatting)
+export type SiteStatus = 'sealed' | 'no-release' | 'revoked' | 'unbound' | 'unverified' | 'unconfirmed';
 export interface SiteState {
   domain: string;
   status: SiteStatus;
@@ -71,6 +73,7 @@ export interface PageInfo {
   origins: string[];
   scripts: { url: string; integrity: string | null }[];
   gateway: Record<string, string> | null; // on the gateway's copy of this domain: the pinned hashes of the gateway's own files
+  proof?: { url: string; gate: string }; // unconfirmed: fetch this same-origin file and send it back (message 'proof')
 }
 
 export interface SignRequest { method: string; params: unknown; chainId: string | null; accounts: string[] }

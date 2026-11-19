@@ -2,6 +2,7 @@
 // (the same rule as Guard); file bytes from either, and they only count if they hash to the on-chain values.
 import { decodeFunctionResult, encodeFunctionData, hexToBytes, zeroAddress, type Abi, type Address, type Hex } from 'viem';
 import { gateAbi, factoryAbi } from '@signet/cli/src/abi.ts';
+import { proofNames, PROOF_PATH } from '@signet/extension/src/lib/proof.ts';
 import { registryAbi, siteAbi } from '@signet/extension/src/lib/abi.ts';
 import { agree, either, type Call } from '@signet/extension/src/lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from '@signet/extension/src/lib/sealed.ts';
@@ -9,6 +10,28 @@ import type { Net, Sealed } from '@signet/extension/src/lib/types.ts';
 
 declare const __SIGNET_NET__: Net & { name: string; tapeout: Record<string, unknown>; explorer?: string };
 export const NET = __SIGNET_NET__;
+declare const __SIGNET_PROOF_ORIGIN__: string;
+
+// ---- the domain proof (docs/domain-ownership.md): the dashboard, /prove and the badge show a project as sealed
+// only if its domain names its gate in /.well-known/signet.json. Read cross-origin, so the domain must allow it
+// (Access-Control-Allow-Origin: *); a blocked read is "unreachable", never "confirmed".
+export type Proof = 'confirmed' | 'not-confirmed' | 'unreachable';
+export async function domainProof(domain: string, gate: string): Promise<Proof> {
+  const url = `${__SIGNET_PROOF_ORIGIN__.replace('{domain}', domain)}${PROOF_PATH}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { mode: 'cors', cache: 'no-store', credentials: 'omit', redirect: 'error' });
+  } catch {
+    return 'unreachable';
+  }
+  if (!res.ok) return 'not-confirmed';
+  return proofNames((await res.text()).slice(0, 4096), gate, NET.chainId) ? 'confirmed' : 'not-confirmed';
+}
+export const PROOF_WORDS: Record<Proof, string> = {
+  confirmed: 'The domain confirms this gate (/.well-known/signet.json).',
+  'not-confirmed': "Not verified: this site hasn't confirmed this gate. Its /.well-known/signet.json is missing or names another gate.",
+  unreachable: "Not verified: the domain's /.well-known/signet.json couldn't be read from here (it must allow cross-origin reads: Access-Control-Allow-Origin: *).",
+};
 export const GATE_ABI = gateAbi as unknown as Abi;
 export const FACTORY_ABI = factoryAbi as unknown as Abi;
 

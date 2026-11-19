@@ -46,8 +46,9 @@ at the end).
 - **Code Verify ships at scale** in three browser stores, for WhatsApp Web. Signet's Guard isn't in any store yet.
 - **WEBCAT is fail-closed before any script runs.** Signet's page check runs *after* the code has run. It can't
   undo what the code did outside signing; the signing-time check is what stops theft.
-- **WEBCAT ties a domain to its signers through enrollment with a cooldown.** **Signet doesn't prove domain
-  ownership today:** anyone can bind an unbound domain (`docs/domain-ownership.md`, fix designed).
+- **WEBCAT ties a domain to its signers through enrollment with a cooldown.** Signet's domain proof is a
+  `/.well-known/signet.json` naming the gate, pinned on first sight: weaker on a first visit during a hijack, and
+  anyone can still *bind* an unbound domain on-chain (readers ignore it; `docs/domain-ownership.md`).
 - **WEBCAT enforces CSP** from the signed manifest, and **needs no blockchain, gas or wallet** for anyone. It uses
   established public infrastructure (Sigstore, Sigsum).
 - **Both are audited by more eyes** and have real deployments. Signet's attack results are from a fork (staging),

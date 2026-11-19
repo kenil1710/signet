@@ -87,7 +87,7 @@
       "limit": true,
       "blocked": false,
       "how": "reached the wallet: eth_sendTransaction",
-      "note": "Not blockable without Guard or a wallet that does the same check. The watchtower confirmed the mismatch on two loads and alerted the team 1.8 s into its round (it runs once a minute, so within about a minute of the hijack); the team can then freeze and warn users."
+      "note": "Not blockable without Guard or a wallet that does the same check. The watchtower confirmed the mismatch on two loads and alerted the team 1.9 s into its round (it runs once a minute, so within about a minute of the hijack); the team can then freeze and warn users."
     },
     {
       "id": "revoked",

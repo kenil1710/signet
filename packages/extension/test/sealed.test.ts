@@ -79,3 +79,19 @@ test('the clean-URL rule applies only to documents without an extension', () => 
 test('the exact sealed path wins over the clean-URL guess', () => {
   assert.equal(sealedPathFor('download', true, has('download', 'download.html')), 'download');
 });
+
+// ---- the domain proof (/.well-known/signet.json) — proofNames
+import { proofNames } from '../src/lib/proof.ts';
+test('domain proof: only a file naming exactly this gate on this chain confirms it', () => {
+  const gate = '0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503';
+  const ok = JSON.stringify({ signet: 1, chainId: 196, gate });
+  assert.equal(proofNames(ok, gate, 196), true);
+  assert.equal(proofNames(ok, gate.toLowerCase(), 196), true); // case doesn't matter
+  assert.equal(proofNames(JSON.stringify({ signet: 1, chainId: 196, gate: '0x000000000000000000000000000000000000dEaD' }), gate, 196), false); // another gate (a squatter's)
+  assert.equal(proofNames(JSON.stringify({ signet: 1, chainId: 1, gate }), gate, 196), false); // another chain
+  assert.equal(proofNames(JSON.stringify({ chainId: 196, gate }), gate, 196), false); // not a Signet proof
+  assert.equal(proofNames(JSON.stringify({ signet: 1, chainId: 196, gate: 'a3d4dfb5' }), gate, 196), false);
+  assert.equal(proofNames(null, gate, 196), false); // missing (404)
+  assert.equal(proofNames('<!doctype html>', gate, 196), false); // a site that answers every path with its index.html
+  assert.equal(proofNames(ok + ' '.repeat(5000), gate, 196), false); // oversized
+});

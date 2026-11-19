@@ -20,7 +20,8 @@ let server: http.Server;
 let url = '';
 let browser: Browser;
 let page: Page;
-let published = ''; // the code-only release published through the dashboard (its id = the proposal's id)
+let published = '';
+let proofOff = false; // true: the domain stops serving its /.well-known/signet.json // the code-only release published through the dashboard (its id = the proposal's id)
 const A = net.accounts!;
 const mainOf = (dist: string) => `assets/${readdirSync(join(dist, 'assets')).find((f) => /^index-.*\.js$/.test(f))}`;
 const as = (who: string) => page.evaluate((a) => ((window as unknown as { __acct: string }).__acct = a), who);
@@ -50,11 +51,17 @@ before(async () => {
   p = await sealDemoDapp(domain);
   rpc2 = await rpcProxy();
   const dist = mkdtempSync(join(tmpdir(), 'dash-dist-'));
-  const b = spawnSync('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL2: rpc2.url } });
-  assert.equal(b.status, 0, b.stdout + b.stderr);
-  const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+  const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
   server = http.createServer((req, res) => {
     const rel = req.url!.split('?')[0] === '/' ? 'app.html' : req.url!.split('?')[0]!.slice(1);
+    // the sealed site's own /.well-known/signet.json, as the domain would serve it (proofOff: a domain that doesn't)
+    const pm = rel.match(/^proof\/([^/]+)\/\.well-known\/signet\.json$/);
+    if (pm) {
+      const f = join(p.dist, '.well-known/signet.json');
+      if (proofOff || pm[1] !== domain || !existsSync(f)) return void ((res.statusCode = 404), res.end());
+      res.setHeader('content-type', 'application/json');
+      return void res.end(readFileSync(f));
+    }
     const f = join(dist, rel);
     if (!existsSync(f)) return void ((res.statusCode = 404), res.end());
     res.setHeader('content-type', types[extname(f)] ?? 'application/octet-stream');
@@ -62,6 +69,9 @@ before(async () => {
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   url = `http://127.0.0.1:${(server.address() as { port: number }).port}/`;
+  // built after the server is up: the dashboard reads each domain's proof from this server instead of https://<domain>
+  const b = spawnSync('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL2: rpc2.url, SIGNET_PROOF_ORIGIN: `${url}proof/{domain}` } });
+  assert.equal(b.status, 0, b.stdout + b.stderr);
   browser = await chromium.launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width: 1180, height: 900 } });
   await ctx.addInitScript(({ rpc, acct }) => {
@@ -180,6 +190,22 @@ test('the badge: live card, link and iframe snippets; the embed shows only the c
   if (process.env.SIGNET_SAVE_DEMO) await page.screenshot({ path: join(DEMO_DIR, 'dashboard-badge.png') });
   await go(`/badge/${domain}?embed`);
   await page.waitForFunction(() => !document.querySelector('h1') && !!document.querySelector('.badge'));
+});
+
+test("domain proof: when the domain doesn't confirm its gate, the badge says Not verified and the project page warns", async () => {
+  proofOff = true;
+  try {
+    await go(`/badge/${domain}?embed`);
+    await page.waitForFunction(() => !!document.querySelector('.badge'));
+    const card = await page.locator('.badge').innerText();
+    assert.match(card, /Not verified/);
+    assert.doesNotMatch(card, /Sealed by Signet/);
+    await go(`/p/${domain}`);
+    await page.locator('.pill.bad', { hasText: 'NOT VERIFIED' }).waitFor();
+    assert.match(await text(), /hasn't confirmed this gate/i);
+  } finally {
+    proofOff = false;
+  }
 });
 
 test('freeze (one approver), unfreeze (two), revoke', async () => {

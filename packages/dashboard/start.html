@@ -22,9 +22,10 @@
 
       <section class="step" id="install"><h2>1 · Install the CLI</h2>
         <p>In your project folder:</p>
-        <pre data-copy>npm install -g {{ORIGIN}}/signetguard-0.1.0.tgz
+        <pre data-copy>npm install -g signetguard
 signet --version
 signet keygen</pre>
+        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g {{ORIGIN}}/signetguard-0.1.0.tgz</code>.</p>
         <p><code>signet keygen</code> creates your CI proposer key in <code>.signet/proposer.key</code> (git-ignored) and prints only its <b>address</b>. Keep the address for step 2. The key can propose and publish releases; it can never approve one.</p>
       </section>
 
@@ -36,9 +37,12 @@ signet keygen</pre>
         <p>In your project folder, with your domain and the gate address from step 2:</p>
         <pre data-copy>signet link app.example.org 0xYourGateAddress
 signet domain public</pre>
-        <p><code>signet link</code> writes <code>signet.config.json</code> (commit it). <code>signet domain public</code> writes <code>public/.well-known/signet.json</code> naming your gate; use the folder your build copies to the site root. Deploy your site once with that file, then check:</p>
+        <p><code>signet link</code> writes <code>signet.config.json</code> (commit it). <code>signet domain public</code> writes <code>public/.well-known/signet.json</code> naming your gate; use the folder your build copies to the site root. Serve it with <code>Access-Control-Allow-Origin: *</code> so the dashboard and badge can read it (Cloudflare Pages and Netlify: add to <code>public/_headers</code>):</p>
+        <pre data-copy>/.well-known/signet.json
+  Access-Control-Allow-Origin: *</pre>
+        <p>(Vercel: the same header in <code>vercel.json</code>.) Deploy your site once with the file, then check:</p>
         <pre data-copy>signet domain --check</pre>
-        <p class="dim">Only someone who controls the domain can publish this file. Today <code>signet domain --check</code> verifies it; Guard and the dashboard will require it before showing "Sealed" (rolling out, see <code>docs/domain-ownership.md</code>).</p>
+        <p class="dim">Only someone who controls the domain can publish this file. Guard, the dashboard, the badge and the watchtower ignore a gate until its domain serves this file naming it, so nobody can seal a domain they don't control.</p>
       </section>
 
       <section class="step" id="ci"><h2>4 · Add the GitHub workflow</h2>
@@ -61,7 +65,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci && npm run build            # your build; output in dist/
-      - run: npm install -g {{ORIGIN}}/signetguard-0.1.0.tgz
+      - run: npm install -g signetguard@0.1.0
       - name: Seal and propose (the CI key can only propose)
         run: signet verify dist && signet seal dist && signet propose dist --reuse
         env:

@@ -4,12 +4,28 @@
 //   3. The live site is loaded in headless Chromium and compared with the sealed release. A mismatch is loaded
 //      a second time; only if the second load is wrong too is the team alerted (once per distinct mismatch).
 // State (what was already posted, the last verified manifests) is kept in a JSON file so a restart doesn't repeat.
+import { proofNames } from '@signet/extension/src/lib/proof.ts';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { chromium, type Browser } from 'playwright';
 import { gateView, isValidManifest, newDomains, openProposals, sealedLists, type Net, type Sealed } from './chain.ts';
 import { checkSite, type SiteCheck } from './check.ts';
 import type { Alerter } from './alerts.ts';
+
+/// True only if the site's own /.well-known/signet.json names `gate`. Loaded with the same browser as the site's
+/// pages (so it sees the same host the users do; no CORS involved).
+export async function domainConfirms(browser: Browser, siteUrl: string, gate: string, chainId: number): Promise<boolean> {
+  const ctx = await browser.newContext();
+  try {
+    const page = await ctx.newPage();
+    const r = await page.goto(new URL('.well-known/signet.json', siteUrl).href, { timeout: 15000 });
+    return !!r && r.ok() && proofNames((await r.text()).slice(0, 4096), gate, chainId);
+  } catch {
+    return false;
+  } finally {
+    await ctx.close();
+  }
+}
 
 export interface Config {
   net: Net;
@@ -25,6 +41,7 @@ export interface Config {
 interface DomainState {
   gate: string;
   lastProposal: number; // proposals up to this id were looked at
+  confirmedGate?: string; // the gate this domain confirmed in /.well-known/signet.json (pinned)
   alerted: string | null; // the mismatch the team was last told about
   note: string; // the last reason the site could not be checked (posted once)
   manifests: Record<string, Sealed>; // verified manifests by hash: the current one and the previous one
@@ -82,9 +99,24 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
       if (g.gate.toLowerCase() !== ds.gate.toLowerCase()) {
         // a domain that was transferred, or unbound and claimed by another gate: its history starts over
         await post('public', `Domain moved to another gate: ${domain}`, [`Gate ${g.gate}. It was bound to ${ds.gate} before.`]);
-        Object.assign(ds, { gate: g.gate, lastProposal: 0, alerted: null, manifests: {} });
+        Object.assign(ds, { gate: g.gate, lastProposal: 0, alerted: null, manifests: {}, confirmedGate: undefined });
       }
       if (ds.note === 'unbound') ds.note = '';
+
+      // the domain must confirm its gate (/.well-known/signet.json, docs/domain-ownership.md): a gate bound by
+      // someone who doesn't control the domain (squatting) is ignored, with no checks and no alerts
+      // Pinned, as in Guard: once the domain has confirmed this gate it stays watched, so a site that goes down or a
+      // hijack that removes the file is still checked and alerted. A new gate needs a new confirmation.
+      const pinned = !!ds.confirmedGate && ds.confirmedGate.toLowerCase() === g.gate.toLowerCase();
+      if (!pinned) {
+        if (!(await domainConfirms(browser, c.urlFor(domain), g.gate, c.net.chainId))) {
+          if (ds.note !== 'unconfirmed') log(`${domain}: not verified (its /.well-known/signet.json doesn't name gate ${g.gate}): ignored`);
+          ds.note = 'unconfirmed';
+          continue;
+        }
+        ds.confirmedGate = g.gate;
+      }
+      if (ds.note === 'unconfirmed') ds.note = '';
 
       // 2. pending tier-10 / tier-11 proposals: posted once each, so nobody has to watch the chain to see them
       for (const p of await openProposals(c.net, g, ds.lastProposal)) {

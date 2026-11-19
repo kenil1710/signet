@@ -126,7 +126,7 @@ table.props{border-bottom:1px solid var(--line)}
 .st.PASS{color:var(--ok);border-color:rgba(90,217,160,.5);background:rgba(90,217,160,.06)}
 .st.FAIL{color:var(--wax-hi);border-color:var(--wax);background:rgba(214,61,39,.1)}
 .st.PENDING{color:var(--warn);border-color:rgba(232,179,90,.45)}
-.st.STALE{color:var(--warn);border-color:rgba(232,179,90,.45)}
+.st.STALE,.st.UNCONFIRMED{color:var(--warn);border-color:rgba(232,179,90,.45)}
 @media (max-width:860px){.claim{grid-template-columns:1fr;gap:10px}}
 .summary{display:flex;align-items:center;gap:14px;margin:28px 0 0;padding:18px 20px;border:1px solid var(--line);font-family:var(--mono);font-size:14px}
 .summary.ok{border-color:rgba(90,217,160,.5);color:var(--ok)} .summary.bad{border-color:var(--wax);color:var(--wax-hi)}

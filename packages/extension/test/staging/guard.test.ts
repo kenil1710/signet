@@ -289,7 +289,9 @@ test('a gateway whose worker is not the pinned one is red; without a gateway the
   writeFileSync(swFile, Buffer.concat([original, Buffer.from('\n// changed on the gateway server\n')]));
   try {
     const s = await browser();
-    const page = s.ctx.pages()[0]!;
+    // the copy can't confirm its own gate (its files come from the chain): the real domain does, as when a user
+    // reaches the copy from the real site
+    const { page } = await visit(s);
     await page.goto(`http://${encodeLabel(domain)}.localhost:${gateway.port}/`).catch(() => {});
     await until('the tab to be taken to the warning page', () => page.url().startsWith('chrome-extension:') && page.url().includes('blocked.html'), 30000); // enforce mode
     await page.waitForSelector('h1');
@@ -320,6 +322,84 @@ test('a Guard circuit whose stored netlist is not the reviewed one is not truste
   assert.match((await events(s))[0]!.details.at(-1)!, /decided by the local mirror \(the circuit on-chain is not the reviewed netlist\)/);
   assert.equal(signed(s).length, 0);
   await s.close();
+});
+
+// ---- domain proof (docs/domain-ownership.md): a gate the domain doesn't confirm is ignored
+async function notVerified(s: Session, tab: number, page: Page): Promise<void> {
+  await light(s, tab, '?'); // grey: never "OK", never "!"
+  const text = await popupShot(s, tab, 'guard-popup-not-verified.png');
+  assert.match(text, /Not verified: this site hasn't confirmed this gate/i, text);
+  assert.ok(!page.url().includes('blocked.html'), 'never sent to the red page');
+  // no verified copy for an unconfirmed gate
+  const copy = await s.ctx.newPage();
+  await copy.goto(`chrome-extension://${s.extId}/copy.html#domain=${domain}`);
+  await copy.waitForSelector('h1');
+  assert.match(await copy.locator('h1').innerText(), /No verified copy/i);
+  await copy.close();
+}
+
+test("squatting: a gate bound to a domain that doesn't serve the proof is ignored (never Sealed, never red, no copy, nothing blocked even in enforce mode)", async () => {
+  site.proof = 'drop'; // the real owner's site never confirmed this gate
+  site.tamper = true; // and its code is not what the squatter sealed
+  try {
+    const s = await browser();
+    const { page, tab } = await visit(s);
+    await notVerified(s, tab, page);
+    // the squatter's gate is in enforce mode, yet nothing is refused: fail-open, as for any unchecked site
+    assert.match(await click(page, 'approve', 'ok'), /Approve: done/);
+    assert.ok(signed(s).length >= 1, 'the signature reached the wallet');
+    await s.close();
+  } finally {
+    site.proof = undefined;
+    site.tamper = false;
+  }
+});
+
+test("squatting: a proof naming another gate doesn't confirm this one", async () => {
+  site.proof = JSON.stringify({ signet: 1, chainId: 196, gate: '0x000000000000000000000000000000000000dEaD' });
+  site.tamper = true;
+  try {
+    const s = await browser();
+    const { page, tab } = await visit(s);
+    await notVerified(s, tab, page);
+    await s.close();
+  } finally {
+    site.proof = undefined;
+    site.tamper = false;
+  }
+});
+
+test('a domain Guard has confirmed stays protected when a later hijack removes the proof', async () => {
+  const s = await browser();
+  const { page, tab } = await visit(s); // the real site: the proof is served, Guard pins the gate
+  await light(s, tab, 'OK');
+  site.proof = 'drop';
+  site.tamper = true;
+  try {
+    // the demo server lets the browser cache scripts for an hour: drop the cache so the reload gets the hijacked bundle
+    await (await s.ctx.newCDPSession(page)).send('Network.clearBrowserCache');
+    await page.goto(`${origin}/`, { waitUntil: 'load' }).catch(() => {});
+    await until('the tab to go to the red page', () => page.url().includes('blocked.html'), 30000);
+    await s.close();
+  } finally {
+    site.proof = undefined;
+    site.tamper = false;
+  }
+});
+
+test('honest limit: a first-time visitor during a hijack that also removes the proof is not protected (fail-open)', async () => {
+  site.proof = 'drop';
+  site.tamper = true;
+  try {
+    const s = await browser();
+    const { page, tab } = await visit(s);
+    await light(s, tab, '?');
+    assert.ok(!page.url().includes('blocked.html'));
+    await s.close();
+  } finally {
+    site.proof = undefined;
+    site.tamper = false;
+  }
 });
 
 test('privacy: on a domain that is not sealed Guard makes no network call and stays out of the way', async () => {

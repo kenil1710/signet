@@ -25,6 +25,15 @@
 | `packages/watchtower` | Loads every sealed site each minute, alerts the team on a confirmed mismatch | staging, one region |
 | `packages/attacks` | The attack suite and the benchmark | staging |
 
+## Protect your own site
+
+```bash
+npm install -g signetguard     # the signet CLI: one file, Node 18+, no repository needed
+```
+
+Then follow the five steps at [`/start`](https://signet-6l4.pages.dev/start): create your gate in the dashboard, prove
+your domain (`signet domain public`), add the GitHub workflow, approve your first release.
+
 ## Built on TapeOut: what Signet really uses
 
 Everything below is on X Layer mainnet (chain 196) unless it says otherwise. `pnpm verify:claims` checks the

@@ -206,7 +206,19 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
   // ---- start
   void (async () => {
     info = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href });
+    // tell the page's wallet wrapper at once: on a sealed domain every signature waits for Guard's decision, which
+    // waits for the first check below (so for the domain proof too). Never a fail-open window while the proof loads.
     down({ type: 'state', sealed: !!info });
+    if (info?.proof) {
+      // this domain is sealed but hasn't confirmed its gate yet: read its own /.well-known/signet.json (same origin)
+      let body: string | null = null;
+      try {
+        const r = await fetch(info.proof.url, { cache: 'no-store', credentials: 'omit', redirect: 'error' });
+        if (r.ok) body = (await r.text()).slice(0, 4096);
+      } catch { /* missing: stays unconfirmed */ }
+      const p = await ask<{ confirmed: boolean }>({ type: 'proof', host: location.hostname, body });
+      if (p?.confirmed) info = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href });
+    }
     if (!info) return firstDone(); // not a sealed domain: nothing else happens on this page
     const start = () => void check().then(firstDone);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });

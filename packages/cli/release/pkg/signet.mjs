@@ -31471,15 +31471,21 @@ async function domainProof(ctx, publicDir, o, log) {
 		mkdirSync(join(publicDir, ".well-known"), { recursive: true });
 		writeFileSync(file, JSON.stringify(want, null, 2) + "\n");
 		log(`Wrote ${showPath(file)}. Deploy it so https://${cfg.domain}/${WELL_KNOWN} names gate ${want.gate}.`);
+		log("Serve it with the header \"Access-Control-Allow-Origin: *\" so the Signet dashboard and badge can read it:");
+		log("  Cloudflare Pages / Netlify, in public/_headers:   /.well-known/signet.json");
+		log("                                                       Access-Control-Allow-Origin: *");
+		log("  Vercel, in vercel.json: {\"headers\":[{\"source\":\"/.well-known/signet.json\",\"headers\":[{\"key\":\"Access-Control-Allow-Origin\",\"value\":\"*\"}]}]}");
 		log(`Then check: signet domain --check`);
 		return;
 	}
 	const { registry } = needDeployed(ctx);
 	const url = `${process.env.SIGNET_DOMAIN_ORIGIN || `https://${cfg.domain}`}/${WELL_KNOWN}`;
 	let got;
+	let cors = "";
 	try {
 		const r = await fetch(url, { redirect: "follow" });
 		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		cors = r.headers.get("access-control-allow-origin") ?? "";
 		got = await r.json();
 	} catch (e) {
 		throw new SignetError("NoProof", `${url} could not be read (${e.message}). Deploy the file: signet domain <public folder>`);
@@ -31494,7 +31500,8 @@ async function domainProof(ctx, publicDir, o, log) {
 	log(`${url}: names gate ${got.gate ?? "(none)"} on chain ${got.chainId ?? "?"}`);
 	log(`registry: ${cfg.domain} → ${bound}`);
 	if (!ok) throw new SignetError("ProofMismatch", `The domain's file, the registry and ${CONFIG_NAME} must all name gate ${want.gate}.`);
-	log(`OK: ${cfg.domain} confirms gate ${want.gate}.`);
+	log(`OK: ${cfg.domain} confirms gate ${want.gate}. Guard and the watchtower accept it.`);
+	if (cors !== "*") log(`warning: no "Access-Control-Allow-Origin: *" on the file, so the Signet dashboard and badge can't read it from the browser and will show "Not verified". Add the header (signet domain <dir> prints how).`);
 }
 // src/cli.ts
 var log = (line = "") => console.log(line);

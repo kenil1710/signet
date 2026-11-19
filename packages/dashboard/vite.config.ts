@@ -12,6 +12,6 @@ const net = {
 // Two pages: index.html is the landing page (no viem, no chain reads); app.html is the dashboard and /prove.
 export default defineConfig({
   base: './',
-  define: { __SIGNET_NET__: JSON.stringify(net) },
+  define: { __SIGNET_NET__: JSON.stringify(net), __SIGNET_PROOF_ORIGIN__: JSON.stringify(process.env.SIGNET_PROOF_ORIGIN || 'https://{domain}') },
   build: { target: 'es2022', rollupOptions: { input: { index: 'index.html', app: 'app.html', start: 'start.html' } } },
 });

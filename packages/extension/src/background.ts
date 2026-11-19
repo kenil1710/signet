@@ -8,6 +8,7 @@ import { agree, either, RpcError, type Call } from './lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sealed.ts';
 import { decide, factsOf } from './lib/policy.ts';
 import { decideWithCircuit } from './lib/guard-circuit.ts';
+import { proofNames, PROOF_PATH } from './lib/proof.ts';
 import { domainOfGatewayHost, encodeLabel } from './lib/label.ts';
 import type { Decision, GuardEvent, Hex, Net, PageInfo, PageReport, Sealed, SignRequest, SiteState } from './lib/types.ts';
 
@@ -117,6 +118,27 @@ async function refreshSite(domain: string, cached: SiteState | undefined): Promi
 }
 
 const inflight = new Map<string, Promise<SiteState>>();
+// ---- domain proof: the domain must name its gate in /.well-known/signet.json (docs/domain-ownership.md)
+// Guard keeps, per domain, the gate the domain itself confirmed ("pinned"). A gate the domain hasn't confirmed is
+// ignored: the site is "unconfirmed" (not sealed, fail-open, never red, no verified copy). Once pinned, a hijack
+// that serves another file can't undo it; a different gate bound on-chain needs a new confirmation.
+
+const NOT_CONFIRMED = "Not verified: this site hasn't confirmed this gate.";
+async function pinnedGate(domain: string): Promise<string | null> {
+  return ((await get<Record<string, string>>(local, 'proofs')) ?? {})[domain] ?? null;
+}
+async function pin(domain: string, gate: string): Promise<void> {
+  const all = (await get<Record<string, string>>(local, 'proofs')) ?? {};
+  await local.set({ proofs: { ...all, [domain]: gate.toLowerCase() } });
+}
+/// The site as Guard may act on it: getSite, downgraded to "unconfirmed" unless the domain confirmed its gate.
+async function siteFor(domain: string): Promise<SiteState> {
+  const site = await getSite(domain);
+  if (site.status === 'unbound' || !site.gate) return site;
+  if ((await pinnedGate(domain)) === site.gate.toLowerCase()) return site;
+  return { ...site, status: 'unconfirmed', reason: NOT_CONFIRMED };
+}
+
 function getSite(domain: string): Promise<SiteState> {
   const running = inflight.get(domain);
   if (running) return running;
@@ -181,6 +203,7 @@ type Msg =
   | { type: 'report'; report: PageReport }
   | { type: 'sign'; req: SignRequest }
   | { type: 'tab-info'; tabId: number }
+  | { type: 'proof'; host: string; body: string | null }
   | { type: 'bypass'; tabId: number; domain: string; url: string }
   | { type: 'wrong-block'; domain: string; note: string }
   | { type: 'open-copy'; domain: string }
@@ -202,7 +225,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         void paint(tabId, null, null);
         return null;
       }
-      const site = await getSite(host);
+      const site = await siteFor(host);
       if (site.status === 'unbound') {
         void paint(tabId, null, null);
         return null;
@@ -217,14 +240,27 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         bypass: !!(await get<boolean>(session, `bypass:${tabId}:${host}`)),
         hashes, origins: cur?.origins ?? [], scripts: site.valid.flatMap((h) => site.manifests[h]!.scripts),
         gateway: viaGateway ? NET.gateway!.pins : null,
+        ...(site.status === 'unconfirmed' && !viaGateway && site.gate ? { proof: { url: PROOF_PATH, gate: site.gate } } : {}),
       };
       return info;
+    }
+    case 'proof': {
+      // only from a page of that very domain (not the gateway's copy), only for a sealed domain
+      if (tabId === undefined || !sender.url) return { confirmed: false };
+      const from = new URL(sender.url);
+      if (from.hostname !== msg.host || (NET.gateway && domainOfGatewayHost(from.host, new URL(NET.gateway.url).host))) return { confirmed: false };
+      const domains = (await get<DomainList>(local, 'domains'))?.list ?? [];
+      if (!domains.includes(msg.host)) return { confirmed: false };
+      const site = await getSite(msg.host);
+      if (!site.gate || !proofNames(msg.body, site.gate, NET.chainId)) return { confirmed: false };
+      await pin(msg.host, site.gate);
+      return { confirmed: true };
     }
     case 'report': {
       if (tabId === undefined) return null;
       const tab = await get<TabState>(session, `tab:${tabId}`);
       if (!tab) return null;
-      const site = await getSite(tab.domain);
+      const site = await siteFor(tab.domain);
       const before = tab.report?.status;
       await session.set({ [`tab:${tabId}`]: { ...tab, report: msg.report } satisfies TabState });
       void paint(tabId, site, msg.report);
@@ -248,7 +284,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const tab = tabId === undefined ? undefined : await get<TabState>(session, `tab:${tabId}`);
       const allow: Decision = { by: 'mirror', input: 0, action: 'allow', enforced: false, refused: false, title: '', reason: '', details: [] };
       if (!tab) return allow;
-      const site = await getSite(tab.domain);
+      const site = await siteFor(tab.domain);
       const ctx = { site: site.status, page: tab.report?.status ?? 'unknown', allowlist: site.current ? (site.manifests[site.current]?.allowlist ?? null) : null, frozen: site.frozen, enforced: site.enforced } as const;
       const verdict = decide(msg.req, ctx);
       // the policy names the facts; the Guard decision circuit decides
@@ -269,7 +305,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     case 'tab-info': {
       const tab = await get<TabState>(session, `tab:${msg.tabId}`);
       if (!tab) return null;
-      const site = await getSite(tab.domain);
+      const site = await siteFor(tab.domain);
       const events = ((await get<GuardEvent[]>(local, 'events')) ?? []).filter((e) => e.domain === tab.domain).slice(0, 20);
       const { manifests: _m, ...brief } = site;
       // contracts: how many addresses the sealed allowlist lets this site ask to sign for (shown in the popup)
@@ -284,7 +320,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     }
     case 'wrong-block': {
       // Nothing is sent anywhere: the report is built locally and handed to the user to pass on to the team.
-      const site = await getSite(msg.domain);
+      const site = await siteFor(msg.domain);
       const events = ((await get<GuardEvent[]>(local, 'events')) ?? []).filter((e) => e.domain === msg.domain).slice(0, 10);
       const report = {
         kind: 'signet-guard-wrong-block', guard: chrome.runtime.getManifest().version, at: new Date().toISOString(), domain: msg.domain, note: msg.note,
@@ -305,13 +341,13 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     }
     case 'copy': {
       // The verified copy: which sealed files are stored in the container, checked against the sealed hash.
-      const site = await getSite(msg.domain);
+      const site = await siteFor(msg.domain);
       const sealed = site.current ? site.manifests[site.current] : undefined;
       if (site.status !== 'sealed' || !sealed || !site.container) return { ok: false, reason: site.reason || 'No verified release for this domain.' };
       return { ok: true, domain: site.domain, release: site.release, manifest: site.current, container: site.container, prefix: site.prefix, files: sealed.files };
     }
     case 'copy-file': {
-      const site = await getSite(msg.domain);
+      const site = await siteFor(msg.domain);
       const f = site.current ? site.manifests[site.current]?.files.find((x) => x.path === msg.path) : undefined;
       if (!f || !site.container) return { ok: false, why: 'not a sealed file' };
       const bytes = await readFile(site.container, site.prefix + msg.path).catch(() => null);
@@ -335,7 +371,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.status !== 'complete') return;
   void (async () => {
     const tab = await get<TabState>(session, `tab:${tabId}`);
-    if (tab?.report) void paint(tabId, await getSite(tab.domain), tab.report);
+    if (tab?.report) void paint(tabId, await siteFor(tab.domain), tab.report);
   })();
 });
 // No sync on wake-up: the worker wakes for every page, and the list download must not follow the user's browsing.

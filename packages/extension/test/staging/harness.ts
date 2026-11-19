@@ -56,6 +56,7 @@ export async function sealDemoDapp(domain: string, o: { spenders?: string[] } = 
   const cfg = JSON.parse(readFileSync(cfgFile, 'utf8'));
   // the team declares who may be given an allowance: the router (Permit2 is recognized by the CLI)
   writeFileSync(cfgFile, JSON.stringify({ ...cfg, allowlist: { '196': { spenders: [ROUTER, ...(o.spenders ?? [])] } } }, null, 2));
+  signet(dir, ['domain', dist]); // the domain proof: dist/.well-known/signet.json names this gate
   signet(dir, ['seal', dist]);
   await anvil('anvil_setBalance', [await pub.readContract({ address: cfg.gate, abi: gateAbi, functionName: 'proposer' }), '0xde0b6b3a7640000']);
   const id = signet(dir, ['propose', dist, '--emergency']).match(/Proposed release #(\d+)/)![1]!; // the CI key from init
@@ -80,7 +81,9 @@ export async function switchToEnforce(p: Project): Promise<void> {
 // ---------------------------------------------------------------- web server
 
 /// tamper: true = the main bundle is tampered on every request; 'once' = on the next request only, then clean.
-export interface Site { port: number; log: string[]; tamper: boolean | 'once'; close(): void }
+/// proof: what /.well-known/signet.json answers. undefined = the sealed file (the domain confirms its gate);
+/// 'drop' = 404 (a domain that never confirmed this gate, or a hijack that removes the file); a string = that body.
+export interface Site { port: number; log: string[]; tamper: boolean | 'once'; proof?: 'drop' | string; close(): void }
 
 /// Serves the sealed build for any *.signet.test host and a small unsealed page for every other host.
 export async function serveSite(dist: string): Promise<Site> {
@@ -105,6 +108,10 @@ export async function serveSite(dist: string): Promise<Site> {
       return;
     }
     const rel = path === '/' ? 'index.html' : path.slice(1);
+    if (rel === '.well-known/signet.json' && site.proof !== undefined) {
+      if (site.proof === 'drop') { res.statusCode = 404; res.end(); } else { res.setHeader('content-type', 'application/json'); res.end(site.proof); }
+      return;
+    }
     const file = join(dist, rel);
     if (rel.includes('..') || !existsSync(file)) {
       res.statusCode = 404;

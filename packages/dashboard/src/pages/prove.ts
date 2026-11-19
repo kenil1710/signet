@@ -2,7 +2,7 @@
 // published truth tables (all 512 inputs, through eval), the circuit beacon, and every sealed project's release
 // (the manifest files in the container must hash to what its gate published).
 import { keccak256, sha256, type Abi, type Address, type Hex } from 'viem';
-import { NET, read, enc, dec, domains, project, releaseLists, releaseOf } from '../chain.ts';
+import { NET, read, enc, dec, domains, project, releaseLists, releaseOf, domainProof, PROOF_WORDS } from '../chain.ts';
 import policy from '@signet/circuit/artifacts/policy.json';
 import guard from '@signet/circuit/artifacts/guard.json';
 import { esc, view, $ } from '../ui.ts';
@@ -18,8 +18,8 @@ const beaconAbi = [
 ] as const satisfies Abi;
 const T = NET.tapeout as { processor: Address; circuitBeacon: Address; circuitImplementation: Address; processorCodehash: Hex; guardCircuitId?: number; policyCircuitId: number };
 
-type Row = { claim: string; status: 'PASS' | 'FAIL' | 'PENDING' | 'STALE' | '…'; detail: string; src: string };
-const LABEL: Record<Row['status'], string> = { PASS: 'Verified', FAIL: 'Failed', PENDING: 'Pending deployment', STALE: 'Stale', '…': 'Checking' };
+type Row = { claim: string; status: 'PASS' | 'FAIL' | 'PENDING' | 'STALE' | 'UNCONFIRMED' | '…'; detail: string; src: string };
+const LABEL: Record<Row['status'], string> = { PASS: 'Verified', FAIL: 'Failed', PENDING: 'Pending deployment', STALE: 'Stale', UNCONFIRMED: 'Not verified', '…': 'Checking' };
 // OKLink links only for addresses that exist on X Layer mainnet: TapeOut's (the same on staging, a mainnet fork),
 // and Signet's own only when this build reads mainnet.
 const OKLINK = 'https://www.oklink.com/xlayer/address/';
@@ -30,6 +30,7 @@ const addr = (a: string, name: string, mainnetAddress = true) => mainnetAddress 
 const todo = (what: string) => `<span class="todo">TODO: ${esc(what)}</span>`;
 const repoFile = (f: string) => `repo <code>${f}</code>`;
 class Stale extends Error {}
+class Unconfirmed extends Error {}
 
 async function truthTable(id: number, art: { netlistSha256: string; expected: string; nIn: number; nOut: number; gates: number }): Promise<string> {
   const [info, nl] = await read([enc(T.processor, cpuAbi, 'circuitInfo', [BigInt(id)]), enc(T.processor, cpuAbi, 'netlist', [BigInt(id)])]);
@@ -79,7 +80,7 @@ export async function provePage(): Promise<void> {
       const d = await f();
       Object.assign(r, d === null ? { status: 'PENDING', detail: 'not deployed on this network yet' } : { status: 'PASS', detail: d });
     } catch (e) {
-      Object.assign(r, { status: e instanceof Stale ? 'STALE' : 'FAIL', detail: (e as Error).message.split('\n')[0] });
+      Object.assign(r, { status: e instanceof Stale ? 'STALE' : e instanceof Unconfirmed ? 'UNCONFIRMED' : 'FAIL', detail: (e as Error).message.split('\n')[0] });
     }
     render();
   };
@@ -118,11 +119,14 @@ export async function provePage(): Promise<void> {
         if (old !== null) throw new Stale(`the container still holds release #${old}'s files: release #${p.currentRelease}'s were never uploaded (Guard shows this site as "could not check")`);
       }
       if (!r.sealed) throw new Error(`${r.why}, and they match no earlier release of this gate either`);
+      const proof = await domainProof(d, p.gate);
+      if (proof !== 'confirmed') throw new Unconfirmed(PROOF_WORDS[proof]);
       return `release #${p.currentRelease}: filesRoot, allowlistHash and originsHash recomputed here, ${r.sealed.files.length} files listed, ${p.enforced ? 'enforce' : 'observe'} mode`;
     });
   }
   const fails = rows.filter((r) => r.status === 'FAIL').length;
   const stale = rows.filter((r) => r.status === 'STALE').length;
+  const unconfirmed = rows.filter((r) => r.status === 'UNCONFIRMED').length;
   $('#sum', v).className = `summary ${fails ? 'bad' : 'ok'}`;
-  $('#sum', v).textContent = fails ? `${fails} check(s) FAILED.` : `All checks passed (${rows.filter((r) => r.status === 'PENDING').length} pending deployment${stale ? `; ${stale} project(s) with a release whose files were not uploaded` : ''}).`;
+  $('#sum', v).textContent = fails ? `${fails} check(s) FAILED.` : `All checks passed (${rows.filter((r) => r.status === 'PENDING').length} pending deployment${stale ? `; ${stale} project(s) with a release whose files were not uploaded` : ''}${unconfirmed ? `; ${unconfirmed} project(s) not verified by their domain` : ''}).`;
 }

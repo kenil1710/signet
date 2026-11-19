@@ -26,6 +26,7 @@ export function headline(i: TabInfo): { title: string; text: string } {
     ? { title: 'Release revoked', text: "The team revoked this site's current release. Don't sign anything here." }
     : { title: "Doesn't match the sealed release", text: `This page is not what the team sealed as release #${s.release}. Don't sign.` };
   if (s.status === 'sealed') return { title: 'Sealed, not fully checked', text: 'Some files could not be read from the browser cache, so Guard cannot vouch for them. Signing is still checked against the sealed allowlist.' };
+  if (s.status === 'unconfirmed') return { title: 'Not verified', text: "Not verified: this site hasn't confirmed this gate. Guard doesn't check, block or offer a copy here." };
   if (s.status === 'no-release') return { title: 'No sealed release yet', text: s.reason };
   return { title: 'Could not check', text: `${s.reason} Guard does not block when it cannot check.` };
 }
