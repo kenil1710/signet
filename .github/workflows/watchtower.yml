@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   round:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # ubuntu-latest is 26.04, where Playwright 1.56 cannot install Chromium
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
