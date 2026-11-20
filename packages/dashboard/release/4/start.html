@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Protect your site with Signet: setup</title>
+    <meta name="description" content="Five steps to seal your dApp's website on X Layer: install the CLI, create your gate, prove your domain, add the GitHub workflow, approve your first release." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%23D63D27%27/%3E%3Ctext x=%2716%27 y=%2722%27 text-anchor=%27middle%27 font-family=%27Arial%27 font-weight=%27700%27 font-size=%2717%27 fill=%27%23fff%27%3ES%3C/text%3E%3C/svg%3E">
+    <script type="module" crossorigin src="./assets/start-DFm4aols.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-P2Xu9kJm.js">
+    <link rel="stylesheet" crossorigin href="./assets/style-BZoHtN8I.css">
+  </head>
+  <body>
+    <header class="top">
+      <div class="top-in">
+        <a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#C8452F"/><circle cx="14" cy="14" r="10" fill="none" stroke="#8E2B1C" stroke-width="1" stroke-dasharray="2 2"/><path d="M17.5 9.5c-.8-1.3-2.1-2-3.6-2-2.2 0-3.7 1.3-3.7 3.1 0 1.8 1.4 2.6 3.9 3.2 1.9.5 2.8 1 2.8 2.2 0 1.2-1.2 2-2.8 2-1.7 0-3-.8-3.6-2.1" fill="none" stroke="#FFF4EC" stroke-width="2" stroke-linecap="round"/></svg> Signet</a>
+        <nav aria-label="Site"><a href="./start" class="on">Setup</a><a href="./app#/">Projects</a><a href="./app#/prove">Proof</a></nav>
+      </div>
+    </header>
+    <main id="app" class="start">
+      <div class="kicker">Setup · X Layer mainnet · about 15 minutes of your time</div>
+      <h1>Protect your site</h1>
+      <p class="lead">After these five steps, no single key can change what your website asks wallets to sign: your CI only <b>proposes</b> each release, your approvers <b>approve</b> it in their own wallets, and TapeOut circuit #6 decides when it may go live. Users who run Guard are checked against exactly what you sealed.</p>
+      <p class="dim">You need: Node.js 18+, a static site built by GitHub Actions (output folder such as <code>dist/</code>), a wallet on X Layer with ~0.001 OKB, and three approver addresses.</p>
+
+      <section class="step quick" id="quick"><h2>Fastest: one command</h2>
+        <p>In your project folder. It asks for your domain, the gate address (it tells you how to create it in the dashboard), your host and your build command, then writes the proposer key, <code>signet.config.json</code>, the domain proof, your host's header file and <code>.github/workflows/signet.yml</code>. It sends no transaction.</p>
+        <pre data-copy>npx -y signetguard&#64;0.1.3 init</pre>
+        <p class="dim">Same thing without questions (CI, scripts): <code>signet init --domain app.example.org --gate 0x… --host cloudflare --yes</code>. Hosts: <code>cloudflare</code>, <code>netlify</code>, <code>vercel</code>, <code>github-pages</code>, <code>other</code>. Or follow the five steps below by hand.</p>
+      </section>
+
+      <section class="step" id="install"><h2>1 · Install the CLI</h2>
+        <p>In your project folder:</p>
+        <pre data-copy>npm install -g signetguard
+signet --version
+signet keygen</pre>
+        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g https://signetguard.xyz/signetguard-0.1.3.tgz</code>.</p>
+        <p><code>signet keygen</code> creates your CI proposer key in <code>.signet/proposer.key</code> (git-ignored) and prints only its <b>address</b>. Keep the address for step 2. The key can propose and publish releases; it can never approve one.</p>
+      </section>
+
+      <section class="step" id="gate"><h2>2 · Create your gate</h2>
+        <p>Open <a href="./app#/new"><b>Protect a site</b></a> in the dashboard, connect your wallet (it offers to switch to X Layer), and enter your domain, three approver addresses, the CI proposer address from step 1, a recovery address kept offline and, optionally, a guardian that can only freeze. Two transactions: <b>1. Reserve the domain</b>, then, two blocks later, <b>2. Create the gate</b> (≈ 0.000013 OKB of gas). The page then shows your gate address.</p>
+      </section>
+
+      <section class="step" id="domain"><h2>3 · Prove you control the domain</h2>
+        <p>In your project folder, with your domain and the gate address from step 2:</p>
+        <pre data-copy>signet link app.example.org 0xYourGateAddress
+signet domain public</pre>
+        <p><code>signet link</code> writes <code>signet.config.json</code> (commit it). <code>signet domain public</code> writes <code>public/.well-known/signet.json</code> naming your gate; use the folder your build copies to the site root. Serve it with <code>Access-Control-Allow-Origin: *</code> so the dashboard and badge can read it (Cloudflare Pages and Netlify: add to <code>public/_headers</code>):</p>
+        <pre data-copy>/.well-known/signet.json
+  Access-Control-Allow-Origin: *</pre>
+        <p>(Vercel: the same header in <code>vercel.json</code>.) Deploy your site once with the file, then check:</p>
+        <pre data-copy>signet domain --check</pre>
+        <p><b>Behind Cloudflare?</b> Turn off <b>Email Obfuscation</b> and <b>Rocket Loader</b> for your site, and anything else that rewrites HTML or scripts on the way out. They change the bytes your visitors get after you sealed them, so Guard shows the site as not matching its release. (Email Obfuscation rewrites any text that looks like an email address, even <code>name&#64;1.2.3</code>, and adds a script.) Check the live bytes against your build with <code>signet verify https://your-domain --build dist</code>.</p>
+        <p class="dim">Only someone who controls the domain can publish this file. Guard, the dashboard, the badge and the watchtower ignore a gate until its domain serves this file naming it, so nobody can seal a domain they don't control.</p>
+      </section>
+
+      <section class="step" id="ci"><h2>4 · Add the GitHub workflow</h2>
+        <ol>
+          <li>Repository → Settings → Secrets and variables → Actions → New secret <code>SIGNET_PROPOSER_KEY</code> = the content of <code>.signet/proposer.key</code>. Then delete the file from your machine.</li>
+          <li>Send the CI proposer address ≈ 0.0005 OKB on X Layer for gas (propose + publish + the release's manifest files).</li>
+          <li>Add <code>.github/workflows/signet.yml</code>, with your own build and deploy commands:</li>
+        </ol>
+        <pre data-copy>name: Signet release
+on:
+  push:
+    branches: [main]
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci && npm run build            # your build; output in dist/
+      - run: npm install -g signetguard&#64;0.1.3
+      - name: Seal and propose (the CI key can only propose)
+        run: signet verify dist && signet seal dist && signet propose dist --reuse
+        env:
+          SIGNET_PROPOSER_KEY: ${{ secrets.SIGNET_PROPOSER_KEY }}
+      - name: Wait for the approvals and the timelock, publish (the circuit decides), store the manifest Guard reads
+        run: signet wait dist --publish --timeout 19800
+        env:
+          SIGNET_PROPOSER_KEY: ${{ secrets.SIGNET_PROPOSER_KEY }}
+      - name: Deploy (only reached after the release is published)
+        run: echo "your deploy command here"</pre>
+        <p><code>signet wait --publish</code> also writes the release's 3 manifest files on-chain (allowlist, origins, file list; ≈ 0.00003 OKB), which is what Guard checks your site against. A re-run skips files that are already stored.</p>
+        <p class="dim">Deploy only after <code>signet wait</code> succeeds: that is what makes an unapproved build unable to go live. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
+      </section>
+
+      <section class="step" id="hosts"><h2>Your host</h2>
+        <p>Whatever the host, the rule is the same: <b>deploy the exact folder you sealed</b>, after <code>signet wait</code> succeeds, with no build or rewriting on the host's side. <code>signet init</code> writes all of this for you.</p>
+        <details><summary><b>Cloudflare Pages</b></summary>
+          <p>Header for the proof, in <code>public/_headers</code>:</p>
+          <pre data-copy>/.well-known/signet.json
+  Access-Control-Allow-Origin: *</pre>
+          <p>Deploy step (secrets <code>CLOUDFLARE_API_TOKEN</code>, <code>CLOUDFLARE_ACCOUNT_ID</code>):</p>
+          <pre data-copy>npx -y wrangler@4 pages deploy dist --project-name YOUR_PROJECT --branch main</pre>
+          <p class="warn"><b>Turn off Email Obfuscation and Rocket Loader</b> for the site (Cloudflare dashboard), and anything else that rewrites HTML or scripts. They change the bytes after you sealed them, so Guard and the watchtower see a mismatch.</p>
+        </details>
+        <details><summary><b>Netlify</b></summary>
+          <p>Header for the proof, in <code>public/_headers</code> (same format as Cloudflare). Deploy step (secrets <code>NETLIFY_AUTH_TOKEN</code>, <code>NETLIFY_SITE_ID</code>):</p>
+          <pre data-copy>npx -y netlify-cli@17 deploy --dir=dist --prod --no-build</pre>
+          <p class="dim">Turn off Netlify's asset optimization / post processing if it's on: it rewrites files after the seal.</p>
+        </details>
+        <details><summary><b>Vercel</b></summary>
+          <p>Header for the proof, in <code>public/vercel.json</code> (deployed as a static folder, so the file goes inside it):</p>
+          <pre data-copy>{"headers":[{"source":"/.well-known/signet.json","headers":[{"key":"Access-Control-Allow-Origin","value":"*"}]}]}</pre>
+          <p>Deploy step (secrets <code>VERCEL_TOKEN</code>, <code>VERCEL_ORG_ID</code>, <code>VERCEL_PROJECT_ID</code>). Deploy the sealed folder, not the source, so Vercel doesn't rebuild it:</p>
+          <pre data-copy>npx -y vercel@39 deploy dist --prod --yes --token "$VERCEL_TOKEN"</pre>
+        </details>
+        <details><summary><b>GitHub Pages</b></summary>
+          <p>Pages already allows cross-origin reads. Add an empty <code>public/.nojekyll</code> so the <code>.well-known</code> folder is served. Settings → Pages → Source: <b>GitHub Actions</b>, then deploy the sealed folder:</p>
+          <pre data-copy>      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - uses: actions/deploy-pages@v4</pre>
+          <p class="dim">The job needs <code>permissions: pages: write, id-token: write</code> and <code>environment: github-pages</code>.</p>
+        </details>
+      </section>
+
+      <section class="step" id="approve"><h2>5 · Approve your first release, add the badge</h2>
+        <p>Push to <code>main</code>. The workflow proposes release #1. Two approvers open <a href="./app#/">the dashboard</a>, open your domain, read Diff Guard, and click <b>Approve</b> in their own wallets. After the timelock the workflow publishes and deploys.</p>
+        <p>Then open <code>https://signetguard.xyz/app#/badge/&lt;your domain&gt;</code> and copy the "Sealed by Signet" badge into your site footer. It links to a live page that reads the chain.</p>
+        <p class="dim">Your gate starts in observe mode (Guard reports, never blocks). Switch to enforce in the dashboard when your releases flow cleanly.</p>
+      </section>
+      <section class="step" id="faq"><h2>Questions</h2>
+        <dl class="faq">
+          <dt>Do my contracts change?</dt><dd>No. Signet seals your website's files and the list of contracts it may call; your contracts stay as they are.</dd>
+          <dt>What does it cost?</dt><dd>Gas on X Layer: about 0.000013 OKB to create the gate, and about 0.0001 OKB per release (propose, publish, the 3 manifest files). The Free plan is free; Pro (planned) adds a faster watchtower and the verified copy.</dd>
+          <dt>An approver loses their key?</dt><dd>The other two can still approve releases (no release needs all three, except admin changes). To replace approvers, your <b>recovery address</b> (kept offline) proposes a new set; it takes effect after 7 days unless two current approvers cancel it, and it works even while the gate is frozen.</dd>
+          <dt>Does it slow my site down?</dt><dd>No. Your site is served as before; nothing is added to your pages. Guard checks in the user's browser, and only on sealed domains.</dd>
+          <dt>What if my users don't install Guard?</dt><dd>Your team still gets the release approvals and timelock, watchtower alerts, instant freeze, and the public proof and badge. Guard is the extra layer that also blocks the signature for users who run it.</dd>
+          <dt>Is my first release slow?</dt><dd>Yes: every first release is tier 10 (2 approvals + 24 h). After that, a code-only release needs 1 approval + 1 h.</dd>
+        </dl>
+      </section>
+
+      <section class="step" id="help"><h2>Get free setup help</h2>
+        <p>We'll set up your first release with you, for free. <a data-link="telegram" class="soon" aria-disabled="true" title="Coming soon" data-applied="1">Ask on Telegram <span class="soon-tag">coming soon</span></a> · <a data-link="x" class="soon" aria-disabled="true" title="Coming soon" data-applied="1">Message us on X <span class="soon-tag">coming soon</span></a></p>
+      </section>
+    </main>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
