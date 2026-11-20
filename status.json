@@ -1,0 +1,13 @@
+{
+  "updatedAt": "2026-11-20T12:05:22.333Z",
+  "network": "mainnet",
+  "domains": [
+    {
+      "domain": "signetguard.xyz",
+      "status": "mismatch",
+      "checkedAt": "2026-11-20T12:05:22.332Z",
+      "release": 4
+    }
+  ],
+  "operator": null
+}
