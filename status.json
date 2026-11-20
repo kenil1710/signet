@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-20T12:05:22.333Z",
+  "updatedAt": "2026-11-20T12:34:26.985Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
-      "status": "mismatch",
-      "checkedAt": "2026-11-20T12:05:22.332Z",
+      "status": "ok",
+      "checkedAt": "2026-11-20T12:34:26.983Z",
       "release": 4
     }
   ],
