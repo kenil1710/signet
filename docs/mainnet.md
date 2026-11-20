@@ -59,6 +59,25 @@ After: `ownerOf(5)` = site gate `0xa3d4…4503`; `SiteRegistry.operatorOf(contai
 Moving #5 out again needs the gate's tier-11 `TransferCircuit` (3 of 3 + 24 h). Fork-tested first (a full publish
 through the registry after the move wrote and read back its manifest files).
 
+## Release #3 published (2026-11-20, 13:45 IST, approved by the user)
+
+Sent from the CI proposer `0x93272103b49B955dF493999F4B9Dea4852FA9453` (nonces 3–6) with
+`SIGNET_NETWORK=mainnet SIGNET_PRIVATE_KEY="$(cat .signet/proposer.key)" node ../cli/src/cli.ts -C . publish 3 release/3`
+(`publish` reads only `SIGNET_PRIVATE_KEY`, not `.signet/proposer.key`). Gas price 0.020000001 gwei.
+
+| Tx | Call | Block | Gas |
+|---|---|---:|---:|
+| [`0x797e35bb…ef4a`](https://www.oklink.com/xlayer/tx/0x797e35bbce7f72436657e8641010c4e58cce94a6199ea7a56fef6e810878ef4a) | `siteGate.publish(3)`: tier 10, 3 of 3 approvals, decided by circuit #6 | 76,393,503 | 306,517 |
+| [`0xdd3debc9…68a1`](https://www.oklink.com/xlayer/tx/0xdd3debc9341ffaa261c9d586c9916c3479b0625b124990d8759dfc81128668a1) | registry write `signet/allowlist.json` (471 B) | 76,393,506 | 510,895 |
+| [`0xdc968fcc…8c1b`](https://www.oklink.com/xlayer/tx/0xdc968fcc4807d623a248b79b699122250f41f35efc26072bc0c991a26f678c1b) | registry write `signet/origins.json` (80 B) | 76,393,509 | 423,804 |
+| [`0x756e437c…ad9a`](https://www.oklink.com/xlayer/tx/0x756e437c15a4c137ed4e9a24c531be4d99e35b15a950cbf24fa15f17d41fad9a) | registry write `signet/files.json` (6,024 B) | 76,393,511 | 1,721,902 |
+| | **Total** | | **2,963,118 (≈ 0.0000593 OKB)** |
+
+Checks: `currentRelease() = 3` and `activeRelease()` = filesRoot `0x67a7…f0f9`, allowlistHash `0x5a48…efc5`,
+originsHash `0xfa18…85cf`, ok = true on both xlayerrpc.okx.com and xlayer.drpc.org; `files.json` read back and
+matched; the live signetguard.xyz files fetched and resealed give the same three hashes. Proposer balance after:
+0.000431713516585676 OKB. Proposals #1 and #2 (tier 10, 0 approvals) stay open until they expire on 25 / 26 Nov.
+
 ## Checks after the deploy
 
 - `record-mainnet` re-read all 7 receipts from xlayerrpc.okx.com and xlayer.drpc.org (both succeeded, both from
@@ -86,7 +105,7 @@ through the registry after the move wrote and read back its manifest files).
 Prepared 2026-11-19 (commit after `de45bc7`); **not deployed**. The live site must stay byte-identical to release/3
 until #3 is published.
 
-1. **Publish #3** (from 13:45:22 IST / 08:15:22 UTC; proposal expires Thu 26 Nov 13:43:29 IST). CI proposer key;
+1. **Publish #3** — **done 2026-11-20 13:45 IST**, see "Release #3 published" above. (From 13:45:22 IST / 08:15:22 UTC; proposal expires Thu 26 Nov 13:43:29 IST). CI proposer key;
    ≈ 0.00006 OKB (publish 306k gas + 3 manifest writes ≈ 2.66M gas). Shown to the user and sent only on their yes:
    `cd packages/dashboard && SIGNET_NETWORK=mainnet node ../cli/src/cli.ts -C . publish 3 release/3`
    Check: `currentRelease() = 3`, the 3 files read back, Guard-style check of the live site = sealed #3.
