@@ -97,6 +97,31 @@ Checks: `currentRelease() = 4` and `activeRelease()` = #4's three hashes, ok = t
 back and matched; the live site refetched and resealed gives the same three hashes. Proposer balance after:
 0.000388441014422051 OKB.
 
+## Release #5 published (2026-11-20, tier 00)
+
+Built with `SIGNET_REPO_PUBLIC=1` and sealed from `dist` **before** deploying; proposed, approved (Approver A), then
+deployed to Cloudflare Pages (`891b387c`) and checked **with a browser user agent** (all 23 files byte-identical; the
+four HTML pages identical in Chromium; the only cross-origin requests are the two sealed RPCs) before publishing.
+Contents: Guard fail-safe docs, /check and /prove fixes, the Guard 0.2.0 pre-release link on /start, explorer links to
+OKX Explorer, benchmark wording.
+
+| Tx | From | Call | Block | Gas |
+|---|---|---|---:|---:|
+| [`0x357fdb40…2324`](https://web3.okx.com/explorer/x-layer/evm/tx/0x357fdb40964b52fc1066a825baa0e1226a691fcb2640c5ee3e2497c4bea02324) | CI proposer | `proposeRelease` → #5, tier 00 | 76,408,967 | 168,996 |
+| — | Approver A | `approve(5)`; timelock from 12:38:43 UTC | | |
+| [`0xb97d2805…fbad`](https://web3.okx.com/explorer/x-layer/evm/tx/0xb97d280502e87164170ffb7883a796752216476c8e544ab37bf63472307cfbad) | CI proposer | `publish(5)`, decided by circuit #6 | 76,412,902 | 292,923 |
+| [`0xd5a9ea6d…b1cc`](https://web3.okx.com/explorer/x-layer/evm/tx/0xd5a9ea6dcaefe985e298418377e993d4ef135baca74b505ca1d11a9bc90eb1cc) | CI proposer | registry write `signet/files.json` (6,802 B); allowlist and origins unchanged | 76,412,906 | 1,707,363 |
+| | | **Total (CI proposer)** | | **2,169,282 (≈ 0.0000434 OKB)** |
+
+Checks: `currentRelease() = 5` and `activeRelease()` = filesRoot `0x7d66…c6e4`, allowlistHash `0x5a48…efc5`,
+originsHash `0xfa18…85cf`, ok = true, on both RPCs; `files.json` read back and matched; the live site refetched with a
+browser user agent and resealed gives the same three hashes. Proposer balance after: 0.000345055372252769 OKB.
+
+**Correction for #3 and #4:** their live byte checks used `curl` without a browser user agent. Cloudflare Web
+Analytics' automatic setup was injecting a beacon script into the HTML for browsers only, so browsers got HTML that
+didn't match #3 and #4 until it was turned off on 2026-11-20 (found by the first live watchtower round; after that
+the live files matched #4 byte for byte with a browser user agent).
+
 ## signet-dev rotation, step 1: guardian removed (2026-11-20)
 
 Approvers A and B each called `voteRemoveGuardian()` (calldata `0x2a62b187`) on the site gate from their own wallets
