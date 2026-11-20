@@ -46,3 +46,9 @@ packages/contracts/deployments/rehearsal-*.json
 
 # the watchtower renewer wallet (never committed)
 packages/watchtower/.secrets/
+
+# internal process notes (kept locally, not published): AI/judge reviews, overnight logs, plan reports, agent rules
+/internal/
+/CLAUDE.md
+# wrangler's local dev state (pages dev, tests)
+.wrangler/
