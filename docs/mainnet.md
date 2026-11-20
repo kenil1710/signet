@@ -109,8 +109,10 @@ until #3 is published.
    ≈ 0.00006 OKB (publish 306k gas + 3 manifest writes ≈ 2.66M gas). Shown to the user and sent only on their yes:
    `cd packages/dashboard && SIGNET_NETWORK=mainnet node ../cli/src/cli.ts -C . publish 3 release/3`
    Check: `currentRelease() = 3`, the 3 files read back, Guard-style check of the live site = sealed #3.
-2. **Deploy the #4 site changes** (`/start`: `signetguard@0.1.2`, "publishing includes the upload", the Cloudflare
-   Email Obfuscation / Rocket Loader warning, tarball link 0.1.2; 0.1.0 and 0.1.1 tarballs removed):
+2. **Deploy the #4 site changes** (the team-first site, /start with `npx signetguard init`, /check, the watchtower
+   status; /start pins `signetguard@0.1.3` and links the 0.1.3 tarball; the 0.1.0 tarball is removed). CLI **0.1.3 is
+   published on npm** (`latest = 0.1.3`, checked 2026-11-20 with `npm view signetguard dist-tags --prefer-online`;
+   the registry's shasum `321de3ef…80c9` equals `packages/cli/release/signetguard-0.1.3.tgz` and the site's copy):
    `SIGNET_REPO_PUBLIC=1 pnpm --filter @signet/dashboard build && npx -y wrangler@4 pages deploy dist --project-name signet --branch main`
    (`SIGNET_REPO_PUBLIC=1` only once the GitHub repo is public: it turns the GitHub link on. Checked 2026-11-19: with
    or without it, #4's allowlist and origins equal #3's, so #4 is tier 00. The ReleaseGate implementation address

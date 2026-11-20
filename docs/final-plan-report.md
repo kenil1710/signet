@@ -105,7 +105,7 @@ after 13:45 IST). No mainnet transaction was sent for this plan.
 
 ## Needs a decision
 
-1. **Publish CLI 0.1.3** (it supersedes 0.1.2; it passed the install gate): `cd ~/signet/packages/cli/release/pkg && npm publish --access public`. /start's commands pin 0.1.3.
+1. ~~Publish CLI 0.1.3~~ **Done** by the user on 2026-11-19: npm `latest = 0.1.3` (shasum `321de3ef…80c9`, same as the local tarball). /start's commands pin 0.1.3.
 2. **Fund the renewer wallet** `0xF7fFeD07bc29271306cBBCb94b4c02F655B0E4b0` with **0.0001 OKB** (≈ 40 renewals, one every ~23 days). From any wallet; the transfer itself costs ≈ 0.0000004 OKB. Not sent.
 3. **Telegram:** create a bot (@BotFather) and a chat; then add the GitHub secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `WATCHTOWER_RENEW_KEY` (the content of `packages/watchtower/.secrets/renewer.key`). Also the public Telegram / X links for "Get free setup help" (shown as "coming soon" until then).
 4. **The watchtower needs the repository public** (GitHub's free minutes); it starts on the first push after the flip.
