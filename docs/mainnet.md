@@ -78,6 +78,25 @@ originsHash `0xfa18…85cf`, ok = true on both xlayerrpc.okx.com and xlayer.drpc
 matched; the live signetguard.xyz files fetched and resealed give the same three hashes. Proposer balance after:
 0.000431713516585676 OKB. Proposals #1 and #2 (tier 10, 0 approvals) stay open until they expire on 25 / 26 Nov.
 
+## Release #4 published (2026-11-20, tier 00, approved by the user)
+
+The repository went public first; the site was built with `SIGNET_REPO_PUBLIC=1` and deployed to Cloudflare Pages
+(`a37f343d`). Every served file, fetched into `release/4`, was byte-identical to `dist` (Pages redirects `/x.html` to
+`/x`, so the HTML pages are fetched there). Sealed: filesRoot `0x6d2e…a933`, allowlistHash `0x5a48…efc5` and
+originsHash `0xfa18…85cf` equal to #3's, so **tier 00** (confirmed on a fork before proposing, then on-chain).
+
+| Tx | From | Call | Block | Gas |
+|---|---|---|---:|---:|
+| [`0xdf06ac87…3ccf5`](https://www.oklink.com/xlayer/tx/0xdf06ac8701e7195b72978530f0039bb19412f1f0deabf919f5da64680a43ccf5) | CI proposer | `proposeRelease` → #4, tier 00 | 76,402,750 | 168,996 |
+| — | Approver A | `approve(4)` in the dashboard; timelock from 10:51:59 UTC | | |
+| [`0x0462e7a0…122a`](https://www.oklink.com/xlayer/tx/0x0462e7a078eac376e44f04d00ed1a7db9ff1cd24351fb498d3c7f29af5dd122a) | CI proposer | `publish(4)`, decided by circuit #6 | 76,406,499 | 292,923 |
+| [`0x5fccc341…d2a3`](https://www.oklink.com/xlayer/tx/0x5fccc341ad95b20c3961c13cf2b9b4631327edba546f41ae10632e936bc6d2a3) | CI proposer | registry write `signet/files.json` (6,802 B); allowlist and origins unchanged, so not rewritten | 76,406,502 | 1,701,706 |
+| | | **Total (CI proposer)** | | **2,163,625 (≈ 0.0000433 OKB)** |
+
+Checks: `currentRelease() = 4` and `activeRelease()` = #4's three hashes, ok = true, on both RPCs; `files.json` read
+back and matched; the live site refetched and resealed gives the same three hashes. Proposer balance after:
+0.000388441014422051 OKB.
+
 ## Checks after the deploy
 
 - `record-mainnet` re-read all 7 receipts from xlayerrpc.okx.com and xlayer.drpc.org (both succeeded, both from
@@ -109,7 +128,7 @@ until #3 is published.
    ≈ 0.00006 OKB (publish 306k gas + 3 manifest writes ≈ 2.66M gas). Shown to the user and sent only on their yes:
    `cd packages/dashboard && SIGNET_NETWORK=mainnet node ../cli/src/cli.ts -C . publish 3 release/3`
    Check: `currentRelease() = 3`, the 3 files read back, Guard-style check of the live site = sealed #3.
-2. **Deploy the #4 site changes** (the team-first site, /start with `npx signetguard init`, /check, the watchtower
+2. **Deploy the #4 site changes** — **done 2026-11-20** (the team-first site, /start with `npx signetguard init`, /check, the watchtower
    status; /start pins `signetguard@0.1.3` and links the 0.1.3 tarball; the 0.1.0 tarball is removed). CLI **0.1.3 is
    published on npm** (`latest = 0.1.3`, checked 2026-11-20 with `npm view signetguard dist-tags --prefer-online`;
    the registry's shasum `321de3ef…80c9` equals `packages/cli/release/signetguard-0.1.3.tgz` and the site's copy):
@@ -118,8 +137,8 @@ until #3 is published.
    or without it, #4's allowlist and origins equal #3's, so #4 is tier 00. The ReleaseGate implementation address
    shown on /app is excluded from the allowlist in `signet.config.json`: it's displayed, never called.)
    Then fetch every live file from signetguard.xyz into `release/4` and require byte-identity with `dist`.
-3. **Seal and propose #4** from the live files: `seal release/4`, then `propose release/4`. Expected (fork-tested
+3. **Seal and propose #4** — **done** (tier 00) from the live files: `seal release/4`, then `propose release/4`. Expected (fork-tested
    2026-11-19): **tier 00 code only**, 1 approval + 1 h; allowlistHash `0x5a48…efc5` and originsHash `0xfa18…85cf`
    unchanged from #3.
-4. **The user approves** (1 approval) in the dashboard.
-5. **Publish #4** after 1 h (+ its manifest upload), shown first and sent on the user's yes.
+4. **The user approves** — **done** (Approver A) (1 approval) in the dashboard.
+5. **Publish #4** — **done**, see "Release #4 published" above. after 1 h (+ its manifest upload), shown first and sent on the user's yes.
