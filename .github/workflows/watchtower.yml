@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Also send one test message to the Telegram chat (the run fails if Telegram does not accept it)'
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -44,7 +49,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           WATCHTOWER_RENEW_KEY: ${{ secrets.WATCHTOWER_RENEW_KEY }}
-        run: node packages/watchtower/src/cli.ts --once
+        run: node packages/watchtower/src/cli.ts --once ${{ inputs.test_alert && '--test-alert' || '' }}
       - name: Publish the status
         run: |
           cd status
