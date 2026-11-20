@@ -222,6 +222,28 @@ test('freeze (one approver), unfreeze (two), revoke', async () => {
   await page.locator('.pill.bad', { hasText: 'release revoked' }).waitFor();
 });
 
+test('vote to remove the guardian: approvers only; the second vote removes it', async () => {
+  // a reload resets the mock wallet to approver 1 (init script), so switch accounts on another page first
+  const openAs = async (who: string) => { await go('/'); await as(who); await go(`/p/${domain}`); };
+  await openAs(A.users[0]!);
+  await page.locator('td', { hasText: 'recovery · guardian' }).waitFor();
+  assert.equal(await page.locator('#rmguardian').count(), 0, 'not shown to a non-approver');
+  await openAs(A.approvers[0]!);
+  await page.locator('#rmguardian').waitFor();
+  await page.waitForFunction(() => /\d of 2/.test(document.getElementById('rmguardian')?.textContent ?? ''));
+  assert.match(await clickAndWait('#rmguardian', /vote recorded|refused/), /vote recorded \(1 of 2/);
+  await page.waitForFunction(() => /You voted to remove the guardian \(1 of 2\)/.test(document.getElementById('rmguardian')?.textContent ?? ''));
+  assert.ok(await page.locator('#rmguardian').isDisabled(), 'one vote per approver');
+  await openAs(A.approvers[1]!);
+  await page.waitForFunction(() => /Vote to remove guardian \(1 of 2\)/.test(document.getElementById('rmguardian')?.textContent ?? ''));
+  assert.match(await clickAndWait('#rmguardian', /guardian removed|refused/), /guardian removed/);
+  await openAs(A.approvers[1]!);
+  const row = page.locator('tr', { has: page.locator('td', { hasText: 'recovery · guardian' }) });
+  await row.waitFor();
+  assert.match((await row.locator('td').nth(1).textContent())!, /· none$/);
+  assert.equal(await page.locator('#rmguardian').count(), 0, 'no button once there is no guardian');
+});
+
 test('/prove, with no wallet: both circuits re-checked on all 512 inputs, the beacon, and every recent release recomputed in the browser', { timeout: 300_000 }, async () => {
   const ctx = await browser.newContext({ viewport: { width: 1180, height: 1000 } }); // no wallet at all
   const pg = await ctx.newPage();

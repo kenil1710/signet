@@ -97,6 +97,18 @@ function reason(e: unknown, abi: Abi = GATE_ABI as Abi): Error {
   return e instanceof Error ? e : new Error(String(e));
 }
 
+/// The wallet's account if this site is already connected, without a prompt (eth_accounts), else null. Used to show
+/// approver-only buttons; every action still connects and the contract checks the sender.
+export async function knownAccount(): Promise<Address | null> {
+  const p = found();
+  if (!p) return account;
+  try {
+    const a = ((await p.request({ method: 'eth_accounts' })) as Address[])[0];
+    if (a) { provider = p; watch(p); account = a; }
+  } catch { /* no wallet answer: keep what we had */ }
+  return account;
+}
+
 export async function connect(): Promise<Address> {
   const p = found();
   if (!p) throw new Error('No wallet found in this browser.');
