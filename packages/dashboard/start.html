@@ -48,7 +48,7 @@ signet domain public</pre>
   Access-Control-Allow-Origin: *</pre>
         <p>(Vercel: the same header in <code>vercel.json</code>.) Deploy your site once with the file, then check:</p>
         <pre data-copy>signet domain --check</pre>
-        <p><b>Behind Cloudflare?</b> Turn off <b>Email Obfuscation</b> and <b>Rocket Loader</b> for your site, and anything else that rewrites HTML or scripts on the way out. They change the bytes your visitors get after you sealed them, so Guard shows the site as not matching its release. (Email Obfuscation rewrites any text that looks like an email address, even <code>name&#64;1.2.3</code>, and adds a script.) Check the live bytes against your build with <code>signet verify https://your-domain --build dist</code>.</p>
+        <p><b>Behind Cloudflare?</b> Turn off <b>Email Obfuscation</b>, <b>Rocket Loader</b> and <b>Web Analytics’ automatic setup</b> (it adds a <code>static.cloudflareinsights.com</code> script to your HTML, only for browsers) for your site, and anything else that rewrites HTML or scripts on the way out. They change the bytes your visitors get after you sealed them, so Guard shows the site as not matching its release. (Email Obfuscation rewrites any text that looks like an email address, even <code>name&#64;1.2.3</code>, and adds a script.) Check the live bytes against your build with <code>signet verify https://your-domain --build dist</code>.</p>
         <p class="dim">Only someone who controls the domain can publish this file. Guard, the dashboard, the badge and the watchtower ignore a gate until its domain serves this file naming it, so nobody can seal a domain they don't control.</p>
       </section>
 
@@ -95,7 +95,7 @@ jobs:
   Access-Control-Allow-Origin: *</pre>
           <p>Deploy step (secrets <code>CLOUDFLARE_API_TOKEN</code>, <code>CLOUDFLARE_ACCOUNT_ID</code>):</p>
           <pre data-copy>npx -y wrangler@4 pages deploy dist --project-name YOUR_PROJECT --branch main</pre>
-          <p class="warn"><b>Turn off Email Obfuscation and Rocket Loader</b> for the site (Cloudflare dashboard), and anything else that rewrites HTML or scripts. They change the bytes after you sealed them, so Guard and the watchtower see a mismatch.</p>
+          <p class="warn"><b>Turn off Email Obfuscation, Rocket Loader and Web Analytics’ automatic setup</b> for the site (Cloudflare dashboard; Web Analytics adds a script to the HTML for browsers only, so a plain <code>curl</code> won’t show it), and anything else that rewrites HTML or scripts. They change the bytes after you sealed them, so Guard and the watchtower see a mismatch.</p>
         </details>
         <details><summary><b>Netlify</b></summary>
           <p>Header for the proof, in <code>public/_headers</code> (same format as Cloudflare). Deploy step (secrets <code>NETLIFY_AUTH_TOKEN</code>, <code>NETLIFY_SITE_ID</code>):</p>
@@ -122,6 +122,16 @@ jobs:
         <p>Push to <code>main</code>. The workflow proposes release #1. Two approvers open <a href="./app#/">the dashboard</a>, open your domain, read Diff Guard, and click <b>Approve</b> in their own wallets. After the timelock the workflow publishes and deploys.</p>
         <p>Then open <code>{{ORIGIN}}/app#/badge/&lt;your domain&gt;</code> and copy the "Sealed by Signet" badge into your site footer. It links to a live page that reads the chain.</p>
         <p class="dim">Your gate starts in observe mode (Guard reports, never blocks). Switch to enforce in the dashboard when your releases flow cleanly.</p>
+      </section>
+      <section class="step" id="guard"><h2>Try Guard (pre-release)</h2>
+        <p>Signet Guard isn’t in the Chrome Web Store yet. A <b>pre-release</b> build for X Layer mainnet is on GitHub, built and signed by this project’s release workflow (a Sigstore build attestation you can check with <code>gh attestation verify</code>):</p>
+        <p><a class="btn" href="#guard" data-link="guardPrerelease">Signet Guard 0.2.0 (pre-release) on GitHub</a></p>
+        <ol>
+          <li>Download the <code>.zip</code> and unzip it into a folder you’ll keep.</li>
+          <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
+          <li>Click <b>Load unpacked</b> and choose the unzipped folder (the one with <code>manifest.json</code>).</li>
+        </ol>
+        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Tested with a mock wallet so far.</p>
       </section>
       <section class="step" id="faq"><h2>Questions</h2>
         <dl class="faq">

@@ -1,0 +1,64 @@
+# Builds Signet Guard for X Layer mainnet from a tag, zips it, signs the zip with a GitHub artifact attestation
+# (Sigstore, tied to this repository, workflow and commit) and attaches it to a GitHub pre-release.
+# Verify a download:  gh attestation verify signet-guard-<version>.zip -R kenil1710/signet
+# Run: push a tag guard-v<version> (it must equal packages/extension/package.json), or "Run workflow" with that tag.
+name: guard-release
+on:
+  push:
+    tags: ['guard-v*']
+  workflow_dispatch:
+    inputs:
+      tag: { description: 'tag to release, e.g. guard-v0.2.0', required: true }
+permissions:
+  contents: write      # create the release
+  id-token: write      # Sigstore signing
+  attestations: write  # store the attestation
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.tag || github.ref }}" }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.18, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Build Guard for mainnet and zip it
+        id: zip
+        env: { SIGNET_NETWORK: mainnet }
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION=$(node -p "require('./packages/extension/package.json').version")
+          [ "$TAG" = "guard-v$VERSION" ] || { echo "tag $TAG does not match packages/extension/package.json $VERSION"; exit 1; }
+          pnpm --filter @signet/extension test
+          pnpm --filter @signet/extension build
+          [ "$(node -p "require('./packages/extension/dist/manifest.json').version")" = "$VERSION" ]
+          ZIP="signet-guard-$VERSION.zip"
+          (cd packages/extension/dist && TZ=UTC find . -exec touch -t 202601010000 {} + && find . -type f | LC_ALL=C sort | zip -X -q "../../../$ZIP" -@)
+          sha256sum "$ZIP" | tee "$ZIP.sha256"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"; echo "version=$VERSION" >> "$GITHUB_OUTPUT"; echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@v2
+        with: { subject-path: "${{ steps.zip.outputs.zip }}" }
+      - name: Create the pre-release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          ZIP="${{ steps.zip.outputs.zip }}"; SHA=$(cut -d' ' -f1 "$ZIP.sha256")
+          cat > notes.md <<EOF
+          **Pre-release.** Signet Guard ${{ steps.zip.outputs.version }} for X Layer mainnet, built from commit \`${GITHUB_SHA::12}\` by this repository's \`guard-release\` workflow. It is not in the Chrome Web Store yet; until it is, load it unpacked.
+
+          **Starts in observe mode on every site** (it reports, never blocks) unless the site's team turned enforcement on. It makes no network call for sites that aren't sealed.
+
+          ### Check the download (optional)
+          - SHA-256: \`$SHA\`
+          - Signature (Sigstore build attestation): \`gh attestation verify $ZIP -R ${GITHUB_REPOSITORY}\`
+
+          ### Load it in Chrome (or Brave, Edge)
+          1. Unzip \`$ZIP\` into a folder you'll keep (Chrome loads it from there).
+          2. Open \`chrome://extensions\` and turn on **Developer mode** (top right).
+          3. Click **Load unpacked** and choose the unzipped folder (the one with \`manifest.json\`).
+          4. Pin **Signet Guard**, then open https://signetguard.xyz: the popup shows the sealed release.
+
+          To update: remove it, then load the new version the same way. Chrome may warn about developer-mode extensions on start; that's expected for unpacked extensions.
+          EOF
+          sed -i 's/^          //' notes.md
+          gh release create "${{ steps.zip.outputs.tag }}" "$ZIP" "$ZIP.sha256" --prerelease --title "Signet Guard ${{ steps.zip.outputs.version }} (pre-release)" --notes-file notes.md
