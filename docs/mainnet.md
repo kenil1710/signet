@@ -26,7 +26,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Approver C | `0x1C4704480E258bdBF8719ffba1679dD0e158c74c` |
 | CI proposer (can propose and publish; never approve) | `0x93272103b49B955dF493999F4B9Dea4852FA9453` (key from `signet keygen`, not in the repo) |
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
-| Guardian (freeze only) | `0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE` (signet-dev) |
+| Guardian (freeze only) | none since 2026-11-20 (was signet-dev `0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE`; removed by 2 approvers, see "signet-dev rotation" below). Planned: signet-ops `0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291` |
 
 Mode: **observe** (a new gate starts there). Current release: **#4** (published 2026-11-20; #3 before it, the same day). See "Release #3 published" and "Release #4 published" below.
 
@@ -96,6 +96,22 @@ originsHash `0xfa18…85cf` equal to #3's, so **tier 00** (confirmed on a fork b
 Checks: `currentRelease() = 4` and `activeRelease()` = #4's three hashes, ok = true, on both RPCs; `files.json` read
 back and matched; the live site refetched and resealed gives the same three hashes. Proposer balance after:
 0.000388441014422051 OKB.
+
+## signet-dev rotation, step 1: guardian removed (2026-11-20)
+
+Approvers A and B each called `voteRemoveGuardian()` (calldata `0x2a62b187`) on the site gate from their own wallets
+(Rabby). The second vote removed the guardian at once (two approvers may, also while frozen; votes count for 7 days).
+
+| Tx | From | Block | Gas | Fee (OKB) | Log |
+|---|---|---:|---:|---:|---|
+| [`0x67ad6723…84ae`](https://web3.okx.com/explorer/x-layer/evm/tx/0x67ad6723c165dce85679b1c6b16427b6aec4812908666fc91b960cf66a6e84ae) | Approver A `0xB9ef…2416` | 76,409,662 | 51,939 | 0.0000014855 | none (first vote) |
+| [`0x50bd19ef…bfa1`](https://web3.okx.com/explorer/x-layer/evm/tx/0x50bd19efd7b8698aa4ab7a08f97260b62e2be40a6f0247d7621ae907451bbfa1) | Approver B `0x3280…6dc` | 76,409,994 | 36,398 | 0.0000010410 | `GuardianRemoved()` from the gate: topic0 `0x49dba45944bff184119ef00551a537ea290e7554229b9e09fe7f63d4bcb072d9` = `keccak256("GuardianRemoved()")`, no data |
+
+After: `guardian()` = `0x0` and `guardianVoteAt(0..2)` = 0 on both RPCs. signet-dev can no longer freeze the gate. Next
+(planned, one transaction at a time): fund approver C, move circuits #6 and #7 into the site gate, propose
+`SetGuardian(signet-ops 0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291)` (3 of 3 + 24 h), sweep signet-dev's OKB to
+signet-ops last. Publish order: pending releases, then SetGuardian, then any SetApprover (it voids other open
+proposals).
 
 ## Checks after the deploy
 
