@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Signet dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%23D63D27%27/%3E%3Ctext x=%2716%27 y=%2722%27 text-anchor=%27middle%27 font-family=%27Arial%27 font-weight=%27700%27 font-size=%2717%27 fill=%27%23fff%27%3ES%3C/text%3E%3C/svg%3E">
+    <script type="module" crossorigin src="./assets/app-DJ7vTW7V.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-P2Xu9kJm.js">
+    <link rel="modulepreload" crossorigin href="./assets/policy-DXwLL7Hq.js">
+    <link rel="stylesheet" crossorigin href="./assets/style-BZoHtN8I.css">
+  </head>
+  <body>
+    <header class="top">
+      <div class="top-in">
+        <a class="brand" href="index.html"><svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#C8452F"/><circle cx="14" cy="14" r="10" fill="none" stroke="#8E2B1C" stroke-width="1" stroke-dasharray="2 2"/><path d="M17.5 9.5c-.8-1.3-2.1-2-3.6-2-2.2 0-3.7 1.3-3.7 3.1 0 1.8 1.4 2.6 3.9 3.2 1.9.5 2.8 1 2.8 2.2 0 1.2-1.2 2-2.8 2-1.7 0-3-.8-3.6-2.1" fill="none" stroke="#FFF4EC" stroke-width="2" stroke-linecap="round"/></svg> Signet</a>
+        <nav aria-label="Dashboard">
+          <a href="#/" data-nav="home">Projects</a>
+          <a href="#/prove" data-nav="prove">Proof</a>
+          <a href="index.html">About</a>
+        </nav>
+      </div>
+    </header>
+    <div id="chainbar" role="alert" hidden>
+      <div class="cb-in"><span>Your wallet is on <b class="cb-now">another network</b>. Signet's contracts are on <b>X Layer (chain 196)</b>.</span>
+        <button id="switchchain" class="primary">Switch to X Layer</button></div>
+    </div>
+    <div id="app"><section class="static-intro">
+      <h1>Signet dashboard</h1>
+      <p>Every website sealed with Signet on X Layer mainnet (chain 196), read live from the chain in your browser. No account; a wallet is needed only to approve, freeze or create a gate.</p>
+      <h2>Projects</h2>
+      <p>For each sealed domain: its gate, the current release and its risk tier, the three approvers, open proposals with their approvals and timelocks, observe or enforce mode, and whether the domain confirms its gate (<code>/.well-known/signet.json</code>). Approvers approve, cancel, freeze and publish here, in their own wallets. <a href="app#/p/signetguard.xyz">signetguard.xyz</a> is Signet's own site.</p>
+      <h2>Proof</h2>
+      <p>The <a href="app#/prove">proof page</a> needs no wallet. It re-runs release-policy circuit #6 and Guard circuit #7 on all 512 inputs against their reference functions, checks the circuit beacon has no owner, and recomputes the file, allowlist and origins hashes of every recent release from the files stored on X Layer.</p>
+      <h2>Live contracts (X Layer mainnet)</h2>
+      <ul>
+        <li><a href="https://web3.okx.com/explorer/x-layer/evm/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589" target="_blank" rel="noopener">SignetRegistry</a> <code>0x98dB5B6B1545D0fb374da40a02045B93398E0589</code>: domain → gate bindings</li>
+        <li><a href="https://web3.okx.com/explorer/x-layer/evm/address/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986" target="_blank" rel="noopener">SignetFactory</a> <code>0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986</code>: creates a team's gate</li>
+        <li><a href="https://web3.okx.com/explorer/x-layer/evm/address/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D" target="_blank" rel="noopener">ReleaseGate implementation</a> <code>0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D</code>: each gate is a non-upgradeable clone of it</li>
+        <li><a href="https://web3.okx.com/explorer/x-layer/evm/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503" target="_blank" rel="noopener">Site gate of signetguard.xyz</a> <code>0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503</code>: also holds the shared file container (circuit #5)</li>
+        <li><a href="https://web3.okx.com/explorer/x-layer/evm/address/0x73153e5fd2Acac604D49d6ca9fea27b750718F22" target="_blank" rel="noopener">TapeOut processor #101</a> <code>0x73153e5fd2Acac604D49d6ca9fea27b750718F22</code>: circuit #6 (release policy) and circuit #7 (Guard decision)</li>
+        <li><a href="https://web3.okx.com/explorer/x-layer/evm/address/0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6" target="_blank" rel="noopener">SiteRegistry</a> <code>0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6</code> and <a href="https://web3.okx.com/explorer/x-layer/evm/address/0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed" target="_blank" rel="noopener">shared container</a> <code>0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed</code>: where each release's manifest is stored</li>
+      </ul>
+      <p><a href="start">Protect your own site</a> · <a href="./">About Signet</a> · <a href="docs/THREAT_MODEL.md">Threat model</a></p>
+      <p class="dim">This page needs JavaScript to read the chain; the summary above is static.</p>
+    </section></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
