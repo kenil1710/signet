@@ -39,7 +39,7 @@ Exactly one output is 1 on every row.
 | Gates | **22 NAND**, no LATCH (combinational: read with `eval`) |
 | Netlist (TAP-02 format, 154 bytes) | `0x000000030000040000000b00000b000000050000060000000d00000d0000000c00000e0000000f00000f0000000900000900000010000011000000120000120000000200000a0000001400001400000015000012000000080000080000000700001700000018000018000000020000130000001a00001a0000001b0000190000001c0000160000001c00001c0000001d00001d00000016000016` |
 | Netlist SHA-256 | `0x03c94d0295eded753d52ad50fae8c7ceac3590d4a9320ca97823dd300784de44` |
-| On X Layer mainnet | **Processor #101 `0x73153e5fd2Acac604D49d6ca9fea27b750718F22`, circuit ID 7**. Mint [`0xa655247a…b059`](https://www.oklink.com/xlayer/tx/0xa655247a48cb08f60d0b3304b3a8d0fea540115b6ed1f5472900f3c793f3b059), tape-out [`0x8fc6a9d7…4c16`](https://www.oklink.com/xlayer/tx/0x8fc6a9d7dbf6082783b267449ee13c6327af56f2a662e087f23f1c40ade44c16). All 512 rows checked with `eval` on mainnet at block 76226736 on two RPC operators |
+| On X Layer mainnet | **Processor #101 `0x73153e5fd2Acac604D49d6ca9fea27b750718F22`, circuit ID 7**. Mint [`0xa655247a…b059`](https://web3.okx.com/explorer/x-layer/evm/tx/0xa655247a48cb08f60d0b3304b3a8d0fea540115b6ed1f5472900f3c793f3b059), tape-out [`0x8fc6a9d7…4c16`](https://web3.okx.com/explorer/x-layer/evm/tx/0x8fc6a9d7dbf6082783b267449ee13c6327af56f2a662e087f23f1c40ade44c16). All 512 rows checked with `eval` on mainnet at block 76226736 on two RPC operators |
 
 **Check a row yourself** (after the mainnet tape-out): row `n` is packed little-endian into 2 bytes, e.g. row 0x13f → `0x3f01`:
 

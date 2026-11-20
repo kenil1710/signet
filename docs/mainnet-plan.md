@@ -2,7 +2,7 @@
 
 **Status: sent on 2026-11-18** (A1–A5 and B1–B2, 0.002171 OKB in total). Addresses and transactions: [`docs/mainnet.md`](mainnet.md).
 The plan below is kept as it was approved; the registry used 2,861,749 gas (not 2,453,967: it grew with chunked uploads).
-Every step waited for Kenil's explicit yes (CLAUDE.md rule 2). The numbers come from a rehearsal of these exact scripts on a fork of mainnet
+Every step waited for the team's explicit go-ahead (project rule: every mainnet transaction is shown with its cost first). The numbers come from a rehearsal of these exact scripts on a fork of mainnet
 (`staging/rehearse-mainnet.sh`), plus a live simulation of the tape-out against mainnet state (no broadcast).
 Both were run on 2026-11-17 at block ≈ 76,141,600.
 

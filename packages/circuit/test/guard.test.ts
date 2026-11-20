@@ -25,7 +25,7 @@ test('guard netlist: well-formed, NAND only, combinational, every input used', (
   assert.ok(d.recs.every((r) => r.op === 'NAND'));
   assert.equal(netlist.bytes.length, 7 * builder.gates);
   assert.deepEqual([netlist.nIn, netlist.nOut], [9, 3]);
-  // no unused input bit (CLAUDE.md rule 7): flipping each input changes the output on some row
+  // no unused input bit (project rule: no unused input bits): flipping each input changes the output on some row
   for (let i = 0; i < 9; i++) {
     const matters = Array.from({ length: 512 }, (_, n) => n).some((n) => packGuard(guard(guardInputsOf(n))) !== packGuard(guard(guardInputsOf(n ^ (1 << i)))));
     assert.ok(matters, `input ${GUARD_INPUTS[i]} is never used`);

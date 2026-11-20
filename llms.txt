@@ -9,7 +9,7 @@ Status (2026-11-18): live on X Layer mainnet (chain 196), deployed 2026-11-18 fo
 - SignetRegistry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, SignetFactory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, ReleaseGate implementation 0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D, Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz; observe mode, no release published yet).
 - `pnpm verify:claims`: 9 claims on mainnet, 10 from the repo, 0 pending.
 - Site (landing, dashboard, /prove against mainnet, no wallet): https://signet-6l4.pages.dev (Cloudflare Pages; signetguard.xyz once its nameservers move).
-- Not live: the Guard extension (not in the Chrome Web Store; tested with a mock wallet, not MetaMask), the gateway (staging only), the watchtower (one region, Telegram, staging).
+- Not live: the Guard extension in the Chrome Web Store (a signed pre-release zip is on GitHub; tested with a mock wallet, not MetaMask), the gateway (staging only), watchtower alerts (the watchtower runs every 5 minutes on GitHub Actions for signetguard.xyz and publishes its status; Telegram not configured).
 
 ## Built on TapeOut (what is really used)
 - Two TapeOut circuits on processor #101: #6 decides when a release may publish (ReleaseGate calls it on every publish and unfreeze; a Solidity copy of the same gates decides only if that call fails or returns a malformed answer, with an on-chain event; the circuit's beacon has no owner, so the rule can't be upgraded); #7 decides Guard's allow/warn/block at signing.
@@ -29,7 +29,7 @@ Status (2026-11-18): live on X Layer mainnet (chain 196), deployed 2026-11-18 fo
 - [THREAT_MODEL.md](THREAT_MODEL.md): what is stopped, and the honest limits
 
 ## Results
-- [docs/benchmark.md](docs/benchmark.md): the same 12 attacks against SRI only (2 blocked), a hash-only checker (7), Signet (12); 0 false blocks
+- [docs/benchmark.md](docs/benchmark.md): 12 attacks we wrote, on our own local fork of X Layer, against SRI only (2 blocked), Signet Guard with its signature checks off ("hash-only", 7), Signet (12); 0 false blocks
 - [docs/attack-report.md](docs/attack-report.md): the attack suite in detail, plus the known limits (no extension, compromised extension)
 
 ## How it works

@@ -10,7 +10,7 @@ const depPath = `${here}../artifacts/guard-deployment.json`;
 const dep = existsSync(depPath) ? JSON.parse(readFileSync(depPath, 'utf8')) : null;
 if (dep && dep.netlistSha256 !== a.netlistSha256) throw new Error('guard-deployment.json is for a different netlist');
 writeFileSync(`${here}../artifacts/guard.json`, JSON.stringify(a, null, 2) + '\n');
-const okl = (h: string) => `[\`${h.slice(0, 10)}…${h.slice(-4)}\`](https://www.oklink.com/xlayer/tx/${h})`;
+const okl = (h: string) => `[\`${h.slice(0, 10)}…${h.slice(-4)}\`](https://web3.okx.com/explorer/x-layer/evm/tx/${h})`;
 const onChain = dep
   ? `**Processor #${dep.processorIndex} \`${dep.processor}\`, circuit ID ${dep.circuitId}**. Mint ${okl(dep.mintTx)}, tape-out ${okl(dep.tapeoutTx)}. All 512 rows checked with \`eval\` on mainnet at block ${dep.verifiedAtBlock} on two RPC operators`
   : '_not taped out on mainnet yet_ (taped out on the staging fork by `pnpm staging:up`; the mainnet plan is in `docs/mainnet-plan.md`)';

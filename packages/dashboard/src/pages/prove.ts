@@ -20,12 +20,12 @@ const T = NET.tapeout as { processor: Address; circuitBeacon: Address; circuitIm
 
 type Row = { claim: string; status: 'PASS' | 'FAIL' | 'PENDING' | 'STALE' | 'UNCONFIRMED' | '…'; detail: string; src: string };
 const LABEL: Record<Row['status'], string> = { PASS: 'Verified', FAIL: 'Failed', PENDING: 'Pending deployment', STALE: 'Stale', UNCONFIRMED: 'Not verified', '…': 'Checking' };
-// OKLink links only for addresses that exist on X Layer mainnet: TapeOut's (the same on staging, a mainnet fork),
+// OKX Explorer links only for addresses that exist on X Layer mainnet: TapeOut's (the same on staging, a mainnet fork),
 // and Signet's own only when this build reads mainnet.
-const OKLINK = 'https://www.oklink.com/xlayer/address/';
+const EXPLORER = 'https://web3.okx.com/explorer/x-layer/evm/address/';
 const onMainnet = NET.name === 'mainnet';
 const addr = (a: string, name: string, mainnetAddress = true) => mainnetAddress || onMainnet
-  ? `${name} <a href="${OKLINK}${a}" target="_blank" rel="noopener">${a.slice(0, 8)}…${a.slice(-4)} ↗</a>`
+  ? `${name} <a href="${EXPLORER}${a}" target="_blank" rel="noopener">${a.slice(0, 8)}…${a.slice(-4)} ↗</a>`
   : `${name} <span title="${a}">${a.slice(0, 8)}…${a.slice(-4)}</span> (${esc(NET.name)} only)`;
 const todo = (what: string) => `<span class="todo">TODO: ${esc(what)}</span>`;
 const repoFile = (f: string) => `repo <code>${f}</code>`;

@@ -1,6 +1,6 @@
 # TapeOut interfaces (X Layer mainnet, chain id 196)
 
-Source of truth for every TapeOut ABI and address the code uses (CLAUDE.md hard rule 1). Nothing here is guessed.
+Source of truth for every TapeOut ABI and address the code uses (project rule: no TapeOut ABI, address or behaviour is ever guessed). Nothing here is guessed.
 Each row says where it came from and how it was confirmed.
 
 **Confidence labels**
@@ -113,10 +113,10 @@ The gas price was 0.02 gwei base. The OP-stack `GasPriceOracle.getL1Fee` returne
 
 | # | Tx | Block | Gas used | L2 gas fee (wei) | Value (wei) |
 |---|---|---|---|---|---|
-| 1 | `mint(0, 2)`: [`0x941443a1…52e9`](https://www.oklink.com/xlayer/tx/0x941443a174f38effc4a4a4c532dd3807d04528fc683d409594c2be139a0752e9) | 76,057,582 | 86,399 | 1,727,980,086,399 | 662,000,000,000,000 |
-| 2 | `tapeout(AND, 2, 1)`: [`0xd0a696bf…51a9`](https://www.oklink.com/xlayer/tx/0xd0a696bfd9a79191d542c899d363bb69e85a1972137e300189a743d804d951a9) | 76,057,584 | 224,682 | 4,493,640,224,682 | 1,300,000,000,000,000 |
-| 3 | deploy `CircuitProbe`: [`0x4b8367bb…9a82`](https://www.oklink.com/xlayer/tx/0x4b8367bb737a27d9d7be195bb297c50c38623cf2d5c5b1b7539f5e5942e79a82) | 76,057,586 | 541,209 | 10,824,180,541,209 | 0 |
-| 4 | `probe.record(true, true)`: [`0xaa5aae2f…93ad`](https://www.oklink.com/xlayer/tx/0xaa5aae2f2b6f7bf8a6661867a5281fd089dd14406a39b0950f0110cf60c493ad) | 76,057,587 | 80,679 | 1,613,580,080,679 | 0 |
+| 1 | `mint(0, 2)`: [`0x941443a1…52e9`](https://web3.okx.com/explorer/x-layer/evm/tx/0x941443a174f38effc4a4a4c532dd3807d04528fc683d409594c2be139a0752e9) | 76,057,582 | 86,399 | 1,727,980,086,399 | 662,000,000,000,000 |
+| 2 | `tapeout(AND, 2, 1)`: [`0xd0a696bf…51a9`](https://web3.okx.com/explorer/x-layer/evm/tx/0xd0a696bfd9a79191d542c899d363bb69e85a1972137e300189a743d804d951a9) | 76,057,584 | 224,682 | 4,493,640,224,682 | 1,300,000,000,000,000 |
+| 3 | deploy `CircuitProbe`: [`0x4b8367bb…9a82`](https://web3.okx.com/explorer/x-layer/evm/tx/0x4b8367bb737a27d9d7be195bb297c50c38623cf2d5c5b1b7539f5e5942e79a82) | 76,057,586 | 541,209 | 10,824,180,541,209 | 0 |
+| 4 | `probe.record(true, true)`: [`0xaa5aae2f…93ad`](https://web3.okx.com/explorer/x-layer/evm/tx/0xaa5aae2f2b6f7bf8a6661867a5281fd089dd14406a39b0950f0110cf60c493ad) | 76,057,587 | 80,679 | 1,613,580,080,679 | 0 |
 | | **Total** | | **932,969** | **18,659,380,932,969** (0.0000187 OKB) | **1,962,000,000,000,000** (0.001962 OKB) |
 
 - Effective gas price was 20,000,001 wei (0.02 gwei); the receipts' `l1Fee` was 0 on all four.
@@ -191,8 +191,8 @@ Sources:
 
 | # | Tx | Block | Gas used | L2 gas fee (wei) | Value (wei) |
 |---|---|---|---|---|---|
-| 1 | `opener.open(#101, 5)`: [`0x7125a14a…edb2`](https://www.oklink.com/xlayer/tx/0x7125a14ab3eda56b928b6831a0a61db66fbf7b651a6d8cbf8e4be7fe6991edb2) | 76,058,449 | 167,256 | 3,345,120,167,256 | 80,000,000,000,000,000 |
-| 2 | `SiteRegistry.putFile(...)`: [`0xf88b8c67…bcc3`](https://www.oklink.com/xlayer/tx/0xf88b8c679358a6dbf4524fb57fd370ee78f960dd36d7db795875a3b91331bcc3) | 76,058,451 | 398,221 | 7,964,420,398,221 | 0 |
+| 1 | `opener.open(#101, 5)`: [`0x7125a14a…edb2`](https://web3.okx.com/explorer/x-layer/evm/tx/0x7125a14ab3eda56b928b6831a0a61db66fbf7b651a6d8cbf8e4be7fe6991edb2) | 76,058,449 | 167,256 | 3,345,120,167,256 | 80,000,000,000,000,000 |
+| 2 | `SiteRegistry.putFile(...)`: [`0xf88b8c67…bcc3`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf88b8c679358a6dbf4524fb57fd370ee78f960dd36d7db795875a3b91331bcc3) | 76,058,451 | 398,221 | 7,964,420,398,221 | 0 |
 | | **Total** | | **565,477** | **11,309,540,565,477** (0.0000113 OKB) | **0.08 OKB** |
 
 - Gas price was 20,000,001 wei and the receipts' `l1Fee` was 0.
@@ -279,8 +279,8 @@ Error seen: `0x30cd7471` = `NotOwner()` (TAP-10 error list) when the caller can'
 
 | # | Tx | Block | Gas used | L2 gas fee (wei) | Value (wei) |
 |---|---|---|---|---|---|
-| 1 | `mint(0, 34)` on transistors `0xBf0B…ae54`: [`0x1c772cbe…b1be`](https://www.oklink.com/xlayer/tx/0x1c772cbe1cfeded533308f7fb3be7a07338144754d8d95205359efef0ff6b1be) | 76,060,132 | 86,399 | 1,727,980,086,399 | 694,000,000,000,000 |
-| 2 | `tapeout(policy netlist, 9, 2)`: [`0x354cb0d5…2b96`](https://www.oklink.com/xlayer/tx/0x354cb0d5e93245326e19cab3c701d5b6b72122d6e293c96f6d7b2211a4f82b96) | 76,060,134 | 298,159 | 5,963,180,298,159 | 1,300,000,000,000,000 |
+| 1 | `mint(0, 34)` on transistors `0xBf0B…ae54`: [`0x1c772cbe…b1be`](https://web3.okx.com/explorer/x-layer/evm/tx/0x1c772cbe1cfeded533308f7fb3be7a07338144754d8d95205359efef0ff6b1be) | 76,060,132 | 86,399 | 1,727,980,086,399 | 694,000,000,000,000 |
+| 2 | `tapeout(policy netlist, 9, 2)`: [`0x354cb0d5…2b96`](https://web3.okx.com/explorer/x-layer/evm/tx/0x354cb0d5e93245326e19cab3c701d5b6b72122d6e293c96f6d7b2211a4f82b96) | 76,060,134 | 298,159 | 5,963,180,298,159 | 1,300,000,000,000,000 |
 | | **Total** | | **384,558** | **7,691,160,384,558** (0.0000077 OKB) | **1,994,000,000,000,000** (0.001994 OKB) |
 
 - Gas price was 20,000,001 wei and the receipts' `l1Fee` was 0.

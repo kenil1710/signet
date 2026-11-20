@@ -33,7 +33,7 @@
     <li><b>Guard:</b> a browser extension (Chrome Web Store listing coming soon) checks the page against the sealed release, read from two X Layer nodes, and checks every signature request against the sealed allowlist (circuit #7).</li>
     <li><b>Builds on TapeKit:</b> TapeKit already verifies DeWEB files on-chain. Signet adds the signing-time allowlist, risk-tiered approvals with timelocks, CI that can only propose, a domain proof, and a verified copy read from X Layer.</li>
   </ul>
-  <p>Benchmark on a fork of X Layer: 12 of 12 attacks blocked, 0 false blocks in 16 clean sessions (SRI alone: 2/12; a hash-only checker: 7/12).</p>
+  <p>Benchmark (12 attacks we wrote, on our own local fork of X Layer): 12 of 12 blocked, 0 false blocks in 16 clean sessions. SRI alone: 2/12; Signet Guard with its signature checks off ("hash-only"): 7/12.</p>
   <p><a href="https://signetguard.xyz/app#/prove">Proof page</a> (re-checks the circuits on X Layer in your browser) ·
   <a href="https://signetguard.xyz/start">Setup guide for teams</a> ·
   <a href="https://signetguard.xyz/check">Free risk check</a> ·
@@ -402,7 +402,7 @@
       <div>
         <span class="label">07 / Benchmark</span>
         <h2 class="stamp h2" style="margin-top:22px">12 attacks.<br><em>12 stopped.</em></h2>
-        <p class="sub">The same twelve attack types, run on a fork of X Layer against three kinds of protection.</p>
+        <p class="sub">Twelve attacks we wrote, run on our own local fork of X Layer against three kinds of protection. "Hash-only" is Signet Guard with its signature checks switched off, not another product.</p>
         <div class="statrow">
           <div><b class="num">0</b> <span>false blocks</span></div>
           <div><b class="num">16</b> <span>clean sessions tested</span></div>
@@ -434,7 +434,7 @@
         </div>
         <div class="blabels">
           <div><b>Subresource Integrity</b> SRI tags only</div>
-          <div><b>Page hash check</b> hash-only extension</div>
+          <div><b>Page hash check</b> Guard, signature checks off</div>
           <div><b>Signet</b> seal + Guard</div>
         </div>
       </div>

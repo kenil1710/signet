@@ -55,4 +55,4 @@ attacker address.
    - Note that the demo chain is a local fork, so threat-intel tools may not even run there. That is a limitation
      of the test, not evidence against them.
    - No claim like "X misses hijacks" beyond what the recording shows.
-   - Repeat on X Layer mainnet only with the user's go-ahead (gas would be spent).
+   - Repeat on X Layer mainnet only with the team's go-ahead (gas would be spent).

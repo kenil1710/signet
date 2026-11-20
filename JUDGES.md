@@ -74,7 +74,7 @@ browser against mainnet, with no wallet (about 3 minutes).
 [`docs/attack-report.md`](docs/attack-report.md): **all 12 attacks against Guard users blocked, 0 false blocks
 on 16 clean sessions**, run on a fork of X Layer with Guard in enforce mode. Shown separately, as a limit: the same
 hijack against a user **without** Guard is not stopped (the drainer reaches the wallet; the watchtower alerts the
-team). Against the same attacks, SRI alone blocks 2 and a hash-only checker 7 ([`docs/benchmark.md`](docs/benchmark.md)). Screenshots in [`docs/demo/`](docs/demo/):
+team). Against the same attacks (12 we wrote, run on our own local fork of X Layer), SRI alone blocks 2 and Signet Guard with its signature checks switched off ("hash-only") 7 ([`docs/benchmark.md`](docs/benchmark.md)). Screenshots in [`docs/demo/`](docs/demo/):
 
 | | |
 |---|---|
@@ -104,9 +104,11 @@ team). Against the same attacks, SRI alone blocks 2 and a hash-only checker 7 ([
 
 [`THREAT_MODEL.md`](THREAT_MODEL.md), especially "Who is protected" and "Honest limits". In short: protection at
 signing needs Guard; Guard starts in observe mode; it fails open when it can't read the chain; a compromised Guard
-extension defeats it. Signet's contracts and the Guard circuit **are on mainnet** ([`docs/mainnet.md`](docs/mainnet.md)), but
-no project, not even Signet's own site, has published a release there yet. Guard isn't in the Chrome Web Store, has
-been tested with a mock wallet only, and the gateway and watchtower run on staging.
+extension defeats it. Signet's contracts and the Guard circuit **are on mainnet** ([`docs/mainnet.md`](docs/mainnet.md)), and Signet's own
+site has published two releases through its gate there (#3, tier 10, and #4, tier 00, on 2026-11-20). Guard isn't in
+the Chrome Web Store (a signed pre-release zip is on GitHub), has been tested with a mock wallet only, and the gateway
+runs on staging. The watchtower checks signetguard.xyz every 5 minutes from GitHub Actions (best effort) and publishes
+its result; its Telegram alerts aren't configured yet.
 
 ## Run it yourself (optional, ~15 minutes)
 

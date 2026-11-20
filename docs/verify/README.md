@@ -31,7 +31,7 @@ the values above don't change. OKX's API docs confirm it accepts both `solidity-
 
 ## 1. SignetRegistry: `0x98dB5B6B1545D0fb374da40a02045B93398E0589`
 
-1. Open **https://www.oklink.com/xlayer/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589**, or go to
+1. Open **https://web3.okx.com/explorer/x-layer/evm/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589**, or go to
    OKX Explorer, choose **X Layer**, and paste the address into the search box.
 2. Open the **Contract** tab and click **Verify and Publish** (or "Verify contract").
 3. Fill in the form:
@@ -53,7 +53,7 @@ the values above don't change. OKX's API docs confirm it accepts both `solidity-
 
 ## 2. SignetFactory: `0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986`
 
-1. Open **https://www.oklink.com/xlayer/address/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986**, then
+1. Open **https://web3.okx.com/explorer/x-layer/evm/address/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986**, then
    **Contract** → **Verify and Publish**.
 2. Compiler type **Solidity (Standard-Json-Input)**, version **v0.8.24+commit.e11b9ed9**, license **MIT**.
 3. Upload **`SignetFactory.standard-input.json`**. Contract name: **`src/SignetFactory.sol:SignetFactory`**.
@@ -70,7 +70,7 @@ the values above don't change. OKX's API docs confirm it accepts both `solidity-
 
 ## 3. ReleaseGate implementation: `0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D`
 
-1. Open **https://www.oklink.com/xlayer/address/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D**, then
+1. Open **https://web3.okx.com/explorer/x-layer/evm/address/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D**, then
    **Contract** → **Verify and Publish**.
 2. Compiler type **Solidity (Standard-Json-Input)**, version **v0.8.24+commit.e11b9ed9**, license **MIT**.
 3. Upload **`ReleaseGate.standard-input.json`**. Contract name: **`src/ReleaseGate.sol:ReleaseGate`**.
@@ -89,7 +89,7 @@ implementation (3). The factory creates one per project (`SignetFactory._clone`)
 it to the verified implementation:
 
 1. Finish step 3 first.
-2. Open **https://www.oklink.com/xlayer/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503**, then the
+2. Open **https://web3.okx.com/explorer/x-layer/evm/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503**, then the
    **Contract** tab.
 3. Many explorers recognise EIP-1167 clones on their own once the implementation is verified, and show "Minimal
    Proxy Contract for 0xD146…3B3D" with the implementation's code and ABI. If yours shows that, you're done.

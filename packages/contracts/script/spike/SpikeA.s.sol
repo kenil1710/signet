@@ -11,7 +11,7 @@ import {CircuitProbe} from "../../src/spike/CircuitProbe.sol";
 /// SIMULATE ONLY (no transactions; safe):
 ///   forge script script/spike/SpikeA.s.sol --rpc-url xlayer --sender <dev address>
 ///
-/// SEND (only after the human's explicit yes, per CLAUDE.md rule 2):
+/// SEND (only after the team's explicit go-ahead):
 ///   forge script script/spike/SpikeA.s.sol --rpc-url xlayer --account <keystore> --broadcast --slow
 ///
 /// The dev account must be the separate dev wallet, never a prize or personal wallet.

@@ -8,7 +8,7 @@ import {ITapeOutProcessor, ITapeOutTransistors, ITapeOutFactory} from "../src/sp
 /// on processor #101, then checks eval() on all 512 inputs against the reference truth table.
 ///
 /// SIMULATE ONLY:  forge script script/PolicyTapeout.s.sol --rpc-url xlayer --sender <dev address>
-/// SEND (only after the human's explicit yes):
+/// SEND (only after the team's explicit go-ahead):
 ///   forge script script/PolicyTapeout.s.sol --rpc-url xlayer --account signet-dev --broadcast --slow
 contract PolicyTapeout is Script {
     ITapeOutFactory constant FACTORY = ITapeOutFactory(0x1f09DAeFA827f02CBb40967cc91b259763760761);

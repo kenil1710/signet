@@ -28,7 +28,7 @@ messages) and TAP-19 (group conversations) build on it.
 |---|---|---|
 | Hub (ERC-1967 proxy) | `0xe61A9C7213a6Aa616C246a2B569e555B417b25ee` | TAP-10 Deployments; measured |
 | Implementation listed in TAP-10 (v3) | `0xdCC57797089eBD9f26e686379A4323f353a3F9C6` | TAP-10 Deployments (read 2026-09-27) |
-| **Implementation now** | **`0xf6b86f44bd039bacc8d3670971d556202d579261`**, since block **76,218,561** (**2026-11-18 07:39 UTC**), upgrade tx [`0xf6218f8a…83c5`](https://www.oklink.com/xlayer/tx/0xf6218f8a3817ccb48be761f6030ac0f4f23b9850cb7b620beeb47303d3bc83c5) sent by the hub owner `0x571d…aF15` | measured (binary search of the implementation slot, then the `Upgraded` log) |
+| **Implementation now** | **`0xf6b86f44bd039bacc8d3670971d556202d579261`**, since block **76,218,561** (**2026-11-18 07:39 UTC**), upgrade tx [`0xf6218f8a…83c5`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf6218f8a3817ccb48be761f6030ac0f4f23b9850cb7b620beeb47303d3bc83c5) sent by the hub owner `0x571d…aF15` | measured (binary search of the implementation slot, then the `Upgraded` log) |
 | Hub owner / sealed | `0x571d447f4f24688eC35Ccf07f1D6993655F6aF15` / **not sealed** (`isSealed()` = 0); the processor factory is not sealed either | measured |
 
 **The new implementation (unknown).** No public document lists it: not TAP-10 (last change 2026-09-28), not
@@ -151,8 +151,8 @@ I checked PeekBox's site on chain (container `0x3F79e17c3D0E4622F94595B50fC0D5f4
 processor #339 `0xb460…eFb6`, live at `1-2-339.tapekit.org`):
 
 - **The publish is plain SiteRegistry writes into the app's own container.**
-  - `index.html` was written by [`0xf7f864c0…6d8c`](https://www.oklink.com/xlayer/tx/0xf7f864c0b558d63c5d3ddaa357e6973c89db7392bfd02186c21c2c1df3476d8c), a `putFile` (`0xfab2ed82`) of 2,369,393 gas.
-  - `app.js` (44 KB) was written in chunks; one piece was [`0xfa454808…ee62`](https://www.oklink.com/xlayer/tx/0xfa4548087458b533df6619e925626452c7bb20c5781b1b7a0d5530ac9ff5ee62), an `appendChunk` (`0xe2b51347`) of 4,501,833 gas.
+  - `index.html` was written by [`0xf7f864c0…6d8c`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf7f864c0b558d63c5d3ddaa357e6973c89db7392bfd02186c21c2c1df3476d8c), a `putFile` (`0xfab2ed82`) of 2,369,393 gas.
+  - `app.js` (44 KB) was written in chunks; one piece was [`0xfa454808…ee62`](https://web3.okx.com/explorer/x-layer/evm/tx/0xfa4548087458b533df6619e925626452c7bb20c5781b1b7a0d5530ac9ff5ee62), an `appendChunk` (`0xe2b51347`) of 4,501,833 gas.
   - Both were sent **directly to SiteRegistry**, so there's no TapeCode contract in between.
 - **There is no release record.** Files are replaced in place, path by path (10 paths, fallback `index.html`). No
   manifest, approval, timelock or version is stored; the only record is each file's `sha256`, size and
@@ -273,10 +273,10 @@ TapeSend integration is **≈ 0.00003 OKB** with option B, or ≈ 0.08 OKB with 
   [TAP-18 Agent Mandates and Task Messages](https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-18.md),
   [TAP-19 Group Conversations](https://github.com/TapeOutProtocol/TAPs/blob/main/TAPs/TAP-19.md)
 - [TapeSend app source: TapeKit `apps/tapesend`](https://github.com/TapeOutProtocol/TapeKit/tree/main/apps/tapesend) (commit `37c617e`) and [www.tapesend.com](https://www.tapesend.com)
-- Hub upgrade on X Layer: [tx `0xf6218f8a…83c5`](https://www.oklink.com/xlayer/tx/0xf6218f8a3817ccb48be761f6030ac0f4f23b9850cb7b620beeb47303d3bc83c5)
+- Hub upgrade on X Layer: [tx `0xf6218f8a…83c5`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf6218f8a3817ccb48be761f6030ac0f4f23b9850cb7b620beeb47303d3bc83c5)
 - [PeekBox README (TapeCode upload)](https://github.com/ivanzhao0315-arch/peekbox); its TapeCode writes:
-  [`0xf7f864c0…6d8c`](https://www.oklink.com/xlayer/tx/0xf7f864c0b558d63c5d3ddaa357e6973c89db7392bfd02186c21c2c1df3476d8c),
-  [`0xfa454808…ee62`](https://www.oklink.com/xlayer/tx/0xfa4548087458b533df6619e925626452c7bb20c5781b1b7a0d5530ac9ff5ee62)
+  [`0xf7f864c0…6d8c`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf7f864c0b558d63c5d3ddaa357e6973c89db7392bfd02186c21c2c1df3476d8c),
+  [`0xfa454808…ee62`](https://web3.okx.com/explorer/x-layer/evm/tx/0xfa4548087458b533df6619e925626452c7bb20c5781b1b7a0d5530ac9ff5ee62)
 - [KuCoin insight: DeWEB, TapeKit and TapeCode](https://www.kucoin.com/news/insight/TAP/6aedc8fdabae5e0007c5353d)
 - FabX: [fabx.tech](https://fabx.tech), [fabx-minter](https://github.com/854771076/fabx-minter),
   [fabx-miner-desk](https://github.com/runesleo/fabx-miner-desk), [KuCoin post on FAB](https://www.kucoin.com/news/insight/UP/6ae6219cbbcb52000745546c)

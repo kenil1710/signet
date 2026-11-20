@@ -23,7 +23,7 @@ import {IPolicyProcessor, ICircuitBeacon, ISiteRegistryWriter, IContainerOpener}
 ///   SIGNET_SITE_GUARDIAN   the watchtower's freeze-only key, or 0x0000000000000000000000000000000000000000
 ///
 /// SIMULATE (no transaction):  forge script script/MainnetDeploy.s.sol --sig "step1()" --rpc-url xlayer --sender <dev>
-/// SEND (only after Kenil's explicit yes):  add --account signet-dev --broadcast --slow
+/// SEND (only after the team's explicit go-ahead):  add --account signet-dev --broadcast --slow
 contract MainnetDeploy is Script {
     address constant DEV = 0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE; // holds circuits #5 and #6
     address constant CPU = 0x73153e5fd2Acac604D49d6ca9fea27b750718F22; // processor #101

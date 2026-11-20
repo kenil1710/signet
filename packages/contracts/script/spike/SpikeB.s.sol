@@ -8,7 +8,7 @@ import {ITapeOutProcessor, ITapeOutContainerOpener, ISiteRegistry} from "../../s
 /// and write one small file to it through SiteRegistry. Read-back: script/spike/spikeB-verify.sh.
 ///
 /// SIMULATE ONLY:  forge script script/spike/SpikeB.s.sol --rpc-url xlayer --sender <dev address>
-/// SEND (only after the human's explicit yes):
+/// SEND (only after the team's explicit go-ahead):
 ///   forge script script/spike/SpikeB.s.sol --rpc-url xlayer --account signet-dev --broadcast --slow
 contract SpikeB is Script {
     ITapeOutProcessor constant CPU = ITapeOutProcessor(0x73153e5fd2Acac604D49d6ca9fea27b750718F22);

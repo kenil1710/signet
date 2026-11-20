@@ -9,7 +9,7 @@
 
 Setup: `packages/extension` (MV3, plain JS for the spike), test server and runner in `packages/extension/spike-c/`, target `packages/demo-dapp` production build. Run: `pnpm --filter @signet/extension spike:c` (headless Chromium 141 via Playwright, fresh profile per scenario). Result: **5/5 scenarios pass**.
 
-**How it works:** the content script, at `document_idle` plus a `PerformanceObserver` for later loads, collects the document URL, every `<script src>`, every script resource-timing entry, and every inline script. For each same-origin URL it calls `fetch(url, { cache: 'only-if-cached', mode: 'same-origin' })`, SHA-256s the bytes and compares them with the sealed manifest. The service worker holds the manifest and returns only the current origin's entry. Badge: green `OK` = all verified; red `!` = a mismatch or an unknown script/origin; grey `?` = nothing failed but something couldn't be read (fail-open, per CLAUDE.md rule 9).
+**How it works:** the content script, at `document_idle` plus a `PerformanceObserver` for later loads, collects the document URL, every `<script src>`, every script resource-timing entry, and every inline script. For each same-origin URL it calls `fetch(url, { cache: 'only-if-cached', mode: 'same-origin' })`, SHA-256s the bytes and compares them with the sealed manifest. The service worker holds the manifest and returns only the current origin's entry. Badge: green `OK` = all verified; red `!` = a mismatch or an unknown script/origin; grey `?` = nothing failed but something couldn't be read (fail-open, per project rule: observe mode and fail-open by default).
 
 **What works (measured):**
 - Vite main bundle (`<script type="module" crossorigin>`), the lazy `import()` chunk (not a `<script>` element; found through resource timing), the inline script (hashed from DOM text), and the HTML document itself served `no-cache`: all read from cache and verified.
@@ -39,14 +39,14 @@ Setup: `packages/extension` (MV3, plain JS for the spike), test server and runne
   2. TapeSend from the shared container: the DeWEB hub's `keyFor` reports `usable = false` unless the holder is a plain account (TAP-10 §13, error `ContractHolder`). So the shared container probably can't use TapeSend messaging while a contract holds it; per-project alerts would need another route.
   3. Path ownership: SignetRegistry must only let ReleaseGate X write under the `projects/<domain>/` that the Domain Registry binds to X, and no `..` or overlapping prefixes.
 - **Risk.** SignetRegistry becomes a shared point of failure for every free-tier project. It should be non-upgradeable (or changeable only through a tier-11-style policy), and it can never write outside `projects/<domain>/` for the approving gate's domain.
-- **Mainnet step later** (needs the human's yes): transfer circuit #5 from the dev wallet to the deployed SignetRegistry.
+- **Mainnet step later** (needs the team's go-ahead): transfer circuit #5 from the dev wallet to the deployed SignetRegistry.
 
 ## 2026-11-16: Policy circuit (packages/circuit)
 
 34 NAND gates, combinational (read with `eval`), 9 inputs in the order `a0 a1 a2 tS tL r1 r0 f e`, 2 outputs `PUBLISH`, `UNFREEZE`. Netlist sha256 `0x1a2e1987…20db`. Equal to the reference on all inputs, both locally and through `eval` on a mainnet fork.
 
 How the spec text was read (each is pinned by a test in `packages/circuit/test/policy.test.ts`):
-- **9 inputs, so 512 combinations, not 1,024.** The spec lists 9 bits but says "10 bits / 1,024 combinations". I did not add an unused 10th input to reach 1,024: a taped-out circuit can't change, so a spare bit could never gain a meaning later. **Decided 2026-11-16: keep 9 inputs**; the spec and CLAUDE.md now say 9 bits / 512 combinations.
+- **9 inputs, so 512 combinations, not 1,024.** The spec lists 9 bits but says "10 bits / 1,024 combinations". I did not add an unused 10th input to reach 1,024: a taped-out circuit can't change, so a spare bit could never gain a meaning later. **Decided 2026-11-16: keep 9 inputs**; the spec and the project rules now say 9 bits / 512 combinations.
 - **Fast lane = 3 of 3 + e, with no timelock**, only in tiers 00 and 10 (spec: "Urgent hotfix: Tier 00/10 fast lane: 3 of 3 with no timelock"). Setting `e` never blocks the normal path.
 - **Tiers 10 and 11 check only `tL`**, tiers 00 and 01 only `tS`, exactly as the table says. ReleaseGate sets `tL` only after 24 h, which is after `tS` anyway.
 - **UNFREEZE = at least 2 approvals**, independent of every other bit. ReleaseGate only acts on it while frozen.
@@ -106,7 +106,7 @@ Measured first on a fork (`test/spike/Operator.fork.t.sol`), because the design 
 - **Why.** Keeps free-tier project files and Signet's own site in different containers with different holders, so neither can ever write into the other.
 - **Contracts.** No change needed: the shared circuit is a constructor argument of SignetRegistry (`circuits`, `circuitId`). The rule that blocks `projects/` for a gate whose own container equals the shared one stays as a safety net.
 - **Tests.** `test/Core.fork.t.sol` now tapes out and opens a fresh container on the fork and uses it as the shared one; circuit #5 is only used as Signet's own site.
-- **Not done on mainnet yet (needs the human's yes):** tape out a 1-gate circuit on processor #101 and open its container. Cost about 0.082 OKB (0.08 opening fee + 0.0013 tape-out fee + 0.000661 for 1 NAND + gas); the dev wallet holds about 0.0466 OKB, so it needs funding first.
+- **Not done on mainnet yet (needs the team's go-ahead):** tape out a 1-gate circuit on processor #101 and open its container. Cost about 0.082 OKB (0.08 opening fee + 0.0013 tape-out fee + 0.000661 for 1 NAND + gas); the dev wallet holds about 0.0466 OKB, so it needs funding first.
 - **After the hackathon: the shared container's circuit NFT moves to a multisig.** Until then the dev wallet holds it and renews the registry's operator grant (at most 30 days per grant). The holder is the one key that could replace the operator or write to the shared container directly, so it must not stay a single key.
 - **First release and the fast lane (confirmed).** The L-1 exemption only lets a first release *ask* for the fast lane; the circuit still requires 3 of 3 for it. With one or two approvals a first release is plain tier 10: 2 approvals + 24 h. Test: `test_L1_firstRelease_fastLaneStillNeedsThreeOfThree`.
 
@@ -176,7 +176,7 @@ Built and tested against staging only (`SIGNET_NETWORK=local`). Nothing here was
 
 **Limits.** HTML is scanned with a small tag scanner, not a full parser. Addresses or URLs built at runtime (string concatenation, fetched config) aren't found: the team adds them in the config, and Diff Guard is the second check. `verify <url>` checks one page and the scripts and styles it references, not lazy-loaded chunks. The CLI runs from TypeScript source with Node ≥ 22.18; a published `npx signet` needs a build step (not done). Admin proposals (tier 11) can be approved and published with the CLI but not yet proposed with it.
 
-## 2026-11-17: SRI hashes are part of `originsHash` (decided by Kenil)
+## 2026-11-17: SRI hashes are part of `originsHash` (decided by the team)
 
 - **Decision.** A changed SRI hash of any cross-origin script counts as an origins change: tier 01 (2 approvals + 1 h), not code-only. `signet/origins.json` is now `{"origins":[…sorted…],"scripts":[{"url","integrity"}…sorted by url…]}` and `originsHash` is the SHA-256 of those bytes. `externalScripts` is gone from `signet/files.json`, so there is one place for it.
 - **Why.** A cross-origin script is code we don't host and Guard can't read from the cache; the SRI hash is the only thing that pins its bytes. Changing it swaps code from an outside origin, which deserves a second approver.
@@ -203,7 +203,7 @@ Built and tested against staging only (`SIGNET_NETWORK=local`). Nothing here was
 
 | Decision | Why |
 |---|---|
-| ~~The action never publishes; it only waits.~~ **Superseded 2026-11-17 (decided by Kenil): the action sends `publish` itself** as soon as approvals and timelock allow it (`signet wait --publish`). See "Four changes after the overnight run" below. | |
+| ~~The action never publishes; it only waits.~~ **Superseded 2026-11-17 (decided by the team): the action sends `publish` itself** as soon as approvals and timelock allow it (`signet wait --publish`). See "Four changes after the overnight run" below. | |
 | **The action writes the three manifest files on-chain after publication** (`upload-manifest`, default on), with the proposer key paying gas. | Otherwise the site would be deployed while the chain still holds the previous release's lists, and Guard would see a mismatch. The registry accepts these bytes from anyone and only if they hash to the current release, so this gives the key no new right. *Needs your confirmation*; set `upload-manifest: false` to turn it off. |
 | **`signet propose --reuse`**: nothing is sent if the build is already the current release or already has an open proposal. | A job can't wait 24 h (GitHub-hosted jobs end after 6 h). Tier 10/11 releases time out (`wait-timeout`, default 5 h 30 min, exit code 3, no deploy) and the team re-runs the job after publication. This needs a reproducible build; if the rebuild differs, a new proposal is made. |
 | **Deploy** is either the `deploy` input (a command run as the last step) or the team's own later steps, which aren't reached unless the action succeeded. | A composite action can't wrap a later step; both ways give "deploy only after published". |
@@ -257,12 +257,12 @@ Tested on staging with the demo dApp and a test server that plays the hijack: 8 
 
 **Not built:** 3 regions, TapeSend, X posts, the public status page, opt-in Guard telemetry, the guardian key (auto-freeze), renewing the registry's 30-day operator grant, a reproducible-build check. The Telegram path was tested against a local stand-in for the Bot API (request shape, chat ids, token never logged), not against Telegram itself: no bot token was available.
 
-## 2026-11-17: Four changes after the overnight run (decided by Kenil)
+## 2026-11-17: Four changes after the overnight run (decided by the team)
 
 **1. The action publishes.** `signet wait <buildDir> --publish` sends `ReleaseGate.publish(id)` once the proposal has its approvals and its timelock is over; the action uses it by default (`publish: false` turns it off).
 - `publish` is open to anyone and the policy circuit decides, so the proposer key gains nothing: with no approvals it publishes nothing (staging test "the key alone publishes nothing"). **The CI key can still only propose; it can never approve.** That sentence stays in the action's docs.
 - A refused call (`PolicyDenied`, `NotLive`, `StaleBase`, `Expired`: an approval withdrawn, a freeze, someone else published first) is not an error; the action keeps watching.
-- Hard rule 4 in `CLAUDE.md` now reads (decided by Kenil, 2026-11-17): "The CI key can propose and call publish (the circuit decides); it can never approve, unfreeze, revoke or make admin changes."
+- Project rule 4 (CI key limits) now reads (decided by the team, 2026-11-17): "The CI key can propose and call publish (the circuit decides); it can never approve, unfreeze, revoke or make admin changes."
 
 **2. Token transfers are a per-project setting.** `"transfers": "user" | "allowlist" | "any"` in `signet.config.json` (default `"user"`), sealed into every chain entry of `signet/allowlist.json`.
 - `user`: a `transfer` / `transferFrom` may only send to the user's own address. `allowlist`: also to a sealed contract or spender (what Guard did before today). `any`: to anyone (a send-tokens app).
@@ -285,11 +285,11 @@ Tested on staging with the demo dApp and a test server that plays the hijack: 8 
 
 ## 2026-11-17: Guard decision circuit (a second TapeOut circuit)
 
-Asked for by Kenil: Guard asks a TapeOut circuit, not its own code, whether a signature is allowed.
+Team decision: Guard asks a TapeOut circuit, not its own code, whether a signature is allowed.
 
 | Decision | Why |
 |---|---|
-| **9 inputs, 3 one-hot outputs, 22 NAND gates.** Inputs: `checked, pageMatches, targetSealed, spenderSealed, recipientOk, decoded, frozen, revoked, enforceMode`; outputs `ALLOW, WARN, BLOCK`. Netlist sha256 `0x03c9…de44`; full table in `docs/guard-truth-table.md` (2 ALLOW, 386 WARN, 124 BLOCK rows). | The 7 facts asked for plus two that the existing policy already depends on: **`checked`** (fail-open: when Guard can't read the release, nothing is blocked; CLAUDE.md rule 9) and **`decoded`** (unknown calldata is an "unverified call" warning, never a block; spec threat 6). Without them the circuit would block in cases the spec says must not be blocked. 9 inputs keeps the exhaustive table at 512 rows, like circuit #6. |
+| **9 inputs, 3 one-hot outputs, 22 NAND gates.** Inputs: `checked, pageMatches, targetSealed, spenderSealed, recipientOk, decoded, frozen, revoked, enforceMode`; outputs `ALLOW, WARN, BLOCK`. Netlist sha256 `0x03c9…de44`; full table in `docs/guard-truth-table.md` (2 ALLOW, 386 WARN, 124 BLOCK rows). | The 7 facts asked for plus two that the existing policy already depends on: **`checked`** (fail-open: when Guard can't read the release, nothing is blocked; project rule: observe mode and fail-open by default) and **`decoded`** (unknown calldata is an "unverified call" warning, never a block; spec threat 6). Without them the circuit would block in cases the spec says must not be blocked. 9 inputs keeps the exhaustive table at 512 rows, like circuit #6. |
 | **`recipientOk` instead of `recipientIsUser`.** It is 1 when the recipient is the user *or* the project's sealed `transfers` rule allows it (or there is no recipient). | With the per-project rule, "is the user" alone would block transfers a project sealed as allowed. The name says what it means. |
 | **Frozen → WARN, not BLOCK.** | Any single approver (or the guardian) can freeze. Making a freeze block every user's signatures would let one key take the app offline for everyone; freeze is about publishing. A tampered page still blocks on its own. |
 | **The rules:** not checked → WARN; any violation → BLOCK in enforce mode, WARN in observe mode; otherwise unknown call or frozen → WARN; otherwise ALLOW. No row with `enforceMode = 0` or `checked = 0` is BLOCK (tested). | Observe mode and fail-open are hard rules. |
@@ -315,7 +315,7 @@ Result: **all 12 attacks against Guard users blocked; 0 false blocks on 16 clean
 | **Code from data (eval / new Function) is run with Playwright's `page.evaluate`** in the page's world, on a clean page. | It is the honest model of an XSS or a compromised config API: no file changes, so the page check can't see it; only the signing check can. |
 | **The poisoned-npm drainer's config fetch is answered inside the page.** | Its host doesn't exist on staging. Without that the drainer stopped before asking for a signature, and an earlier run counted that as "blocked": a false success, now removed. |
 | **Rollback inside the grace window is tested for a user whose Guard verified the old release earlier.** For a user who never saw it, the old files simply fail the page check. | That is the case where old files are legitimately accepted; the test shows the *current* allowlist still refuses a spender the new release retired. |
-| **The no-extension case is run and reported in its own "known limits" section, not in the attack count** (changed 2026-11-17 at Kenil's request; it was first counted as 1 of 13 not blocked). A compromised extension is documented, not run. | Counting a case Guard can't act on by design as a failed defense was misleading in the other direction: it read as a gap in Guard. It is stated plainly instead, in the report, `THREAT_MODEL.md` and `CLAIMS.md`. |
+| **The no-extension case is run and reported in its own "known limits" section, not in the attack count** (changed 2026-11-17 at the team's request; it was first counted as 1 of 13 not blocked). A compromised extension is documented, not run. | Counting a case Guard can't act on by design as a failed defense was misleading in the other direction: it read as a gap in Guard. It is stated plainly instead, in the report, `THREAT_MODEL.md` and `CLAIMS.md`. |
 
 Found while building it:
 - **A test artifact, not a Guard bug:** an early version sent its "revoked" signature from Guard's own warning page, where the test's mock wallet is injected but no site code can run. It looked like a leak; the wallet log (no `eth_chainId` lookup, which Guard's wrapper always does) showed the request never went through Guard. The attack now goes through "Go back to the site".
@@ -326,7 +326,7 @@ Found while building it:
 
 - **`pnpm verify:claims`** (`packages/claims/src/verify.ts`): 7 claims checked live on X Layer mainnet (two RPC operators, same block, answers compared key-order-independently), 8 recomputed from the repo or backed by named tests, 2 PENDING until deployment. It sends nothing and needs no key. It fails if `CLAIMS.md` doesn't list a claim it checks. About 2 minutes, mostly the 2 × 512 `eval` calls, throttled because public RPCs rate-limit bursts.
 - **Pending is never shown as passed.** C8 (Signet's contracts) and C9 (Guard circuit) turn into real checks as soon as `deployments/mainnet.json` names them.
-- **Overclaims removed** from the spec, `CLAUDE.md` and the new `README.md`. The pitch now says what is true: protection at signing reaches Guard users only; others get the watchtower's alert to the team. Also qualified: "nobody can change the circuit" (rests on bytecode and on-chain checks; TapeOut has no verified source), "keeps your app running" (verified copy for Guard users, gateway not deployed), "10 minutes" (a target), "no false blocks" (0 on 16 staging sessions, not measured on real sites), "first to ship", "zero-install users" via OKX Wallet (not discussed with them).
+- **Overclaims removed** from the spec, the project rules and the new `README.md`. The pitch now says what is true: protection at signing reaches Guard users only; others get the watchtower's alert to the team. Also qualified: "nobody can change the circuit" (rests on bytecode and on-chain checks; TapeOut has no verified source), "keeps your app running" (verified copy for Guard users, gateway not deployed), "10 minutes" (a target), "no false blocks" (0 on 16 staging sessions, not measured on real sites), "first to ship", "zero-install users" via OKX Wallet (not discussed with them).
 - **`THREAT_MODEL.md`** lists what each layer does, the attack-suite result per threat, and the limits, including the ones that hurt: most users aren't protected at signing; fail-open can be triggered by making a user's RPCs fail; a compromised Guard extension defeats everything; SiteRegistry is upgradeable by its owner.
 
 ## 2026-11-18: Chunked upload for files over 48 KB (`SignetRegistry.writeChunk`)
@@ -369,7 +369,7 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 
 | Decision | Why |
 |---|---|
-| Signet is on mainnet: registry, factory, gate implementation, site gate for `signetguard.xyz`, Guard circuit #7 (`docs/mainnet.md`), for 0.002171 OKB. Guardian = signet-dev, by Kenil's choice (freeze only). | Approved step by step (CLAUDE.md rule 2), after a full rehearsal with the same inputs on a fork. |
+| Signet is on mainnet: registry, factory, gate implementation, site gate for `signetguard.xyz`, Guard circuit #7 (`docs/mainnet.md`), for 0.002171 OKB. Guardian = signet-dev, by the team's choice (freeze only). | Approved step by step (every mainnet transaction shown with its cost first), after a full rehearsal with the same inputs on a fork. |
 | The full rehearsal (`staging/rehearse-mainnet-full.sh`) runs the mainnet scripts on a fork, then every staging suite against that deployment, without touching the staging chain. `record-mainnet` has a rehearsal mode that writes only `deployments/rehearsal.json`. | The suites prove the deployment the mainnet scripts make, not only the staging one. The rehearsal caught a crash in `record-mainnet` (a nested site-gate field) before the real deploy. |
 | JSON-RPC batches are capped at 3 calls (`rpc.ts MAX_BATCH`). | xlayer.drpc.org rejects 4+, which broke /prove and Guard's site check on mainnet. |
 | `verify:claims` labels a "pending" claim that now passes as a mainnet claim, and counts by result. | C8 and C9 pass on mainnet; the report should say "0 pending". |
@@ -398,3 +398,13 @@ Contracts: SignetRegistry 11.0 → 12.9 KB, 4 new Foundry tests. ReleaseGate unc
 - **Watchtower:** the existing Playwright watchtower runs every 5 min from `.github/workflows/watchtower.yml` (needs the repo public for free minutes), state + `status.json` on a `watchtower-status` branch, Telegram alerts, operator auto-renew from a dedicated wallet (0xF7fF…E4b0). Why: it protects users without Guard (the team hears within minutes), and a real browser sees what users load; a Cloudflare Worker can't run a browser on the free plan.
 - **/check:** a Cloudflare Pages Function (deployed with the site), read-only, results cached 10 min, 10 checks/min per IP (best effort), no logging. RDAP through IANA's bootstrap file (rdap.org blocks non-browser clients).
 - **`signet init`:** bare in a terminal, or with `--gate/--host`: a setup that writes the proposer key, config, domain proof, host header file and workflow, with no transaction; with role flags: the original on-chain init (the staging harness depends on it).
+
+## 2026-11-20: Guard fails safe when the circuit answers wrongly; three findings from going live
+
+| Decision | Why |
+|---|---|
+| **The local mirror decides alone only when the Guard circuit is unreachable** (no circuit on the network, an RPC error, or the two RPCs disagreeing). When the circuit is reached but can't be trusted (its stored netlist or the beacon implementation changed, a malformed or undecodable answer, or an answer that differs from the mirror), Guard takes the **strictest of the circuit's answer, the mirror's answer and WARN**: never ALLOW. The popup shows who decided the last check (circuit, cached, mirror while unreachable, or fail-safe). Before this, a disagreement silently used the mirror. | Silently trusting extension code when the on-chain answer disagrees defeats the point of asking the circuit. Unit tests cover all 512 rows for disagreement; staging covers a changed netlist and RPCs that disagree. Guard 0.2.0. |
+| **Cloudflare Web Analytics' automatic setup must be off** for a sealed site. It injects `static.cloudflareinsights.com/beacon.min.js` into the HTML **only for browser user agents**, so `curl` byte checks passed while browsers got HTML that didn't match releases #3 and #4 (found by the first live watchtower round). `signet verify` now fetches with a browser user agent, and /start lists the setting next to Rocket Loader and Email Obfuscation. Live byte checks use a browser user agent from now on. | The seal must equal what visitors' browsers receive, not what a bot receives. |
+| **Publish order with admin changes:** executing `SetApprover` bumps `approverSet`, which makes **every other open proposal** `NotLive` (`ReleaseGate._live`), including releases. So pending releases and other admin changes are published **before** an approver change, and the guardian change is published before the approver change (fork-tested both orders). | Avoids losing approvals and a second 24 h wait. |
+| **The watchtower runner is pinned to `ubuntu-24.04`.** `ubuntu-latest` became 26.04, where Playwright 1.56 can't install Chromium, so the first live round failed. | Keep the schedule working until Playwright supports the new image. |
+| **Internal process notes are no longer in the repository** (AI and judge reviews, overnight logs, plan reports, agent rules): kept locally in a git-ignored `internal/` folder. They remain in the git history. | The public repository is for the product and its evidence. |

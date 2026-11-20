@@ -3,7 +3,7 @@
 GitHub composite action: **verify → seal → propose → wait for approvals and the timelock → publish → deploy.**
 
 ```yaml
-- uses: kenil1710/signet/packages/action@main   # placeholder path until the repo is public
+- uses: kenil1710/signet/packages/action@main
   with:
     build-dir: dist
     proposer-key: ${{ secrets.SIGNET_PROPOSER_KEY }}

@@ -36,7 +36,7 @@ export const XLAYER = {
   chainName: 'X Layer',
   nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
   rpcUrls: [NET.name === 'mainnet' ? 'https://xlayerrpc.okx.com' : NET.rpcUrl],
-  blockExplorerUrls: ['https://www.oklink.com/xlayer'],
+  blockExplorerUrls: ['https://web3.okx.com/explorer/x-layer'],
 };
 
 /// The wallet's current chain, without asking for accounts; null when there is no wallet.
