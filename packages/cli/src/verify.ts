@@ -20,6 +20,8 @@ function report(target: string, findings: Finding[]): Report {
 const SRI_FIX = 'Self-host the script, or add integrity="sha384-..." crossorigin="anonymous" (openssl dgst -sha384 -binary file.js | openssl base64 -A).';
 const NO_STORE_FIX = 'Serve HTML with "Cache-Control: no-cache" (revalidate every time) and hashed assets with "Cache-Control: public, max-age=31536000, immutable".';
 
+const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 signet-verify';
+
 /// CDN features that rewrite HTML or scripts after the build, so the served bytes stop matching the sealed hash.
 const REWRITES: { re: RegExp; what: string; fix: string }[] = [
   { re: /rocket-loader(\.min)?\.js|type=["'][0-9a-f]+-text\/javascript["']|data-cf-settings=/i, what: 'Cloudflare Rocket Loader rewrites every <script> tag', fix: 'Cloudflare dashboard: Speed > Optimization > turn Rocket Loader off.' },
@@ -77,7 +79,9 @@ export function verifyDir(dir: string, domain = 'localhost'): Report {
 
 async function get(url: string): Promise<{ status: number; headers: Headers; body: Buffer; finalUrl: string }> {
   // The decoded body is what Guard hashes, so gzip/brotli don't matter. No cookies, no referrer, generic client name.
-  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15_000), headers: { 'user-agent': 'signet-verify', 'cache-control': 'no-cache' } });
+  // A browser's user agent and Accept header: some CDN features (Cloudflare Web Analytics' automatic setup) inject
+  // scripts into the HTML only for browsers, so a bot user agent would get clean bytes and miss them.
+  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15_000), headers: { 'user-agent': BROWSER_UA, accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'cache-control': 'no-cache' } });
   return { status: res.status, headers: res.headers, body: Buffer.from(await res.arrayBuffer()), finalUrl: res.url };
 }
 

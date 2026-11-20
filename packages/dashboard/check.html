@@ -15,7 +15,7 @@
       </div>
     </header>
     <main id="app" class="start check">
-      <div class="kicker">Free · read-only · no account · nothing stored</div>
+      <div class="kicker">Free · read-only · no account</div>
       <h1>How exposed is your dApp's front end?</h1>
       <p class="lead">Enter a domain. We load its page once, from our server, and report what a front-end attacker could use: scripts from other origins without SRI, missing security headers, mixed content, the registrar lock and DNS hints, and whether its releases are sealed.</p>
       <form id="f" class="chk-form" action="check" method="get">
@@ -23,6 +23,7 @@
         <input id="d" name="domain" placeholder="app.example.org" autocomplete="off" spellcheck="false" required>
         <button class="primary" type="submit">Check</button>
       </form>
+      <noscript><p class="dim">The report needs JavaScript to display. Without it, open <code>/api/check?domain=app.example.org</code> on this site for the same report as JSON.</p></noscript>
       <div id="out" aria-live="polite"></div>
       <section class="step"><h2>What it checks</h2>
         <ul>
@@ -40,7 +41,7 @@
           <li>Whether today's files are the ones your team reviewed. That is what <a href="start">sealing your releases</a> proves.</li>
           <li>Your hosting, CDN and registrar account security (2FA, API keys).</li>
         </ul>
-        <p class="dim">Privacy: the check runs on our server, so your browser never contacts the checked site. We don't store results or log who asked; a result is cached for 10 minutes so repeated checks don't hit the site again. Limited to 10 checks a minute per address.</p>
+        <p class="dim">Privacy: the check runs on our server, so your browser never contacts the checked site. We keep no record of who asked. Each domain's report is held in Cloudflare's cache for up to 10 minutes, so repeated checks don't load the site again, and is then dropped; nothing else is kept. To limit abuse, your IP address is held in memory for one minute (10 checks a minute per address).</p>
       </section>
     </main>
     <div id="toast" role="status" aria-live="polite"></div>

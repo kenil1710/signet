@@ -1,6 +1,6 @@
 // GET /api/check?domain=app.example.org: the free risk check (Cloudflare Pages Function, deployed with the site).
-// Read-only and server-side, so the visitor's browser never contacts the checked site. Nothing is stored or logged:
-// no cookies, no analytics. Results are cached per domain for 10 minutes; each client IP gets 10 checks per minute
+// Read-only and server-side, so the visitor's browser never contacts the checked site. Nothing is logged and no
+// cookies or analytics are used. Reports are cached per domain for 10 minutes; each client IP gets 10 checks per minute
 // (best effort: the limit lives in one worker instance, not globally).
 import { analyze, cleanDomain } from '../../src/check/risk.ts';
 

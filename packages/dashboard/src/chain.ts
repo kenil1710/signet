@@ -24,14 +24,15 @@ export async function watchtowerStatus(): Promise<WatchStatus | null> {
     return null;
   }
 }
+const utc = (iso: string) => `${new Date(iso).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 const ago = (iso: string) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'just now' : m < 120 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
 const WORDS: Record<string, string> = { ok: 'matches its sealed release', mismatch: 'DOES NOT MATCH its sealed release', unreachable: "couldn't be loaded", unchecked: 'not checked (no release published, or its manifest is not stored)', new: 'not checked yet' };
 /// One line for a domain (or the whole watchtower, without a domain), honest when there's no status.
 export function watchLine(s: WatchStatus | null, domain?: string): { cls: string; text: string } {
   if (!s) return { cls: 'dim', text: 'Watchtower: no public status yet (it is published once the repository is public).' };
   const stale = Date.now() - Date.parse(s.updatedAt) > 30 * 60000;
-  const head = `Watchtower: last round ${ago(s.updatedAt)}${stale ? ' (late: GitHub runs schedules on a best-effort basis)' : ''}`;
-  if (!domain) return { cls: stale ? 'warnsum' : 'ok', text: `${head}; watching ${s.domains.map((d) => d.domain).join(', ') || 'no domain'}${s.operator ? `; file-store operator grant valid for ${s.operator.daysLeft} more days` : ''}.` };
+  const head = `Watchtower: last round ${utc(s.updatedAt)} (${ago(s.updatedAt)})${stale ? ' (late: GitHub runs schedules on a best-effort basis)' : ''}`;
+  if (!domain) return { cls: s.domains.some((d) => d.status === 'mismatch' || d.status === 'unreachable') ? 'bad' : stale ? 'warnsum' : 'ok', text: `${head}; ${s.domains.map((d) => `${d.domain} ${WORDS[d.status] ?? d.status}${d.release ? ` (release #${d.release})` : ''}`).join('; ') || 'watching no domain'}${s.operator ? `; file-store operator grant valid for ${s.operator.daysLeft} more days` : ''}.` };
   const d = s.domains.find((x) => x.domain === domain);
   if (!d) return { cls: 'dim', text: `${head}; it doesn't watch ${domain} (watched with Pro).` };
   return { cls: d.status === 'ok' ? 'ok' : d.status === 'mismatch' || d.status === 'unreachable' ? 'bad' : 'dim', text: `${head}: ${domain} ${WORDS[d.status] ?? d.status}${d.release ? ` (release #${d.release})` : ''}${d.checkedAt ? `, checked ${ago(d.checkedAt)}` : ''}.` };
