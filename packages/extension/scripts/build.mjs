@@ -48,7 +48,7 @@ const rpcHosts = [...new Set([net.rpcUrl, net.rpcUrl2].filter(Boolean).map((u) =
 const manifest = {
   manifest_version: 3,
   name: 'Signet Guard',
-  version: '0.1.0',
+  version: JSON.parse(readFileSync(`${root}package.json`, 'utf8')).version,
   description: "Checks a sealed dApp's website against the release its team published on X Layer, and refuses signatures the team never sealed.",
   minimum_chrome_version: '120',
   background: { service_worker: 'background.js', type: 'module' },

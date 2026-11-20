@@ -303,7 +303,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
     }
     case 'sign': {
       const tab = tabId === undefined ? undefined : await get<TabState>(session, `tab:${tabId}`);
-      const allow: Decision = { by: 'mirror', input: 0, action: 'allow', enforced: false, refused: false, title: '', reason: '', details: [] };
+      const allow: Decision = { by: 'none', input: 0, action: 'allow', enforced: false, refused: false, title: '', reason: '', details: [] };
       if (!tab) return allow;
       const site = await siteFor(tab.domain);
       const ctx = { site: site.status, page: tab.report?.status ?? 'unknown', allowlist: site.current ? (site.manifests[site.current]?.allowlist ?? null) : null, frozen: site.frozen, enforced: site.enforced } as const;
@@ -316,9 +316,13 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         set: (c) => local.set({ guardCircuit: c }),
       });
       const action = answer.out.BLOCK ? 'block' : answer.out.WARN ? 'warn' : 'allow';
-      const d: Decision = { ...verdict, by: answer.by, input: answer.input, action, enforced: site.enforced, refused: action === 'block' };
-      if (action !== 'allow') {
-        const how = `decided by ${answer.by === 'mirror' ? `the local mirror (${answer.why})` : `the Guard circuit, row 0x${answer.input.toString(16).padStart(3, '0')}${answer.by === 'circuit-cached' ? ', cached' : ''}`}`;
+      const d: Decision = { ...verdict, by: answer.by, why: answer.why, input: answer.input, action, enforced: site.enforced, refused: action === 'block' };
+      // shown in the popup: whether the last signature check was decided by the circuit, the mirror or fail-safe
+      await local.set({ decider: { by: answer.by, why: answer.why ?? null, at: Date.now() } });
+      if (action !== 'allow' || answer.by === 'mirror') {
+        const how = answer.by === 'mirror' ? `decided by the local mirror (${answer.why})`
+          : answer.by === 'conflict' ? `decided fail-safe, at least a warning (${answer.why})`
+          : `decided by the Guard circuit, row 0x${answer.input.toString(16).padStart(3, '0')}${answer.by === 'circuit-cached' ? ', cached' : ''}`;
         await logEvent({ at: Date.now(), domain: tab.domain, kind: 'sign', refused: d.refused, url: tab.url, title: verdict.title, reason: verdict.reason, details: [msg.req.method, ...verdict.details, how] });
       }
       return d;
@@ -332,7 +336,8 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       // contracts: how many addresses the sealed allowlist lets this site ask to sign for (shown in the popup)
       const sealed = site.current ? site.manifests[site.current] : undefined;
       const contracts = sealed ? new Set(Object.values(sealed.allowlist).flatMap((c) => [...c.targets, ...c.spenders]).map((a) => a.toLowerCase())).size : 0;
-      return { tab, site: brief, light: lightOf(site, tab.report), events, files: sealed?.files.length ?? 0, contracts };
+      const decider = (await get<{ by: string; why: string | null; at: number }>(local, 'decider')) ?? null;
+      return { tab, site: brief, light: lightOf(site, tab.report), events, files: sealed?.files.length ?? 0, contracts, decider };
     }
     case 'bypass': {
       await session.set({ [`bypass:${msg.tabId}:${msg.domain}`]: true });

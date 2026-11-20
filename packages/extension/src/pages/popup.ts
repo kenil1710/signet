@@ -7,6 +7,16 @@ const LOGO = '<svg width="20" height="20" viewBox="0 0 28 28" aria-hidden="true"
 const BROKEN = '<svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4a28 28 0 1 0 0 56" fill="none" stroke="#FF8E77" stroke-width="3"/><path d="M36 4.3A28 28 0 0 1 36 59.7" fill="none" stroke="#FF8E77" stroke-width="3" opacity=".5"/><path d="M33 2l-4 14 6 6-6 10 5 8-4 22" fill="none" stroke="#FF8E77" stroke-width="2.5" stroke-linejoin="round"/></svg>';
 const head = () => `<div class="pp-head"><span class="pp-brand">${LOGO} Signet Guard</span><span class="pp-net">X Layer · ${__NET__.chainId}</span></div>`;
 
+/// Who decides signature checks: the on-chain Guard circuit, the local mirror while it is unreachable, or fail-safe.
+function decider(i: TabInfo): string {
+  const id = __NET__.guardCircuit ? `Guard circuit #${__NET__.guardCircuit.id}` : 'the local mirror';
+  const d = i.decider;
+  if (!d || d.by === 'none') return `${esc(id)} (on-chain)`;
+  if (d.by === 'mirror') return `local mirror: circuit unreachable<div class="dim">${esc(d.why ?? '')}</div>`;
+  if (d.by === 'conflict') return `fail-safe (warn or block): circuit answer not trusted<div class="dim">${esc(d.why ?? '')}</div>`;
+  return `${esc(id)} (on-chain${d.by === 'circuit-cached' ? ', cached' : ''})`;
+}
+
 void (async () => {
   const root = document.getElementById('root')!;
   // ?tab=<id> shows a given tab (used by tests and screenshots); otherwise the active tab
@@ -31,6 +41,7 @@ void (async () => {
       <dt>Approvers on this gate</dt><dd>${i.site.approvers.length}</dd>
       <dt>Files matched</dt><dd class="${bad.length ? 'bad' : 'good'}">${files.length - bad.length} / ${files.length} loaded · ${i.files} sealed</dd>
       <dt>Allowed contracts</dt><dd>${i.contracts ?? '-'}</dd>
+      <dt>Decisions</dt><dd class="${i.decider?.by === 'conflict' ? 'bad' : ''}" id="decider">${decider(i)}</dd>
       <dt>Nodes</dt><dd>${nodes.length ? nodes.map(esc).join(' + ') : 'none'}${nodes.length === 2 ? ' (must agree)' : ''}</dd>
     </dl>
     <p class="pp-mode">Mode: <strong>${i.site.enforced ? 'enforce' : 'observe'}</strong> ${i.site.enforced ? '(Guard blocks)' : '(Guard reports, never blocks)'}${i.site.frozen ? ' · gate frozen' : ''}${i.site.stale ? ' · using the release checked earlier' : ''}</p>

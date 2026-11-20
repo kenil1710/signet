@@ -79,7 +79,10 @@ export interface PageInfo {
 export interface SignRequest { method: string; params: unknown; chainId: string | null; accounts: string[] }
 export type Action = 'allow' | 'warn' | 'block';
 export interface Decision {
-  by: 'circuit' | 'circuit-cached' | 'mirror'; // who decided: the on-chain circuit, its cached answer, or the local mirror
+  by: 'circuit' | 'circuit-cached' | 'mirror' | 'conflict' | 'none'; // who decided: the on-chain circuit, its cached answer,
+  // the local mirror (only while the circuit is unreachable), conflict (the circuit answered but can't be trusted: the
+  // strictest of circuit, mirror and WARN), or none (not a sealed tab: nothing was decided)
+  why?: string; // for mirror and conflict: the reason
   input: number; // the circuit's packed input (docs/guard-truth-table.md row)
   action: Action; // the circuit's answer: allow / warn / block
   enforced: boolean; // enforce mode on the gate

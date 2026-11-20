@@ -1,6 +1,6 @@
 import type { GuardEvent, PageReport, SiteState } from '../lib/types.ts';
 
-export interface TabInfo { tab: { domain: string; url: string; report: PageReport | null }; site: Omit<SiteState, 'manifests'>; light: 'green' | 'red' | 'grey'; events: GuardEvent[]; files: number; contracts?: number }
+export interface TabInfo { tab: { domain: string; url: string; report: PageReport | null }; site: Omit<SiteState, 'manifests'>; light: 'green' | 'red' | 'grey'; events: GuardEvent[]; files: number; contracts?: number; decider?: { by: string; why: string | null; at: number } | null }
 export const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 export const send = <T>(msg: unknown) => chrome.runtime.sendMessage(msg) as Promise<T>;
 

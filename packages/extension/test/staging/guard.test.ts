@@ -309,7 +309,7 @@ test('a gateway whose worker is not the pinned one is red; without a gateway the
   }
 });
 
-test('a Guard circuit whose stored netlist is not the reviewed one is not trusted: the local mirror decides, and still refuses', async () => {
+test('a Guard circuit whose stored netlist is not the reviewed one is not trusted: Guard fails safe (at least a warning), still refuses, and the popup says so', async () => {
   rpcA.lie = rpcB.lie = (method, params, result) => {
     const data = (params[0] as { data?: string })?.data ?? '';
     if (method !== 'eth_call' || !data.startsWith('0x3fc4be56')) return result; // netlist(uint256)
@@ -319,8 +319,25 @@ test('a Guard circuit whose stored netlist is not the reviewed one is not truste
   const { page, tab } = await visit(s, `/?spender=${DRAINER}`);
   await light(s, tab, 'OK');
   assert.match(await click(page, 'approve', 'error'), /Spender not in the sealed allowlist/);
-  assert.match((await events(s))[0]!.details.at(-1)!, /decided by the local mirror \(the circuit on-chain is not the reviewed netlist\)/);
+  assert.match((await events(s))[0]!.details.at(-1)!, /decided fail-safe, at least a warning \(the circuit on-chain is not the reviewed netlist\)/);
   assert.equal(signed(s).length, 0);
+  assert.match(await popupShot(s, tab, 'guard-popup-circuit-not-trusted.png'), /fail-safe \(warn or block\): circuit answer not trusted/);
+  await s.close();
+});
+
+test('the two RPCs disagree on the circuit answer (circuit unreachable): the local mirror decides, still refuses, and the popup says so', async () => {
+  rpcA.lie = (method, params, result) => {
+    const data = (params[0] as { data?: string })?.data ?? '';
+    if (method !== 'eth_call' || !data.startsWith('0x934d06ea')) return result; // eval(uint256,bytes): only on RPC A
+    return (result as string).replace(/(.{130})..(.*)$/, '$102$2');
+  };
+  const s = await browser();
+  const { page, tab } = await visit(s, `/?spender=${DRAINER}`);
+  await light(s, tab, 'OK');
+  assert.match(await click(page, 'approve', 'error'), /Spender not in the sealed allowlist/);
+  assert.match((await events(s))[0]!.details.at(-1)!, /decided by the local mirror \(the Guard circuit is unreachable: /);
+  assert.equal(signed(s).length, 0);
+  assert.match(await popupShot(s, tab, 'guard-popup-circuit-unreachable.png'), /local mirror: circuit unreachable/);
   await s.close();
 });
 
