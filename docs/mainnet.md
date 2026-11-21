@@ -167,6 +167,23 @@ After (both RPCs): `ownerOf(5)`, `ownerOf(6)` and `ownerOf(7)` = site gate `0xa3
 circuit out needs the gate's tier-11 `TransferCircuit` (3 of 3 + 24 h). signet-dev: 0.043355954124861684 OKB,
 nonce 24, and no role left on the gate.
 
+## signet-dev rotation, step 4: SetGuardian(signet-ops) proposed and approved 3 of 3 (2026-11-21)
+
+Tier-11 admin change: 3 of 3 approvals + 24 h. Sent by the approvers from Rabby; each snippet checked the chain, the
+sender's role and (for approvals) that proposal #6 is exactly SetGuardian(signet-ops) before sending.
+
+| Tx | From | Call | Block | Gas | Fee (OKB) |
+|---|---|---|---:|---:|---:|
+| [`0x373138be…364b`](https://web3.okx.com/explorer/x-layer/evm/tx/0x373138be7c23bf2c242cbd1806d1c436680c061acc6de48f0958c624921c364b) | Approver A | `proposeAdmin(4 = SetGuardian, abi.encode(0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291))` → `Proposed(id 6, kind 2, tier 3 = 11)` | 76,480,424 | 174,269 | 0.0000049841 |
+| [`0x78c0580f…63c3`](https://web3.okx.com/explorer/x-layer/evm/tx/0x78c0580fb1aee71daf51e96c689d2085d1d52926fe2524864929c4124afd63c3) | Approver A | `approve(6)` → `Approved(6, slot 0)` | 76,480,947 | 39,751 | 0.0000011369 |
+| [`0x13ff5eb3…2e92`](https://web3.okx.com/explorer/x-layer/evm/tx/0x13ff5eb38554ac668d0e48cd402af0335ec8acf905f91c04e75ae25b994d2e92) | Approver B | `approve(6)` → `Approved(6, slot 1)` | 76,480,987 | 41,994 | 0.0000012010 |
+| [`0xdf5ed0b9…80a1`](https://web3.okx.com/explorer/x-layer/evm/tx/0xdf5ed0b98e39c33fea65740814d4381a81486b903ce5de45c57416bde4fe80a1) | Approver C | `approve(6)` → `Approved(6, slot 2)` | 76,481,006 | 44,483 | 0.0000012722 |
+
+State (both RPCs): proposal #6 approvals = 7 (A, B, C), `readyAt` = 1795250042 (2026-11-21 08:34:02 UTC), approver
+set 0 (current). **Publishable from 2026-11-22 08:34:02 UTC (14:04:02 IST)**; expires 2026-11-28 08:24:20 UTC.
+Publishing (`publish(6)`, ≈ 188,645 gas, fork-tested) sets the guardian to signet-ops. No other admin change may be
+executed before it: a `SetApprover` would void proposal #6.
+
 ## Checks after the deploy
 
 - `record-mainnet` re-read all 7 receipts from xlayerrpc.okx.com and xlayer.drpc.org (both succeeded, both from
