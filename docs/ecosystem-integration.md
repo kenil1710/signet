@@ -93,7 +93,7 @@ circuit #5. It's held by the dev wallet, and it's also the file store for every 
 
 | Option | How | One-time cost | Watchtower key worth stealing? |
 |---|---|---|---|
-| A. Dev wallet sends | The server holds the signet-dev key | 0 | **Yes, very.** It holds circuits #5, #6 and #7, renews the file operator, and is the site gate's guardian. **Rejected.** |
+| A. Dev wallet sends | The server holds the signet-dev key | 0 | **Yes, very.** At the time it held circuits #5, #6 and #7, renewed the file operator, and was the site gate's guardian (all three circuits are in the site gate and the guardian role is gone since 2026-11-21). **Rejected.** |
 | **B. Relay contract holds circuit #5** | `SignetAlerts` holds the #5 NFT. A hot "watchtower" key can only call `alert(to, ref, payload)`, which calls `hub.send(P, 5, …)`, with a daily rate limit. An admin (signet-dev, later a multisig) can rotate that key, renew the SiteRegistry operator grant for SignetRegistry, and take the NFT back. | deploy ≈ 0.6–0.8M gas ≈ **0.000012–0.000016 OKB**; NFT transfer ≈ 0.000002; operator re-grant 136,055 gas ≈ **0.0000027** (measured on the earlier deploy). Total **≈ 0.00002 OKB** | **Low.** A thief can send spam or fake alerts from Signet's identity until the admin rotates the key. The thief can't move the NFT or touch files. Fake alerts could carry phishing links, so alerts would carry **no links**: they name the dashboard, and the reader types it. |
 | C. A separate alerts container | Same relay, but holding circuit **#7**'s container (or a new tiny circuit). Circuit #5, the file store, isn't touched. | **0.08 OKB** to open (`FEE()`, measured) + ≈ 0.00002 | Low |
 

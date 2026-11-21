@@ -14,7 +14,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | ReleaseGate implementation (deployed by the factory) | [`0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D`](https://web3.okx.com/explorer/x-layer/evm/address/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D) |
 | Signet's site gate, for **signetguard.xyz** (files under `signet/signetguard.xyz/`) | [`0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503`](https://web3.okx.com/explorer/x-layer/evm/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503) |
 | Release-policy circuit (taped out 2026-11-16) | **#6** on processor #101 [`0x73153e5fd2Acac604D49d6ca9fea27b750718F22`](https://web3.okx.com/explorer/x-layer/evm/address/0x73153e5fd2Acac604D49d6ca9fea27b750718F22) |
-| Guard decision circuit | **#7** on processor #101 (22 NAND, 9 inputs, 3 outputs; 512/512 rows checked on both RPCs at block 76,226,736) |
+| Guard decision circuit | **#7** on processor #101 (22 NAND, 9 inputs, 3 outputs; 512/512 rows checked on both RPCs at block 76,226,736). Held by the site gate since 2026-11-21, like #5 and #6 |
 | Shared file container (circuit #5); operator = the registry for 30 days | [`0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`](https://web3.okx.com/explorer/x-layer/evm/address/0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed) |
 
 ## Site gate roles (`signetguard.xyz`)
@@ -150,6 +150,22 @@ Sent by the team from signet-dev with `cast send <to> --value 0.0001ether --gas-
 After (both RPCs): Approver C 0.000100862337790599 OKB (enough for its tier-11 approvals, ≈ 44.5k gas each);
 renewer 0.0001 OKB (≈ 40 operator renewals; the low-balance alert stops); signet-dev 0.043358370552861684 OKB,
 nonce 22.
+
+## signet-dev rotation, step 3: circuits #6 and #7 moved into the site gate (2026-11-21)
+
+Sent by the team from signet-dev: `cast send <processor> 'safeTransferFrom(address,address,uint256)' <signet-dev> <site gate> <id> --gas-limit 80000 --account signet-dev`.
+The gate accepts only circuit NFTs from a processor with its pinned code hash (`processorCodehash` = processor #101's,
+`0x57aa…17d5`).
+
+| Tx | Circuit | Block | Gas | Fee (OKB) | Event |
+|---|---|---:|---:|---:|---|
+| [`0x71d27701…1c5a`](https://web3.okx.com/explorer/x-layer/evm/tx/0x71d277016408f603fe62a62c8c6ccdf06099df4a1c6579d8b55dd7abd5341c5a) | #6 (release policy) | 76,479,357 | 59,934 | 0.0000012586 | `Transfer(signet-dev → site gate, 6)` |
+| [`0xbe1d7877…4462`](https://web3.okx.com/explorer/x-layer/evm/tx/0xbe1d7877fe1fc10b6aff2ac152c19a00aac92db2fe68da9c66cf30eadc384462) | #7 (Guard decision) | 76,479,389 | 55,134 | 0.0000011578 | `Transfer(signet-dev → site gate, 7)` |
+
+After (both RPCs): `ownerOf(5)`, `ownerOf(6)` and `ownerOf(7)` = site gate `0xa3d4…4503`; `eval(6, …)` and
+`eval(7, …)` still answer any caller, and `pnpm verify:claims` re-checked both circuits on all 512 rows. Moving a
+circuit out needs the gate's tier-11 `TransferCircuit` (3 of 3 + 24 h). signet-dev: 0.043355954124861684 OKB,
+nonce 24, and no role left on the gate.
 
 ## Checks after the deploy
 

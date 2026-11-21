@@ -1,8 +1,8 @@
 {
   "project": "Signet",
-  "checkedAt": "2026-11-18T12:18:16.415Z",
+  "checkedAt": "2026-11-21T08:14:58.371Z",
   "chain": "X Layer mainnet (196)",
-  "block": "76235142",
+  "block": "76479734",
   "rpcs": [
     "https://xlayerrpc.okx.com",
     "https://xlayer.drpc.org"
@@ -35,9 +35,9 @@
     {
       "id": "C4",
       "kind": "mainnet",
-      "claim": "Circuit #6 was minted and taped out by the dev wallet in transactions 0x1c772cbe… and 0x354cb0d5…, and the dev wallet still holds it",
+      "claim": "Circuit #6 was minted and taped out by the dev wallet in transactions 0x1c772cbe… and 0x354cb0d5…, and since 0x71d27701… Signet's site gate holds it (moving it out needs 3 of 3 approvers + 24 h)",
       "status": "PASS",
-      "detail": "both succeeded; tape-out in block 76060134; ownerOf(6) = 0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE"
+      "detail": "mint and tape-out succeeded (tape-out block 76060134); moved in block 76479357; ownerOf(6) = 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (the site gate)"
     },
     {
       "id": "C5",
@@ -119,7 +119,7 @@
     {
       "id": "R9",
       "kind": "repo",
-      "claim": "Against the same attacks on staging, SRI alone blocks 2 of 12, a hash-only checker 7 of 12, and Signet 12 of 12, with 0 false blocks",
+      "claim": "Against the same 12 attacks (written by us, run on our own local fork of X Layer), SRI alone blocks 2 of 12, Signet Guard with its signature checks off (\"hash-only\") 7 of 12, and Signet 12 of 12, with 0 false blocks",
       "status": "PASS",
       "detail": "docs/benchmark.md (reproduce: pnpm staging:up && pnpm benchmark)"
     },
@@ -128,7 +128,7 @@
       "kind": "repo",
       "claim": "A real-size bundle (300 KB) can be stored on-chain as the verified copy, one proved 24 KB piece per transaction, each under 16.7M gas",
       "status": "PASS",
-      "detail": "13 transactions, 70,049,906 gas in total, at most 5,635,691 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
+      "detail": "13 transactions, 70,054,261 gas in total, at most 5,635,682 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
     },
     {
       "id": "R7",

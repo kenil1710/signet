@@ -84,12 +84,12 @@ const CLAIMS: Claim[] = [
   },
   { id: 'C3', kind: 'mainnet', text: 'Circuit #6 gives the published truth table (docs/policy-truth-table.md) on all 512 inputs', check: (b) => all512(b, 6n, artifact().expected) },
   {
-    id: 'C4', kind: 'mainnet', text: `Circuit #6 was minted and taped out by the dev wallet in transactions ${dep6.mintTx.slice(0, 10)}… and ${dep6.tapeoutTx.slice(0, 10)}…, and the dev wallet still holds it`,
+    id: 'C4', kind: 'mainnet', text: `Circuit #6 was minted and taped out by the dev wallet in transactions ${dep6.mintTx.slice(0, 10)}… and ${dep6.tapeoutTx.slice(0, 10)}…, and since ${dep6.moveTx.slice(0, 10)}… Signet's site gate holds it (moving it out needs 3 of 3 approvers + 24 h)`,
     check: async (b) => {
-      const [m, t] = await Promise.all([dep6.mintTx, dep6.tapeoutTx].map((h: Hex) => both((c) => c.getTransactionReceipt({ hash: h }))));
+      const [m, t, mv] = await Promise.all([dep6.mintTx, dep6.tapeoutTx, dep6.moveTx].map((h: Hex) => both((c) => c.getTransactionReceipt({ hash: h }))));
       const owner = await call<Address>(b, CPU, cpuAbi, 'ownerOf', [6n]);
-      const ok = m!.status === 'success' && t!.status === 'success' && t!.to?.toLowerCase() === CPU.toLowerCase() && Number(t!.blockNumber) === dep6.tapeoutBlock && owner.toLowerCase() === dep6.holder.toLowerCase();
-      return ok ? pass(`both succeeded; tape-out in block ${t!.blockNumber}; ownerOf(6) = ${owner}`) : fail(`mint ${m!.status}, tape-out ${t!.status} to ${t!.to} block ${t!.blockNumber}, owner ${owner}`);
+      const ok = m!.status === 'success' && t!.status === 'success' && t!.to?.toLowerCase() === CPU.toLowerCase() && Number(t!.blockNumber) === dep6.tapeoutBlock && mv!.status === 'success' && Number(mv!.blockNumber) === dep6.moveBlock && owner.toLowerCase() === dep6.heldBy.toLowerCase();
+      return ok ? pass(`mint and tape-out succeeded (tape-out block ${t!.blockNumber}); moved in block ${mv!.blockNumber}; ownerOf(6) = ${owner} (the site gate)`) : fail(`mint ${m!.status}, tape-out ${t!.status} to ${t!.to} block ${t!.blockNumber}, move ${mv!.status} block ${mv!.blockNumber}, owner ${owner}`);
     },
   },
   {
@@ -188,7 +188,7 @@ const CLAIMS: Claim[] = [
     },
   },
   {
-    id: 'R9', kind: 'repo', text: 'Against the same attacks on staging, SRI alone blocks 2 of 12, a hash-only checker 7 of 12, and Signet 12 of 12, with 0 false blocks',
+    id: 'R9', kind: 'repo', text: 'Against the same 12 attacks (written by us, run on our own local fork of X Layer), SRI alone blocks 2 of 12, Signet Guard with its signature checks off ("hash-only") 7 of 12, and Signet 12 of 12, with 0 false blocks',
     check: async () => {
       if (!existsSync(`${ROOT}docs/benchmark.md`)) return fail('docs/benchmark.md missing');
       const m = read('docs/benchmark.md').match(/SRI alone blocked (\d+), a hash-only checker blocked (\d+), and Signet blocked (\d+), with (\d+) false blocks/);
