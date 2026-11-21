@@ -138,6 +138,19 @@ After: `guardian()` = `0x0` and `guardianVoteAt(0..2)` = 0 on both RPCs. signet-
 signet-ops last. Publish order: pending releases, then SetGuardian, then any SetApprover (it voids other open
 proposals).
 
+## signet-dev rotation, step 2: approver C and the renewer funded (2026-11-21)
+
+Sent by the team from signet-dev with `cast send <to> --value 0.0001ether --gas-limit 21000 --account signet-dev`.
+
+| Tx | To | Value (OKB) | Block | Gas | Fee (OKB) |
+|---|---|---:|---:|---:|---:|
+| [`0x788d86fb…fdd2`](https://web3.okx.com/explorer/x-layer/evm/tx/0x788d86fb0ca3cb8d6a4a53f5ca94309cfaecbc9a91e4fab21af1db8f92d7fdd2) | Approver C `0x1C47…c74c` | 0.0001 | 76,479,051 | 21,000 | 0.00000042 |
+| [`0x3e8772bd…d795`](https://web3.okx.com/explorer/x-layer/evm/tx/0x3e8772bd9efb474c7e9e732dc720f833306d695afe4e190453a06811a7bed795) | Watchtower renewer `0xF7fF…E4b0` | 0.0001 | 76,479,070 | 21,000 | 0.00000042 |
+
+After (both RPCs): Approver C 0.000100862337790599 OKB (enough for its tier-11 approvals, ≈ 44.5k gas each);
+renewer 0.0001 OKB (≈ 40 operator renewals; the low-balance alert stops); signet-dev 0.043358370552861684 OKB,
+nonce 22.
+
 ## Checks after the deploy
 
 - `record-mainnet` re-read all 7 receipts from xlayerrpc.okx.com and xlayer.drpc.org (both succeeded, both from
