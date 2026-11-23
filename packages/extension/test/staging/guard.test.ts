@@ -292,6 +292,8 @@ test('a gateway whose worker is not the pinned one is red; without a gateway the
     // the copy can't confirm its own gate (its files come from the chain): the real domain does, as when a user
     // reaches the copy from the real site
     const { page } = await visit(s);
+    // the real domain's proof must be confirmed first (an unconfirmed site is never shown red, by design)
+    await until('the domain proof to be confirmed', () => s.sw.evaluate(async (d) => !!((await chrome.storage.local.get('proofs')).proofs as Record<string, string> | undefined)?.[d], domain));
     await page.goto(`http://${encodeLabel(domain)}.localhost:${gateway.port}/`).catch(() => {});
     await until('the tab to be taken to the warning page', () => page.url().startsWith('chrome-extension:') && page.url().includes('blocked.html'), 30000).catch(async (e) => {
       const tab = await tabIdOf(s, page).catch(() => -1);
