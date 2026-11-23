@@ -157,10 +157,14 @@ async function crawlBrowser(project: string, base: string, paths: string[]): Pro
   try {
     const { createRequire } = await import('node:module');
     const { pathToFileURL } = await import('node:url');
-    const mod = await import(pathToFileURL(createRequire(join(project, 'package.json')).resolve('playwright')).href);
+    const req = createRequire(join(project, 'package.json'));
+    // playwright, or @playwright/test (what most projects have for e2e tests): both export chromium
+    const name = ['playwright', '@playwright/test'].find((m) => { try { req.resolve(m); return true; } catch { return false; } });
+    if (!name) throw new Error('no playwright');
+    const mod = await import(pathToFileURL(req.resolve(name)).href);
     pw = mod.chromium ? mod : mod.default; // CommonJS: the exports are under default
   } catch {
-    throw new SignetError('crawl', `--crawl-browser needs playwright in ${project} (npm i -D playwright && npx playwright install chromium)`);
+    throw new SignetError('crawl', `--crawl-browser needs playwright or @playwright/test in ${project} (npm i -D playwright && npx playwright install chromium)`);
   }
   const browser = await pw.chromium.launch({ headless: true });
   const out: { path: string; html: string; runtime: string[] }[] = [];
