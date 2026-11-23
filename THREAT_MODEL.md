@@ -75,9 +75,11 @@ that isn't a signature through the wallet (show a fake address, read the page).
   is shown (names, amounts, links), and can make sealed code send sealed calls with chosen parameters: an approve
   amount, `setLimits` values on *your own* vault. The signing check (sealed contracts, your own factory vault,
   transfer recipients) is what still protects you; it does not check amounts.
-- **Inline scripts the crawl didn't see.** A React runtime piece that appears only on some pages (an error reveal)
-  and wasn't on a crawled page is reported as injected: a false warning, not a hole. The team lists such pages in
-  `pages.crawl`.
+- **Inline scripts the crawl didn't see.** The sealer seals the inline scripts of the crawled pages, including those a
+  page creates while it runs (`seal --crawl-browser`: React inserts some during hydration from the flight data). A
+  script that only appears on a page type that wasn't crawled is reported as injected: a false warning, not a hole.
+  Found on misthos.world: nested 404 pages use a second theme snippet. The team lists one page per layout (and a
+  404 inside each nested layout) in `pages.crawl`, and checks reports in observe mode before enforcing.
 - `<script nomodule>` and preloads the browser never fetched are not checked: nothing runs from them in Chrome 120+.
 
 **Factory contracts** (`allowlist.json`, per chain: `factories`). A contract that isn't listed passes as a target or

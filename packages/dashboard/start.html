@@ -111,15 +111,15 @@ jobs:
         </details>
         <details><summary><b>Next.js with server-rendered pages (Vercel)</b> <span class="soon-tag">CLI 0.2.0, Guard 0.3.0</span></summary>
           <p>A server-rendered page is built per request, so its HTML can't be sealed. Signet seals the code instead: every file under <code>/_next/static</code> and <code>public/</code>, and the exact inline scripts the pages run. In <code>signet.config.json</code>:</p>
-          <pre data-copy>"pages": { "mode": "ssr", "crawl": ["/", "/a-page-that-streams"] }</pre>
+          <pre data-copy>"pages": { "mode": "ssr", "crawl": ["/", "/a-page-that-streams", "/docs/a-page", "/no-such-page", "/docs/no-such-page"] }</pre>
           <p>Seal the exact build that is deployed. Build once, deploy that build as a preview, seal it (the CLI crawls the preview's pages for their inline scripts), then promote the same deployment:</p>
           <pre data-copy>npx -y vercel&#64;39 build --prod --token "$VERCEL_TOKEN"
 URL=$(npx -y vercel&#64;39 deploy --prebuilt --token "$VERCEL_TOKEN")
-npx signetguard&#64;0.2.0 seal .vercel/output/static --crawl "$URL"
+npx signetguard&#64;0.2.0 seal .vercel/output/static --crawl-browser "$URL"
 npx signetguard&#64;0.2.0 propose .vercel/output/static
 # after approval and the timelock: promote the same deployment, then publish
 npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
-          <p class="dim">List in <code>crawl</code> at least one page that streams (uses Suspense), so React's streaming runtime is sealed. A preview behind Deployment Protection is read with <code>VERCEL_AUTOMATION_BYPASS_SECRET</code>. Contracts your app deploys per user through a factory (vaults, accounts) can't be listed one by one: add a <code>"factories"</code> rule to that chain's allowlist; Guard then allows a contract the factory created only for its owner. See the threat model for what this mode does not seal.</p>
+          <p class="dim"><code>--crawl-browser</code> loads each page in headless Chromium (your project's <code>playwright</code>) and seals the inline scripts the page creates while it runs too; React inserts some during hydration. List in <code>crawl</code> one page per layout: a page that streams (Suspense), a page of each nested layout (docs…), and a 404 at the top and inside each nested layout. A page whose scripts weren't crawled shows as "doesn't match" in observe mode: add it to the list before switching to enforce. A preview behind Deployment Protection is read with <code>VERCEL_AUTOMATION_BYPASS_SECRET</code>. Contracts your app deploys per user through a factory (vaults, accounts) can't be listed one by one: add a <code>"factories"</code> rule to that chain's allowlist; Guard then allows a contract the factory created only for its owner. See the threat model for what this mode does not seal.</p>
         </details>
         <details><summary><b>GitHub Pages</b></summary>
           <p>Pages already allows cross-origin reads. Add an empty <code>public/.nojekyll</code> so the <code>.well-known</code> folder is served. Settings → Pages → Source: <b>GitHub Actions</b>, then deploy the sealed folder:</p>
