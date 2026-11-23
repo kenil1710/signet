@@ -26,7 +26,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Approver C | `0x1C4704480E258bdBF8719ffba1679dD0e158c74c` |
 | CI proposer (can propose and publish; never approve) | `0x93272103b49B955dF493999F4B9Dea4852FA9453` (key from `signet keygen`, not in the repo) |
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
-| Guardian (freeze only) | none since 2026-11-20 (was signet-dev `0x79327d03b79c99a88A838e82bE9d17eB1A62c7BE`; removed by 2 approvers, see "signet-dev rotation" below). Planned: signet-ops `0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291` |
+| Guardian (freeze only) | signet-ops `0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291` since 2026-11-23 (keystore with scrypt n = 2^18; tier-11 `SetGuardian`, proposal #6). Before: signet-dev until 2026-11-20, then none |
 
 Mode: **observe** (a new gate starts there). Current release: **#4** (published 2026-11-20; #3 before it, the same day). See "Release #3 published" and "Release #4 published" below.
 
@@ -183,6 +183,15 @@ State (both RPCs): proposal #6 approvals = 7 (A, B, C), `readyAt` = 1795250042 (
 set 0 (current). **Publishable from 2026-11-22 08:34:02 UTC (14:04:02 IST)**; expires 2026-11-28 08:24:20 UTC.
 Publishing (`publish(6)`, ≈ 188,645 gas, fork-tested) sets the guardian to signet-ops. No other admin change may be
 executed before it: a `SetApprover` would void proposal #6.
+
+## signet-dev rotation, step 4 done: SetGuardian(signet-ops) published (2026-11-23)
+
+| Tx | From | Call | Block | Gas | Fee (OKB) |
+|---|---|---|---:|---:|---:|
+| [`0xfdbe3bf7…83d6`](https://web3.okx.com/explorer/x-layer/evm/tx/0xfdbe3bf74e95c27318ba5ddac9d499cfc4df5d5c16a00d42eddd928608d583d6) | Approver A | `publish(6)` → `AdminExecuted(6, action 4 = SetGuardian)` | 76,665,695 | 188,645 | 0.0000053952 |
+
+After (both RPCs): `guardian()` = signet-ops `0x9275…E291`; proposal #6 executed. Step 4 cost in total
+(propose + 3 approvals + publish): 489,142 gas, ≈ 0.0000140 OKB. Next: step 5, sweep signet-dev's OKB to signet-ops.
 
 ## Checks after the deploy
 
