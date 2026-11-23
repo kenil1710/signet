@@ -120,8 +120,8 @@ export async function signerFor(ctx: Ctx, envs: string[], keyFile?: string): Pro
   let key: string | undefined;
   let from = '';
   for (const name of envs) {
-    if (process.env[name]) {
-      key = process.env[name];
+    if (process.env[name]?.trim()) {
+      key = process.env[name]!.trim(); // a secret set from a key file keeps its trailing newline
       from = name;
       break;
     }

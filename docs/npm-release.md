@@ -27,7 +27,7 @@ and 4 as an automatic gate.
 
 | Version | Published | npm `dist.shasum` (SHA-1) | Tarball SHA-256 | Checked after publishing |
 |---|---|---|---|---|
-| 0.2.1 (security fix: the Vercel bypass secret goes to the deployment's own origin only; 0.2.0 sent it to every origin in `--crawl-browser` and across cross-origin redirects in `--crawl`) | built 2026-11-23, **not published yet** | `ecf77cf6bab2d1a6735a20d771a09daa22df9306` | `7e082e3d58ed4dcfe2c5f15f78ca554cd98d0f5d85ea712570f752171728bc37` | before publishing: steps 2–5 passed (CLI tests 43/43, ssr staging 8/8, reproducible pack) |
+| 0.2.1 (security fix: the Vercel bypass secret goes to the deployment's own origin only; 0.2.0 sent it to every origin in `--crawl-browser` and across cross-origin redirects in `--crawl`. Also: a proposer key from the environment is trimmed, so a secret set from `.signet/proposer.key` with its trailing newline works) | built 2026-11-23, **not published yet** | `e72b93add49a0a1af280b70f211ee874f907d140` | `c883244cdedc672541ff00d26b61daf66ac8df7661794d05b0e1326dbbdd9815` | before publishing: steps 2–5 passed (CLI tests 44/44, ssr staging 8/8, reproducible pack) |
 | 0.2.0 (Signet v2: page mode `ssr`, `seal --crawl` / `--crawl-browser`, factory rule, chunked `files.json`) | 2026-11-23, `latest` | `c50c2e36ad26e28d677276eeefd461b7a77d68f2` | `c9a75897dcc603d5f962ae7063c7c5c164bb9956c16cb7a613a60767d5e1d528` | see below |
 
 **0.2.0 after publishing (2026-11-23):**

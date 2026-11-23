@@ -29416,8 +29416,8 @@ async function signerFor(ctx, envs, keyFile) {
 	}
 	let key;
 	let from = "";
-	for (const name of envs) if (process.env[name]) {
-		key = process.env[name];
+	for (const name of envs) if (process.env[name]?.trim()) {
+		key = process.env[name].trim();
 		from = name;
 		break;
 	}
