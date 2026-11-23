@@ -29706,6 +29706,83 @@ function extractOrigins(text) {
 	} catch {}
 	return [...out];
 }
+// src/inline.ts
+init_toHex();
+var JS_TYPES = /* @__PURE__ */ new Set([
+	"",
+	"module",
+	"text/javascript",
+	"application/javascript",
+	"application/ecmascript",
+	"application/x-ecmascript",
+	"application/x-javascript",
+	"text/ecmascript",
+	"text/javascript1.0",
+	"text/javascript1.1",
+	"text/javascript1.2",
+	"text/javascript1.3",
+	"text/javascript1.4",
+	"text/javascript1.5",
+	"text/jscript",
+	"text/livescript",
+	"text/x-ecmascript",
+	"text/x-javascript"
+]);
+var CODE_LIKE = /* @__PURE__ */ new Set(["importmap", "speculationrules"]);
+function normType(type) {
+	return String(type ?? "").split(";")[0].trim().toLowerCase();
+}
+function runs(type) {
+	const t = normType(type);
+	return JS_TYPES.has(t) || CODE_LIKE.has(t);
+}
+function inlineHash(text) {
+	return sha256(toHex(new TextEncoder().encode(text)));
+}
+var FLIGHT = /^self\.__next_f\.push\(([\s\S]*)\)$/;
+var REVEAL = /^\$R[SCXV]\(([\s\S]*)\)$/;
+var MAX_ARG = 1e6;
+function jsonArray(src) {
+	if (src.length > MAX_ARG) return null;
+	try {
+		const v = JSON.parse(src);
+		return Array.isArray(v) ? v : null;
+	} catch {
+		return null;
+	}
+}
+function templateOf(text) {
+	const f = FLIGHT.exec(text);
+	if (f) {
+		const a = jsonArray(f[1]);
+		if (a && a.length >= 1 && a.every((x) => x === null || typeof x === "number" || typeof x === "string")) return "data";
+		return null;
+	}
+	const r = REVEAL.exec(text);
+	if (r) {
+		const a = jsonArray(`[${r[1]}]`);
+		if (a && a.length >= 1 && a.length <= 8 && a.every((x) => typeof x === "string" && x.length <= 4096)) return "reveal";
+	}
+	return null;
+}
+function inlineScriptsOf(html) {
+	const out = [];
+	for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+		const attrs = m[1];
+		if (/\ssrc\s*=/i.test(` ${attrs}`)) continue;
+		const t = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs);
+		out.push({
+			text: m[2],
+			type: t ? t[1] ?? t[2] ?? t[3] ?? "" : ""
+		});
+	}
+	return out;
+}
+function inlineHashesOf(pages) {
+	const set = /* @__PURE__ */ new Set();
+	for (const html of pages) for (const s of inlineScriptsOf(html)) if (runs(s.type) && !templateOf(s.text)) set.add(inlineHash(s.text));
+	return [...set].sort();
+}
 // src/seal.ts
 init_encodeAbiParameters(), init_getAddress();
 var ALLOWLIST_PATH = "signet/allowlist.json";
@@ -29773,6 +29850,15 @@ var TRANSFERS = [
 	"allowlist",
 	"any"
 ];
+function checkRule(r, chain) {
+	if (!(r && typeof r === "object" && /^0x[0-9a-fA-F]{40}$/.test(r.factory) && /^[A-Za-z_]\w*\(address,(bytes32|uint256)\)$/.test(r.predict) && /^[A-Za-z_]\w*\(\)$/.test(r.id) && Array.isArray(r.roles) && r.roles.length >= 1 && r.roles.every((x) => /^[A-Za-z_]\w*\(\)$/.test(x)))) throw new Error(`allowlist["${chain}"].factories: each rule needs factory (address), predict ("name(address,bytes32)"), id ("name()") and roles (["owner()", …])`);
+	return {
+		factory: getAddress(r.factory.toLowerCase()),
+		predict: r.predict,
+		id: r.id,
+		roles: [...r.roles]
+	};
+}
 function walk(dir, base = "") {
 	const out = [];
 	for (const e of readdirSync(join(dir, base), { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) {
@@ -29815,6 +29901,19 @@ function externalScriptsOf(html, page, siteOrigin) {
 	}
 	return out;
 }
+function listEntryOf(filesBytes) {
+	const e = {
+		path: FILES_PATH,
+		contentType: JSON_TYPE,
+		sha256: sha256Hex(Buffer.from(filesBytes)),
+		size: filesBytes.length
+	};
+	if (filesBytes.length > 48e3 && filesBytes.length <= 84e5) {
+		e.chunks = [];
+		for (let off = 0; off < filesBytes.length; off += CHUNK_BYTES) e.chunks.push(sha256Hex(Buffer.from(filesBytes.subarray(off, off + CHUNK_BYTES))));
+	}
+	return e;
+}
 function canonical(value) {
 	return Buffer.from(JSON.stringify(value));
 }
@@ -29850,7 +29949,7 @@ function seal(buildDir, cfg, opts = {}) {
 			sha256: sha256Hex(bytes),
 			size: bytes.length
 		};
-		if (bytes.length > 48e3 && bytes.length <= 84e5 && isOnchainPath(path)) {
+		if (!cfg.pages && bytes.length > 48e3 && bytes.length <= 84e5 && isOnchainPath(path)) {
 			entry.chunks = [];
 			for (let off = 0; off < bytes.length; off += CHUNK_BYTES) entry.chunks.push(sha256Hex(bytes.subarray(off, off + CHUNK_BYTES)));
 		}
@@ -29893,6 +29992,33 @@ function seal(buildDir, cfg, opts = {}) {
 			eip712: sortAddrs(eip712),
 			transfers
 		};
+		if (r.factories?.length) allowlist[id].factories = r.factories.map((f) => checkRule(f, id));
+	}
+	let pages;
+	if (cfg.pages) {
+		if (cfg.pages.mode !== "ssr") throw new Error("\"pages.mode\" must be \"ssr\"");
+		const crawled = opts.crawled ?? [];
+		if ((cfg.pages.crawl?.length ?? 0) > 0 && crawled.length === 0) throw new Error("this project seals server-rendered pages: run signet seal with --crawl <preview URL> so their inline scripts are sealed");
+		const own = paths.filter((p) => /\.html?$/i.test(p)).map((p) => readFileSync(join(buildDir, p), "utf8"));
+		const sealedPaths = new Set(paths);
+		for (const c of crawled) {
+			for (const t of tagsOf(c.html, "script")) {
+				const src = typeof t.attrs.src === "string" ? t.attrs.src : null;
+				if (!src) continue;
+				const u = new URL(src, `${siteOrigin}${c.path}`);
+				if (u.origin === siteOrigin && !sealedPaths.has(u.pathname.replace(/^\/+/, ""))) throw new Error(`the preview page ${c.path} loads ${u.pathname}, which is not in ${buildDir}: seal the exact build that is deployed`);
+			}
+			externalScripts.push(...externalScriptsOf(c.html, c.path, siteOrigin));
+			for (const o of extractOrigins(c.html)) originSet.add(o);
+		}
+		const workers = (cfg.pages.serviceWorkers ?? []).map((w) => w.replace(/^\/+/, ""));
+		for (const w of workers) if (!sealedPaths.has(w)) throw new Error(`pages.serviceWorkers: ${w} is not a file of ${buildDir}`);
+		const runtime = crawled.flatMap((c) => c.runtime ?? []).filter((t) => !templateOf(t)).map((t) => inlineHash(t));
+		pages = {
+			mode: "ssr",
+			inline: [.../* @__PURE__ */ new Set([...inlineHashesOf([...own, ...crawled.map((c) => c.html)]), ...runtime])].sort(),
+			serviceWorkers: workers.sort()
+		};
 	}
 	const oInclude = (cfg.origins?.include ?? []).map((o) => new URL(o).origin.toLowerCase());
 	const oExclude = new Set((cfg.origins?.exclude ?? []).map((o) => new URL(o).origin.toLowerCase()));
@@ -29912,7 +30038,11 @@ function seal(buildDir, cfg, opts = {}) {
 		url,
 		integrity
 	})).filter((s, i, all) => all.findIndex((x) => x.url === s.url && x.integrity === s.integrity) === i).sort((a, b) => a.url < b.url ? -1 : 1);
-	const originsBytes = canonical({
+	const originsBytes = canonical(pages ? {
+		origins: originsList,
+		scripts,
+		pages
+	} : {
 		origins: originsList,
 		scripts
 	});
@@ -29923,12 +30053,7 @@ function seal(buildDir, cfg, opts = {}) {
 		files,
 		calls
 	});
-	const listEntry = {
-		path: FILES_PATH,
-		contentType: JSON_TYPE,
-		sha256: sha256Hex(filesBytes),
-		size: filesBytes.length
-	};
+	const listEntry = listEntryOf(filesBytes);
 	const sealed = [...files, listEntry];
 	for (const f of sealed) if (f.chunks) warnings.push(`${f.path}: ${f.size} bytes, over ${MAX_ONCHAIN_BYTES}: stored on-chain in ${f.chunks.length} chunks, one transaction each`);
 	else if (f.size > 48e3) warnings.push(`${f.path}: ${f.size} bytes, sealed by hash but too large to store on-chain (limit 350 chunks of ${CHUNK_BYTES} bytes)`);
@@ -29936,7 +30061,7 @@ function seal(buildDir, cfg, opts = {}) {
 	const allowlistHash = sha256Hex(allowlistBytes);
 	const originsHash = sha256Hex(originsBytes);
 	const manifest = {
-		version: 1,
+		version: !!pages || Object.values(allowlist).some((a) => a.factories) ? 2 : 1,
 		domain: cfg.domain,
 		filesRoot,
 		allowlistHash,
@@ -29970,7 +30095,8 @@ function seal(buildDir, cfg, opts = {}) {
 			files: [...where].sort()
 		})).sort((a, b) => a.address.toLowerCase() < b.address.toLowerCase() ? -1 : 1),
 		ignoredOrigins: ignoredOrigins.sort(),
-		warnings
+		warnings,
+		pages: pages ?? null
 	};
 }
 function loadSealed(buildDir) {
@@ -29980,12 +30106,7 @@ function loadSealed(buildDir) {
 	const bytes = (path) => readFileSync(join(buildDir, path));
 	const listBytes = bytes(FILES_PATH);
 	const list = JSON.parse(listBytes.toString("utf8"));
-	const files = [...list.files, {
-		path: FILES_PATH,
-		contentType: JSON_TYPE,
-		sha256: sha256Hex(listBytes),
-		size: listBytes.length
-	}];
+	const files = [...list.files, listEntryOf(listBytes)];
 	const stale = (what) => /* @__PURE__ */ new Error(`${what} changed since the build was sealed. Run: signet seal ${buildDir}`);
 	for (const f of list.files) if (!existsSync(join(buildDir, f.path)) || sha256Hex(bytes(f.path)) !== f.sha256) throw stale(f.path);
 	if (walk(buildDir).filter((p) => !RESERVED.has(p)).length !== list.files.length) throw stale("The set of files");
@@ -30023,13 +30144,7 @@ function parseSealed(domain, allowlistBytes, originsBytes, filesBytes) {
 		scripts: []
 	} : o;
 	if (!Array.isArray(of.origins) || !Array.isArray(of.scripts)) throw new Error(`${ORIGINS_PATH} is not an origins file`);
-	const own = {
-		path: FILES_PATH,
-		contentType: JSON_TYPE,
-		sha256: sha256Hex(filesBytes),
-		size: filesBytes.length
-	};
-	const filesRoot = merkleRoot(leavesOf(domain, [...list.files, own]));
+	const filesRoot = merkleRoot(leavesOf(domain, [...list.files, listEntryOf(filesBytes)]));
 	const allowlistHash = sha256Hex(allowlistBytes);
 	const originsHash = sha256Hex(originsBytes);
 	return {
@@ -30041,7 +30156,8 @@ function parseSealed(domain, allowlistBytes, originsBytes, filesBytes) {
 		origins: of.origins,
 		scripts: of.scripts,
 		files: list.files,
-		calls: list.calls ?? null
+		calls: list.calls ?? null,
+		pages: of.pages ?? null
 	};
 }
 // src/verify.ts
@@ -30055,6 +30171,7 @@ function report(target, findings) {
 }
 var SRI_FIX = "Self-host the script, or add integrity=\"sha384-...\" crossorigin=\"anonymous\" (openssl dgst -sha384 -binary file.js | openssl base64 -A).";
 var NO_STORE_FIX = "Serve HTML with \"Cache-Control: no-cache\" (revalidate every time) and hashed assets with \"Cache-Control: public, max-age=31536000, immutable\".";
+var BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 signet-verify";
 var REWRITES = [
 	{
 		re: /rocket-loader(\.min)?\.js|type=["'][0-9a-f]+-text\/javascript["']|data-cf-settings=/i,
@@ -30070,6 +30187,21 @@ var REWRITES = [
 		re: /static\.cloudflareinsights\.com\/beacon(\.min)?\.js/i,
 		what: "Cloudflare Web Analytics injects a script into the HTML",
 		fix: "Turn off automatic injection (Web Analytics > Manage site), or add the snippet to your build so it is sealed."
+	},
+	{
+		re: /\/_vercel\/insights\/script\.js|va\.vercel-scripts\.com/i,
+		what: "Vercel Web Analytics adds a script to the page",
+		fix: "Vercel dashboard: Project > Analytics > disable (and remove @vercel/analytics from the app), or seal it as part of your build."
+	},
+	{
+		re: /\/_vercel\/speed-insights\/script\.js/i,
+		what: "Vercel Speed Insights adds a script to the page",
+		fix: "Vercel dashboard: Project > Speed Insights > disable (and remove @vercel/speed-insights from the app)."
+	},
+	{
+		re: /vercel\.live\/_next-live|data-vercel-toolbar|\/_vercel\/toolbar/i,
+		what: "The Vercel Toolbar is injected into the page",
+		fix: "Vercel dashboard: Project > Settings > General > Vercel Toolbar: off for Production (and for Preview if you seal from a preview)."
 	},
 	{
 		re: /\/cdn-cgi\/(scripts|challenge-platform)\//i,
@@ -30187,7 +30319,8 @@ async function get(url) {
 		redirect: "follow",
 		signal: AbortSignal.timeout(15e3),
 		headers: {
-			"user-agent": "signet-verify",
+			"user-agent": BROWSER_UA,
+			accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 			"cache-control": "no-cache"
 		}
 	});
@@ -30536,6 +30669,20 @@ function diffSealed(domain, base, next, code) {
 	for (const s of scripts.sriChanged) flags.push(`CHANGED SRI hash for ${s.url}: the script's bytes are different`);
 	for (const s of scripts.added) flags.push(`NEW cross-origin script ${s.url}${s.integrity ? "" : " WITHOUT an SRI hash"}`);
 	if (base) for (const c of calls.added) flags.push(`${baseKnown ? "NEW" : "PRESENT"} ${c.label} in the code: ${c.count} (was ${baseKnown ? c.before : "not recorded"})`);
+	const bp = base?.pages ?? null;
+	const np = next.pages ?? null;
+	if (np && !bp) flags.push(`NEW page mode "ssr": the HTML is no longer sealed, only the scripts; ${np.inline.length} inline script(s) sealed by hash, Next.js flight data and React streaming calls allowed as data`);
+	if (!np && bp) flags.push("CHANGED page mode back to static: the HTML is sealed again");
+	if (np && bp) {
+		const added = np.inline.filter((h) => !bp.inline.includes(h));
+		if (added.length) flags.push(`NEW inline script(s) allowed: ${added.length} (${added.map((h) => h.slice(0, 10)).join(", ")})`);
+		for (const w of np.serviceWorkers.filter((x) => !bp.serviceWorkers.includes(x))) flags.push(`NEW service worker allowed: ${w}`);
+	}
+	if (np && !bp) for (const w of np.serviceWorkers) flags.push(`NEW service worker allowed: ${w}`);
+	for (const [chain, a] of Object.entries(next.allowlist)) {
+		const before = new Set((base?.allowlist[chain]?.factories ?? []).map((f) => JSON.stringify(f)));
+		for (const f of a.factories ?? []) if (!before.has(JSON.stringify(f))) flags.push(`NEW factory rule on chain ${chain}: any contract created by ${f.factory} (${f.predict}, id ${f.id}) that the signer is ${f.roles.join(" or ")} of may be called and given allowances`);
+	}
 	return {
 		version: 1,
 		domain,
@@ -31514,7 +31661,7 @@ var HOSTS = [
 	"other"
 ];
 var DASHBOARD = "https://signetguard.xyz/app#/new";
-var CLI_VERSION = "0.1.3";
+var CLI_VERSION = "0.2.0";
 function deployStep(host, out, o) {
 	if (o.deploy) return {
 		run: o.deploy,
@@ -31684,7 +31831,7 @@ Next:
 }
 // src/cli.ts
 var log = (line = "") => console.log(line);
-var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.1.3").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
+var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.2.0").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
 var ctx = () => {
 	const g = program.opts();
 	return makeCtx(resolve(g.project), g.as);
@@ -31716,17 +31863,20 @@ program.command("keygen").description("create a CI proposer key in .signet/propo
 	log("  It can propose releases and call publish. It can never approve, unfreeze, revoke or make admin changes.");
 	log(`  Next: put its content in the GitHub secret SIGNET_PROPOSER_KEY, send ${address} a little OKB for gas, then delete the file.`);
 });
-program.command("seal <buildDir>").description("hash every file, extract the allowlist and the external origins, write signet-manifest.json").option("--domain <domain>", `the domain (default: from ${CONFIG_NAME})`).option("--chain-id <id>", "the chain your contracts are on (default: from the config, else 196)").action((buildDir, o) => {
+program.command("seal <buildDir>").description("hash every file, extract the allowlist and the external origins, write signet-manifest.json").option("--domain <domain>", `the domain (default: from ${CONFIG_NAME})`).option("--chain-id <id>", "the chain your contracts are on (default: from the config, else 196)").option("--crawl <previewUrl>", "server-rendered sites (\"pages\" in the config): the deployed preview of this exact build; its pages give the inline scripts").option("--crawl-browser <previewUrl>", "as --crawl, but loads each page in headless Chromium (your project's playwright) and also seals the inline scripts the page creates while it runs").action(async (buildDir, o) => {
 	const cfg = readConfig(resolve(program.opts().project));
 	const domain = o.domain ?? cfg?.domain;
 	if (!domain) throw new SignetError("domain", `no domain: pass --domain or run signet init (writes ${CONFIG_NAME})`);
+	const project = resolve(program.opts().project);
+	const crawled = !cfg?.pages ? void 0 : o.crawlBrowser ? await crawlBrowser(project, o.crawlBrowser, cfg.pages.crawl ?? ["/"]) : o.crawl ? await crawl(o.crawl, cfg.pages.crawl ?? ["/"]) : void 0;
 	const r = seal(buildDir, {
 		domain,
 		chainId: Number(o.chainId ?? cfg?.chainId ?? 196),
 		allowlist: cfg?.allowlist,
 		transfers: cfg?.transfers,
-		origins: cfg?.origins
-	});
+		origins: cfg?.origins,
+		pages: cfg?.pages
+	}, { crawled });
 	const m = r.manifest;
 	log(`Sealed ${m.fileCount} files (${m.totalBytes} bytes) for ${m.domain}`);
 	log(`  filesRoot      ${m.filesRoot}`);
@@ -31755,9 +31905,77 @@ program.command("seal <buildDir>").description("hash every file, extract the all
 	if (r.scripts.length) log("  A new cross-origin script or a changed SRI hash counts as an origins change (tier 01).");
 	for (const w of r.warnings) log(`  warning: ${w}`);
 	log();
+	for (const [chain, a] of Object.entries(r.allowlist)) for (const f of a.factories ?? []) log(`  chain ${chain}: also any contract created by factory ${f.factory} (${f.predict}, id ${f.id}) that the signer is ${f.roles.join(" or ")} of`);
+	if (r.pages) {
+		log(`Server-rendered pages: the HTML is not sealed; every script file is. ${r.pages.inline.length} inline script(s) sealed by hash from ${crawled?.length ?? 0} crawled page(s) and the build's own HTML; Next.js flight data and React streaming calls are allowed as data.`);
+		for (const h of r.pages.inline) log(`    inline ${h}`);
+		if (r.pages.serviceWorkers.length) log(`  service workers allowed: ${r.pages.serviceWorkers.join(", ")}`);
+	}
 	log(`Wrote ${buildDir}/signet-manifest.json and ${buildDir}/signet/{allowlist,origins,files}.json`);
 	log(`Next: signet propose ${buildDir}`);
 });
+async function crawl(base, paths) {
+	const out = [];
+	const headers = {
+		"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 signet-seal",
+		accept: "text/html"
+	};
+	if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers["x-vercel-protection-bypass"] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+	for (const p of paths) {
+		const url = new URL(p, base.endsWith("/") ? base : `${base}/`).href;
+		const res = await fetch(url, {
+			headers,
+			redirect: "follow",
+			signal: AbortSignal.timeout(2e4)
+		});
+		if (res.status >= 500) throw new SignetError("crawl", `${url} answered HTTP ${res.status}`);
+		out.push({
+			path: new URL(url).pathname,
+			html: await res.text()
+		});
+		log(`  crawled ${new URL(url).pathname}${res.ok ? "" : ` (HTTP ${res.status})`}`);
+	}
+	return out;
+}
+async function crawlBrowser(project, base, paths) {
+	let pw;
+	try {
+		const { createRequire } = await import("node:module");
+		const { pathToFileURL } = await import("node:url");
+		const mod = await import(pathToFileURL(createRequire(join(project, "package.json")).resolve("playwright")).href);
+		pw = mod.chromium ? mod : mod.default;
+	} catch {
+		throw new SignetError("crawl", `--crawl-browser needs playwright in ${project} (npm i -D playwright && npx playwright install chromium)`);
+	}
+	const browser = await pw.chromium.launch({ headless: true });
+	const out = [];
+	try {
+		const ctx = await browser.newContext({ extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : {} });
+		await ctx.addInitScript({ content: `window.__signetSeen = []; new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes)
+      if (n instanceof HTMLScriptElement && !n.src && !n.noModule) window.__signetSeen.push(n.text); }).observe(document, { childList: true, subtree: true });` });
+		const page = await ctx.newPage();
+		for (const p of paths) {
+			const url = new URL(p, base.endsWith("/") ? base : `${base}/`).href;
+			const res = await page.goto(url, {
+				waitUntil: "networkidle",
+				timeout: 6e4
+			});
+			if (!res || res.status() >= 500) throw new SignetError("crawl", `${url} answered HTTP ${res?.status()}`);
+			await page.waitForTimeout(1500);
+			const html = await res.text();
+			const runtime = await page.evaluate("window.__signetSeen");
+			out.push({
+				path: new URL(url).pathname,
+				html,
+				runtime
+			});
+			log(`  crawled ${new URL(url).pathname} in Chromium (${runtime.length} inline script(s) seen while it ran)`);
+		}
+	} finally {
+		await browser.close();
+	}
+	return out;
+}
 program.command("verify <target>").description("check a build directory or a live URL: no-store, cross-origin scripts without SRI, CDN rewrites, SSR").option("--build <dir>", "with a URL: compare what is served with this build, byte for byte").option("--strict", "exit 1 on warnings too").option("--json", "print the findings as JSON").action(async (target, o) => {
 	const isUrl = /^https?:\/\//i.test(target);
 	if (!isUrl && !(existsSync(target) && statSync(target).isDirectory())) throw new SignetError("target", `${target} is neither a directory nor an http(s) URL`);

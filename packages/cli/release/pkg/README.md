@@ -32,11 +32,11 @@ Proof page (re-checks the circuits on X Layer in your browser, no wallet): https
 
 | | |
 |---|---|
-| SignetRegistry | [0x98dB5B6B1545D0fb374da40a02045B93398E0589](https://www.oklink.com/xlayer/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589) |
-| SignetFactory | [0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986](https://www.oklink.com/xlayer/address/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986) |
-| ReleaseGate implementation (each gate is a non-upgradeable clone) | [0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D](https://www.oklink.com/xlayer/address/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D) |
-| TapeOut processor #101 (circuit #6: release policy; #7: Guard decision) | [0x73153e5fd2Acac604D49d6ca9fea27b750718F22](https://www.oklink.com/xlayer/address/0x73153e5fd2Acac604D49d6ca9fea27b750718F22) |
-| Signet's own site gate (signetguard.xyz) | [0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503](https://www.oklink.com/xlayer/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503) |
+| SignetRegistry | [0x98dB5B6B1545D0fb374da40a02045B93398E0589](https://web3.okx.com/explorer/x-layer/evm/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589) |
+| SignetFactory | [0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986](https://web3.okx.com/explorer/x-layer/evm/address/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986) |
+| ReleaseGate implementation (each gate is a non-upgradeable clone) | [0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D](https://web3.okx.com/explorer/x-layer/evm/address/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D) |
+| TapeOut processor #101 (circuit #6: release policy; #7: Guard decision) | [0x73153e5fd2Acac604D49d6ca9fea27b750718F22](https://web3.okx.com/explorer/x-layer/evm/address/0x73153e5fd2Acac604D49d6ca9fea27b750718F22) |
+| Signet's own site gate (signetguard.xyz) | [0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503](https://web3.okx.com/explorer/x-layer/evm/address/0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503) |
 
 ## Source
 

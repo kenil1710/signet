@@ -1,6 +1,6 @@
 {
   "name": "signetguard",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Signet CLI: seal each release of your dApp's website on X Layer, so Signet Guard refuses any wallet signature your team didn't seal. A TapeOut circuit decides when a release goes live.",
   "license": "MIT",
   "type": "module",
