@@ -28,6 +28,8 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
       if (n instanceof Element && n.querySelectorAll) for (const sc of n.querySelectorAll('script')) record(sc);
       return;
     }
+    // <script nomodule>: never fetched or run by a browser with ES modules (every Chrome Guard runs in, 120+)
+    if (n.noModule) return;
     if (n.src) {
       if (seenSrc.size < MAX_SEEN) seenSrc.add(n.src);
       else overflow = true;
@@ -145,7 +147,8 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     if (!/^https?:$/.test(u.protocol)) return; // blob:, data:, extension URLs
     u.hash = '';
     const prev = results.get(u.href);
-    if (prev && !(el && prev.status === 'cross-origin')) return;
+    // done, unless it wasn't loaded yet last time (an async script, a lazy chunk) or an element now shows its integrity
+    if (prev && prev.status !== 'not-cached' && !(el && prev.status === 'cross-origin')) return;
     results.set(u.href, { url: u.href, status: 'not-cached', note: 'checking' });
     const r = u.origin === location.origin ? await checkSameOrigin(u, scripty, isDocument) : scripty ? checkCrossOrigin(u, el) : null;
     if (r) results.set(u.href, r);
@@ -216,9 +219,15 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
       results.set(location.href.split('#')[0]!, { url: location.href.split('#')[0]!, status: 'ok-ssr', note: 'server-rendered page: its scripts are checked, not its HTML' });
       checkInline();
     }
-    for (const s of document.scripts) if (s.src) jobs.push(checkOne(s.src, true, s));
+    for (const s of document.scripts) if (s.src && !s.noModule) jobs.push(checkOne(s.src, true, s));
     for (const src of seenSrc) jobs.push(checkOne(src, true, [...document.scripts].find((s) => s.src === src) ?? null));
-    for (const l of document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href], link[rel~="modulepreload"][href], link[rel~="preload"][as="script"][href]')) jobs.push(checkOne(l.href, !l.rel.includes('stylesheet'), null));
+    // preloads count once the browser actually fetched them (a hint never fetched runs nothing)
+    const fetched = new Set((performance.getEntriesByType('resource') as PerformanceResourceTiming[]).map((e) => e.name.split('#')[0]));
+    for (const l of document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href], link[rel~="modulepreload"][href], link[rel~="preload"][as="script"][href]')) {
+      const preload = !l.rel.includes('stylesheet');
+      if (preload && !fetched.has(l.href.split('#')[0]!)) continue;
+      jobs.push(checkOne(l.href, preload, null));
+    }
     for (const e of performance.getEntriesByType('resource') as PerformanceResourceTiming[]) {
       const js = e.initiatorType === 'script' || /\.m?js$/i.test(new URL(e.name).pathname);
       if (js || e.initiatorType === 'link' || e.initiatorType === 'css') jobs.push(checkOne(e.name, js, null));

@@ -190,11 +190,11 @@ export async function rpcProxy(): Promise<Proxy> {
 
 // ---------------------------------------------------------------- the extension build and the browser
 
-export function buildExtension(rpc1: string, rpc2: string, gateway?: { url: string; dist: string }): string {
+export function buildExtension(rpc1: string, rpc2: string, gateway?: { url: string; dist: string }, chains?: Record<string, { rpcUrl: string; rpcUrl2: string }>): string {
   const out = tmp('guard-ext-');
   const r = spawnSync(process.execPath, [join(ROOT, 'packages/extension/scripts/build.mjs')], {
     cwd: join(ROOT, 'packages/extension'), encoding: 'utf8',
-    env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL: rpc1, SIGNET_RPC_URL2: rpc2, GUARD_OUT: out, SIGNET_GATEWAY_URL: gateway?.url ?? '', SIGNET_GATEWAY_DIST: gateway?.dist ?? '' },
+    env: { ...process.env, SIGNET_NETWORK: 'local', SIGNET_RPC_URL: rpc1, SIGNET_RPC_URL2: rpc2, GUARD_OUT: out, SIGNET_GATEWAY_URL: gateway?.url ?? '', SIGNET_GATEWAY_DIST: gateway?.dist ?? '', ...(chains ? { SIGNET_CHAINS: JSON.stringify(chains) } : {}) },
   });
   if (r.status !== 0) throw new Error(`extension build failed\n${r.stdout}${r.stderr}`);
   return out;
