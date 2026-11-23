@@ -51,6 +51,47 @@ That last row is most users today. Signet does not change what they sign.
 | 16 | Freeze spam by an approver | Unfreeze needs 2 of 3; remove the approver via recovery | Foundry tests | Up to 24 h of no releases. Signing is not blocked by a freeze (only warned) |
 | 17 | **Compromised Signet: the Guard extension, its build, or our Chrome Web Store account** | Open source; minimal permissions (storage, alarms, two RPC hosts); the decision rule is a public circuit | **not testable**, documented only | **Everything.** A malicious Guard update can feed the circuit any facts, allow any signature, or report browsing. This is our largest risk. Mitigations planned, not done: reproducible extension builds, a hardware key on the store account |
 
+## Server-rendered sites and factory contracts (Signet v2: Guard 0.3.0, CLI 0.2.0)
+
+A server-rendered site (Next.js and similar) can't seal its HTML: every page is built per request. In page mode
+`ssr` (sealed in `origins.json`, so turning it on is at least tier 01) Signet seals **the code, not the HTML**:
+
+| What | How Guard checks it | What gets through |
+|---|---|---|
+| Script files (every `/_next/static` chunk, preloads that were fetched, stylesheets) | Read from the browser cache, SHA-256 against the sealed release, as on a static site | Nothing that isn't a sealed file: a tampered or added chunk is a mismatch |
+| Inline `<script>` | Each must be a **sealed hash** (theme and config snippets, React's streaming runtime, collected from the build and from crawling the deployed preview) or a **data template**: `self.__next_f.push(JSON)` (Next.js flight data) or `$RS/$RC/$RX/$RV(JSON strings)` (React reveals). The argument is checked with `JSON.parse`, never evaluated; any extra character fails. Types the browser doesn't run (`application/json`, `ld+json`) are data; `importmap` and `speculationrules` must be sealed | Only sealed snippets and pure data |
+| `on*=` attributes, `javascript:` URLs | Injected code | Nothing |
+| Service workers | Must be a sealed path listed in `pages.serviceWorkers` (none by default); their bytes are hashed | Nothing else |
+
+**The race.** An injected inline script runs before anything can look at it. Guard records every `<script>` node from
+`document_start` (a MutationObserver in the content script), keeps scripts that remove themselves and every text a
+script had (so a script can't run and then rewrite itself into an allowed one, or change its type to look inert),
+and **before every signature** takes the pending records synchronously and runs a fresh full check. A script that
+injects itself and calls `eth_sendTransaction` at once is refused (staging test). It still *ran*: it can do anything
+that isn't a signature through the wallet (show a fake address, read the page).
+
+**What `ssr` mode does not seal (honest limits):**
+- **The page's text and data.** The HTML and the flight data come from the server. A hijacked server can change what
+  is shown (names, amounts, links), and can make sealed code send sealed calls with chosen parameters: an approve
+  amount, `setLimits` values on *your own* vault. The signing check (sealed contracts, your own factory vault,
+  transfer recipients) is what still protects you; it does not check amounts.
+- **Inline scripts the crawl didn't see.** A React runtime piece that appears only on some pages (an error reveal)
+  and wasn't on a crawled page is reported as injected: a false warning, not a hole. The team lists such pages in
+  `pages.crawl`.
+- `<script nomodule>` and preloads the browser never fetched are not checked: nothing runs from them in Chrome 120+.
+
+**Factory contracts** (`allowlist.json`, per chain: `factories`). A contract that isn't listed passes as a target or
+spender only if `factory.predictVaultAddress(X, target.programId()) == target` for X = the signer or the target's
+`owner()`, and **the signer is the target's owner or guardian**. Read on two RPCs that must agree (Arc: Circle and
+dRPC, fixed in Guard's build). Strict: an RPC error, a disagreement or a revert means "not sealed" (the opposite of
+Guard's general fail-open, on purpose: a vault address is exactly what a hijacker would swap).
+- Refused: a contract with the vault's interface not created by the factory; a factory vault someone else owns; a
+  factory vault an attacker created naming you as owner (its creator isn't you). All three are staging tests.
+- **Limit:** a vault whose ownership was transferred (owner ≠ creator) is not recognized unless the signer created it;
+  the team lists such a vault explicitly. The rule relies on the factory being immutable: checked for Misthos
+  (no proxy slots, no `DELEGATECALL`/`SSTORE`/`SELFDESTRUCT` in its code, immutable implementation), not by Guard.
+- **Guard 0.2.0** reads a v2 release as a static site and wrongly reports a server-rendered page as not matching.
+
 ## Honest limits
 
 - **Most users are not protected at signing** (see the first table). Guard is not in the Chrome Web Store yet, and it has been tested with a mock wallet, not with MetaMask or OKX Wallet.
