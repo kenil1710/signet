@@ -51,7 +51,12 @@ export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsB
   const scripts = Array.isArray(o) ? [] : o.scripts;
   if (!Array.isArray(origins) || !Array.isArray(scripts)) throw new Error('the origins file is malformed');
   const pages = Array.isArray(o) || o.pages === undefined ? null : parsePages(o.pages);
-  const own = { path: FILES_PATH, contentType: 'application/json', sha256: sha256(filesBytes), size: filesBytes.length };
+  const own: SealedFile = { path: FILES_PATH, contentType: 'application/json', sha256: sha256(filesBytes), size: filesBytes.length };
+  // a list over 48,000 bytes is stored in 24,000-byte chunks, whose hashes are leaves too (CLI seal.ts listEntryOf)
+  if (filesBytes.length > 48_000 && filesBytes.length <= 350 * 24_000) {
+    own.chunks = [];
+    for (let off = 0; off < filesBytes.length; off += 24_000) own.chunks.push(sha256(filesBytes.subarray(off, off + 24_000)));
+  }
   const filesRoot = merkleRoot(leavesOf(domain, [...list.files, own]));
   const allowlistHash = sha256(allowlistBytes);
   const originsHash = sha256(originsBytes);

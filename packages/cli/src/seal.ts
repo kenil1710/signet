@@ -160,6 +160,17 @@ export function externalScriptsOf(html: string, page: string, siteOrigin: string
 
 // ---------------------------------------------------------------- seal
 
+/// The leaf entry of signet/files.json itself. Over MAX_ONCHAIN_BYTES it is stored in chunks like any other file, so
+/// its chunk hashes are leaves too (a large site: Misthos's list is ~94 KB). Same rule in Guard (extension sealed.ts).
+export function listEntryOf(filesBytes: Uint8Array): SealedFile {
+  const e: SealedFile = { path: FILES_PATH, contentType: JSON_TYPE, sha256: sha256Hex(Buffer.from(filesBytes)), size: filesBytes.length };
+  if (filesBytes.length > MAX_ONCHAIN_BYTES && filesBytes.length <= MAX_CHUNKS * CHUNK_BYTES) {
+    e.chunks = [];
+    for (let off = 0; off < filesBytes.length; off += CHUNK_BYTES) e.chunks.push(sha256Hex(Buffer.from(filesBytes.subarray(off, off + CHUNK_BYTES))));
+  }
+  return e;
+}
+
 function canonical(value: unknown): Buffer {
   return Buffer.from(JSON.stringify(value));
 }
@@ -185,7 +196,9 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean;
   for (const path of paths) {
     const bytes = readFileSync(join(buildDir, path));
     const entry: SealedFile = { path, contentType: contentTypeOf(path), sha256: sha256Hex(bytes), size: bytes.length };
-    if (bytes.length > MAX_ONCHAIN_BYTES && bytes.length <= MAX_CHUNKS * CHUNK_BYTES && isOnchainPath(path)) {
+    // chunk hashes let `upload --full` store the file on-chain for the verified copy; a server-rendered site has no
+    // verified copy (its HTML isn't sealed), so in ssr mode they are left out and files.json stays small
+    if (!cfg.pages && bytes.length > MAX_ONCHAIN_BYTES && bytes.length <= MAX_CHUNKS * CHUNK_BYTES && isOnchainPath(path)) {
       entry.chunks = [];
       for (let off = 0; off < bytes.length; off += CHUNK_BYTES) entry.chunks.push(sha256Hex(bytes.subarray(off, off + CHUNK_BYTES)));
     }
@@ -278,7 +291,7 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean;
   const originsBytes = canonical((pages ? { origins: originsList, scripts, pages } : { origins: originsList, scripts }) satisfies OriginsFile);
   const calls = countCalls(callSites);
   const filesBytes = canonical({ version: 1, domain: cfg.domain, files, calls } satisfies FilesFile);
-  const listEntry: SealedFile = { path: FILES_PATH, contentType: JSON_TYPE, sha256: sha256Hex(filesBytes), size: filesBytes.length };
+  const listEntry = listEntryOf(filesBytes);
   const sealed = [...files, listEntry];
   for (const f of sealed) {
     if (f.chunks) warnings.push(`${f.path}: ${f.size} bytes, over ${MAX_ONCHAIN_BYTES}: stored on-chain in ${f.chunks.length} chunks, one transaction each`);
@@ -332,7 +345,7 @@ export function loadSealed(buildDir: string): SealedBuild {
   const bytes = (path: string) => readFileSync(join(buildDir, path));
   const listBytes = bytes(FILES_PATH);
   const list = JSON.parse(listBytes.toString('utf8')) as FilesFile;
-  const files: SealedFile[] = [...list.files, { path: FILES_PATH, contentType: JSON_TYPE, sha256: sha256Hex(listBytes), size: listBytes.length }];
+  const files: SealedFile[] = [...list.files, listEntryOf(listBytes)];
   const stale = (what: string) => new Error(`${what} changed since the build was sealed. Run: signet seal ${buildDir}`);
   for (const f of list.files) if (!existsSync(join(buildDir, f.path)) || sha256Hex(bytes(f.path)) !== f.sha256) throw stale(f.path);
   const onDisk = walk(buildDir).filter((p) => !RESERVED.has(p));
@@ -386,8 +399,7 @@ export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsB
   const o = JSON.parse(text(originsBytes)) as OriginsFile | string[];
   const of: OriginsFile = Array.isArray(o) ? { origins: o, scripts: [] } : o; // a bare list: sealed before SRI hashes moved here
   if (!Array.isArray(of.origins) || !Array.isArray(of.scripts)) throw new Error(`${ORIGINS_PATH} is not an origins file`);
-  const own: SealedFile = { path: FILES_PATH, contentType: JSON_TYPE, sha256: sha256Hex(filesBytes), size: filesBytes.length };
-  const filesRoot = merkleRoot(leavesOf(domain, [...list.files, own]));
+  const filesRoot = merkleRoot(leavesOf(domain, [...list.files, listEntryOf(filesBytes)]));
   const allowlistHash = sha256Hex(allowlistBytes);
   const originsHash = sha256Hex(originsBytes);
   return {

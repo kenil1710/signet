@@ -293,7 +293,11 @@ test('a gateway whose worker is not the pinned one is red; without a gateway the
     // reaches the copy from the real site
     const { page } = await visit(s);
     await page.goto(`http://${encodeLabel(domain)}.localhost:${gateway.port}/`).catch(() => {});
-    await until('the tab to be taken to the warning page', () => page.url().startsWith('chrome-extension:') && page.url().includes('blocked.html'), 30000); // enforce mode
+    await until('the tab to be taken to the warning page', () => page.url().startsWith('chrome-extension:') && page.url().includes('blocked.html'), 30000).catch(async (e) => {
+      const tab = await tabIdOf(s, page).catch(() => -1);
+      const dump = await s.sw.evaluate(async (t) => JSON.stringify((await chrome.storage.session.get(`tab:${t}`))[`tab:${t}`]), tab);
+      throw new Error(`${e.message}; url ${page.url()}; report ${dump?.slice(0, 2500)}`);
+    }); // enforce mode
     await page.waitForSelector('h1');
     assert.match(await page.locator('#root').innerText(), /changed · http:\/\/.*\.localhost:\d+\/sw\.js/);
     await light(s, await tabIdOf(s, page), '!');

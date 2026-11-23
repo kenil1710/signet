@@ -95,3 +95,21 @@ test('domain proof: only a file naming exactly this gate on this chain confirms 
   assert.equal(proofNames('<!doctype html>', gate, 196), false); // a site that answers every path with its index.html
   assert.equal(proofNames(ok + ' '.repeat(5000), gate, 196), false); // oversized
 });
+
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { loadSealed } from '../../cli/src/seal.ts';
+test('a big site: signet/files.json over 48,000 bytes is chunked, and the CLI and Guard agree on filesRoot', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'big-'));
+  mkdirSync(join(dir, '_next/static/chunks'), { recursive: true });
+  for (let i = 0; i < 600; i++) writeFileSync(join(dir, `_next/static/chunks/c${String(i).padStart(4, '0')}-${'x'.repeat(40)}.js`), `console.log(${i})`);
+  const r = seal(dir, { domain: 'big.example', chainId: 196 });
+  const list = r.files.find((f) => f.path === 'signet/files.json')!;
+  assert.ok(list.size > 48_000, `files.json is ${list.size} bytes`);
+  assert.equal(list.chunks?.length, Math.ceil(list.size / 24_000), 'its chunk hashes are leaves');
+  assert.ok(!r.warnings.some((w) => /files\.json.*too large/.test(w)), 'no longer "too large to store on-chain"');
+  const g = parseSealed('big.example', readFileSync(join(dir, 'signet/allowlist.json')), readFileSync(join(dir, 'signet/origins.json')), readFileSync(join(dir, 'signet/files.json')));
+  assert.equal(g.filesRoot, r.manifest.filesRoot);
+  assert.equal(g.manifestHash, r.manifest.manifestHash);
+  const b = loadSealed(dir);
+  assert.doesNotThrow(() => b.chunkProof('signet/files.json', 0), 'the upload can prove each chunk');
+});
