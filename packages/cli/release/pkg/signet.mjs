@@ -31961,8 +31961,8 @@ async function crawlBrowser(project, base, paths) {
 	const out = [];
 	try {
 		const ctx = await browser.newContext({ extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : {} });
-		await ctx.addInitScript({ content: `window.__signetSeen = []; new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes)
-      if (n instanceof HTMLScriptElement && !n.src && !n.noModule) window.__signetSeen.push(n.text); }).observe(document, { childList: true, subtree: true });` });
+		await ctx.addInitScript({ content: `window.__signetEls = new Set(); new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes)
+      if (n instanceof HTMLScriptElement && !n.src && !n.noModule) window.__signetEls.add(n); }).observe(document, { childList: true, subtree: true });` });
 		const page = await ctx.newPage();
 		for (const p of paths) {
 			const url = new URL(p, base.endsWith("/") ? base : `${base}/`).href;
@@ -31973,7 +31973,7 @@ async function crawlBrowser(project, base, paths) {
 			if (!res || res.status() >= 500) throw new SignetError("crawl", `${url} answered HTTP ${res?.status()}`);
 			await page.waitForTimeout(1500);
 			const html = await res.text();
-			const runtime = await page.evaluate("window.__signetSeen");
+			const runtime = await page.evaluate("[...window.__signetEls].map((e) => e.text)");
 			out.push({
 				path: new URL(url).pathname,
 				html,

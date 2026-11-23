@@ -171,8 +171,10 @@ async function crawlBrowser(project: string, base: string, paths: string[]): Pro
   try {
     const ctx = await browser.newContext({ extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : {} });
     // runs in the page (a string: this package has no DOM types)
-    await ctx.addInitScript({ content: `window.__signetSeen = []; new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes)
-      if (n instanceof HTMLScriptElement && !n.src && !n.noModule) window.__signetSeen.push(n.text); }).observe(document, { childList: true, subtree: true });` });
+    // keeps every inline script element (also those that remove themselves) and reads their final text at the end: a
+    // text seen at insertion can be partial (React inserts the element, then its text), Guard ignores those too
+    await ctx.addInitScript({ content: `window.__signetEls = new Set(); new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes)
+      if (n instanceof HTMLScriptElement && !n.src && !n.noModule) window.__signetEls.add(n); }).observe(document, { childList: true, subtree: true });` });
     const page = await ctx.newPage();
     for (const p of paths) {
       const url = new URL(p, base.endsWith('/') ? base : `${base}/`).href;
@@ -180,7 +182,7 @@ async function crawlBrowser(project: string, base: string, paths: string[]): Pro
       if (!res || res.status() >= 500) throw new SignetError('crawl', `${url} answered HTTP ${res?.status()}`); // 404 pages are pages too
       await page.waitForTimeout(1500);
       const html = await res.text();
-      const runtime = (await page.evaluate('window.__signetSeen')) as string[];
+      const runtime = (await page.evaluate('[...window.__signetEls].map((e) => e.text)')) as string[];
       out.push({ path: new URL(url).pathname, html, runtime });
       log(`  crawled ${new URL(url).pathname} in Chromium (${runtime.length} inline script(s) seen while it ran)`);
     }
