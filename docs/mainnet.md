@@ -191,7 +191,19 @@ executed before it: a `SetApprover` would void proposal #6.
 | [`0xfdbe3bf7…83d6`](https://web3.okx.com/explorer/x-layer/evm/tx/0xfdbe3bf74e95c27318ba5ddac9d499cfc4df5d5c16a00d42eddd928608d583d6) | Approver A | `publish(6)` → `AdminExecuted(6, action 4 = SetGuardian)` | 76,665,695 | 188,645 | 0.0000053952 |
 
 After (both RPCs): `guardian()` = signet-ops `0x9275…E291`; proposal #6 executed. Step 4 cost in total
-(propose + 3 approvals + publish): 489,142 gas, ≈ 0.0000140 OKB. Next: step 5, sweep signet-dev's OKB to signet-ops.
+(propose + 3 approvals + publish): 489,142 gas, ≈ 0.0000140 OKB.
+
+## signet-dev rotation, step 5 done: OKB swept to signet-ops (2026-11-23). Rotation complete
+
+Sent by the team: `cast send 0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291 --value 43355534124840684 --legacy --gas-price 20000001 --gas-limit 21000 --account signet-dev`.
+
+| Tx | From → to | Value (OKB) | Block | Gas | Fee (OKB) |
+|---|---|---:|---:|---:|---:|
+| [`0xd980e920…5d37`](https://web3.okx.com/explorer/x-layer/evm/tx/0xd980e9205ef7a146dcb913b14fa4041ec0840c93b795afbeb6e38a8aaf825d37) | signet-dev → signet-ops | 0.043355534124840684 | 76,679,835 (15:47:51 UTC) | 21,000 | 0.000000420000021 |
+
+After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 25; signet-ops 0.043355534124840684 OKB.
+**The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
+no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
 ## Checks after the deploy
 
@@ -213,7 +225,7 @@ After (both RPCs): `guardian()` = signet-ops `0x9275…E291`; proposal #6 execut
 - Verify the source on OKX Explorer by hand: [`docs/verify/README.md`](verify/README.md) (OKLink's API login is no longer available; free, no wallet). Files checked against mainnet by `docs/verify/check.py`.
 - ~~Renew the registry's operator grant~~ Done differently, 2026-11-19: circuit #5 moved into the site gate (below). The grant now runs to **2026-12-19 08:05 UTC** and **anyone** can renew it with `siteGate.renewOperator(processor, 5)`. The watchtower will do it automatically (planned, `packages/watchtower/README.md`).
 - ~~Signet's own site's first release~~ Done: release #3 (tier 10, 3 of 3 approvals) and #4 (tier 00) published on 2026-11-20, manifests uploaded. Hosting the full site on DeWEB: not done.
-- Fund approver C (it holds ≈ 0.0000009 OKB, too little for one approval): planned with the signet-dev rotation. The CI proposer and approvers A and B are funded.
+- ~~Fund approver C~~ Done 2026-11-21 (rotation step 2). The CI proposer and approvers A, B and C are funded.
 
 ## Runbook: release #3 → #4 (Fri 20 Nov 2026)
 
