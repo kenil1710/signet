@@ -10,7 +10,7 @@ import { encodeAbiParameters, getAddress, type Hex } from 'viem';
 import { sha256Hex, leafOf, leavesOf, merkleRoot, merkleProof, chunkPath, CHUNK_BYTES, CHUNK_TYPE } from './merkle.ts';
 import { findCalls, countCalls, isCode, type CallCounts } from './calls.ts';
 import { extractAddresses, extractOrigins, DOC_HOSTS, PERMIT2 } from './extract.ts';
-import { inlineHashesOf } from './inline.ts';
+import { inlineHash, inlineHashesOf, templateOf } from './inline.ts';
 export { extractAddresses, extractOrigins, DOC_HOSTS } from './extract.ts';
 
 export const ALLOWLIST_PATH = 'signet/allowlist.json';
@@ -81,7 +81,8 @@ export interface SealConfig {
   pages?: { mode: 'ssr'; crawl?: string[]; serviceWorkers?: string[] };
 }
 /// Pages fetched from the deployed preview for an ssr seal: their HTML, by path.
-export type Crawled = { path: string; html: string }[];
+/// runtime: inline scripts the page created in a real browser (React inserts some during hydration, from flight data).
+export type Crawled = { path: string; html: string; runtime?: string[] }[];
 
 function checkRule(r: FactoryRule, chain: string): FactoryRule {
   const ok = r && typeof r === 'object' && /^0x[0-9a-fA-F]{40}$/.test(r.factory) && /^[A-Za-z_]\w*\(address,(bytes32|uint256)\)$/.test(r.predict)
@@ -263,7 +264,8 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean;
     }
     const workers = (cfg.pages.serviceWorkers ?? []).map((w) => w.replace(/^\/+/, ''));
     for (const w of workers) if (!sealedPaths.has(w)) throw new Error(`pages.serviceWorkers: ${w} is not a file of ${buildDir}`);
-    pages = { mode: 'ssr', inline: inlineHashesOf([...own, ...crawled.map((c) => c.html)]), serviceWorkers: workers.sort() };
+    const runtime = crawled.flatMap((c) => c.runtime ?? []).filter((t) => !templateOf(t)).map((t) => inlineHash(t));
+    pages = { mode: 'ssr', inline: [...new Set([...inlineHashesOf([...own, ...crawled.map((c) => c.html)]), ...runtime])].sort(), serviceWorkers: workers.sort() };
   }
 
   // origins: every origin found in the build except documentation links and the site itself

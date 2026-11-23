@@ -18,7 +18,8 @@ await build({
   ssr: { noExternal: true, target: 'node' },
   build: {
     ssr: `${ROOT}src/cli.ts`, outDir: out, emptyOutDir: false, target: 'node18', minify: false,
-    rollupOptions: { output: { format: 'es', entryFileNames: 'signet.mjs', inlineDynamicImports: true } },
+    // playwright: optional, loaded from the project's own node_modules for `seal --crawl-browser`, never bundled
+    rollupOptions: { external: ['playwright'], output: { format: 'es', entryFileNames: 'signet.mjs', inlineDynamicImports: true } },
   },
 });
 const js = readFileSync(`${out}/signet.mjs`, 'utf8');

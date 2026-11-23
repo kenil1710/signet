@@ -8,7 +8,7 @@
 // through the JS until no new one appears), so this measures exact costs and false warnings on the real site. The
 // real release seals the Vercel build output instead (/start, "Next.js with server-rendered pages").
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,8 +20,8 @@ const { chromium } = req('playwright');
 const DOMAIN = 'misthos.world';
 const SITE = `https://${DOMAIN}`;
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-const PAGES = (process.argv.includes('--pages') ? process.argv[process.argv.indexOf('--pages') + 1]! : '/,/campaigns,/c,/docs,/p/kency-arc-creators').split(',');
-const VISIT = [...PAGES, '/docs/getting-started', '/app'];
+const PAGES = (process.argv.includes('--pages') ? process.argv[process.argv.indexOf('--pages') + 1]! : '/,/campaigns,/c,/docs,/docs/quickstart,/p/kency-arc-creators,/no-such-page,/docs/no-such-page').split(',');
+const VISIT = [...PAGES, '/docs/faq', '/docs/security', '/docs/architecture', '/app', '/p/kency-arc-creators/rounds/1', '/p/no-such-program', '/another-missing-page', '/campaigns?x=1'];
 const A = '0xB9ef367A86DE5150a5390c4148073901587d2416', B = '0x3280887C6ed2c0C43679918654f72222b767e6dc', C = '0x1C4704480E258bdBF8719ffba1679dD0e158c74c';
 const RECOVERY = '0x69400a5f15F6b2D84AAB70989B32266010E6cD93';
 const ANVIL_KEY0 = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'; // anvil's default account, fork only
@@ -37,8 +37,15 @@ const cast = (...a: string[]) => sh('cast', [...a, '--rpc-url', FORK]).trim();
 
 // ---------------------------------------------------------------- 1. the files misthos.world serves now
 async function fetchText(url: string): Promise<{ ok: boolean; body: Buffer; type: string }> {
-  const r = await fetch(url, { headers: { 'user-agent': UA, accept: '*/*' } });
-  return { ok: r.ok, body: Buffer.from(await r.arrayBuffer()), type: r.headers.get('content-type') ?? '' };
+  for (let i = 0; ; i++) {
+    try {
+      const r = await fetch(url, { headers: { 'user-agent': UA, accept: '*/*' }, signal: AbortSignal.timeout(30_000) });
+      return { ok: r.ok, body: Buffer.from(await r.arrayBuffer()), type: r.headers.get('content-type') ?? '' };
+    } catch (e) {
+      if (i >= 3) throw e;
+      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
 }
 async function collect(siteDir: string): Promise<number> {
   const seen = new Set<string>();
@@ -73,7 +80,7 @@ async function main() {
   const anvil = spawn('anvil', ['--fork-url', 'https://xlayerrpc.okx.com', '--port', String(PORT), '--chain-id', '196', '--silent'], { stdio: 'ignore' });
   for (let i = 0; i < 80 && !(await fetch(FORK, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' }).then((r) => r.ok).catch(() => false)); i++) await new Promise((r) => setTimeout(r, 250));
   const cli = (args: string[], key = ANVIL_KEY0) => sh(process.execPath, [join(ROOT, 'packages/cli/src/cli.ts'), '-C', dir, ...args], { SIGNET_NETWORK: 'mainnet', SIGNET_RPC_URL: FORK, SIGNET_PRIVATE_KEY: key, SIGNET_PROPOSER_KEY: '' });
-  const txGas = (out: string, what: string) => { for (const m of out.matchAll(/tx (0x[0-9a-f]{64})[^\n]*?gas (\d+)/g)) gas.push({ what, gas: Number(m[2]) }); };
+  const txGas = (out: string, what: string) => { for (const m of out.matchAll(/tx\s+(0x[0-9a-f]{64})[^\n]*?gas (\d+)/g)) gas.push({ what, gas: Number(m[2]) }); };
   try {
     // the gate: commit, then createGate (the CLI's init with role flags; the dashboard sends the same two calls)
     let out = cli(['init', '--domain', DOMAIN, '--approvers', `${A},${B},${C}`, '--recovery', RECOVERY, '--guardian', 'none', '--no-wait']);
@@ -93,7 +100,11 @@ async function main() {
     }, null, 2));
     cli(['domain', siteDir]);
     console.log('3. sealing (crawling the live pages for their inline scripts)…');
-    out = cli(['seal', siteDir, '--crawl', SITE]);
+    // --crawl-browser uses the project's playwright: link Signet's own into this throwaway project
+    mkdirSync(join(dir, 'node_modules'), { recursive: true });
+    writeFileSync(join(dir, 'package.json'), '{"private":true}');
+    for (const m of ['playwright']) symlinkSync(realpathSync(join(ROOT, 'packages/extension/node_modules', m)), join(dir, 'node_modules', m));
+    out = cli(['seal', siteDir, '--crawl-browser', SITE]);
     console.log(out.split('\n').filter((l) => /Sealed|allowlistHash|originsHash|chain |factory|Server-rendered|inline 0x|origins the site/.test(l)).map((l) => `   ${l.trim()}`).join('\n'));
     const proposer = cast('call', cfg.gate, 'proposer()(address)');
     cast('rpc', 'anvil_setBalance', proposer, '0xde0b6b3a7640000');
@@ -111,8 +122,9 @@ async function main() {
     cast('rpc', 'evm_increaseTime', String(24 * 3600 + 60));
     cast('rpc', 'evm_mine');
     out = cli(['publish', id, siteDir], proposerKey);
-    txGas(out, 'publish + manifest uploads (CI key)');
-    for (const m of out.matchAll(/wrote\s+(\S+)\s+\((\d+) bytes, gas (\d+)\)/g)) gas.push({ what: `  upload ${m[1]} (${m[2]} B)`, gas: Number(m[3]) });
+    for (const m of out.matchAll(/Published[^\n]*?gas (\d+)/g)) gas.push({ what: 'publish(#1) (CI key)', gas: Number(m[1]) });
+    for (const m of out.matchAll(/wrote\s+(\S+)\s+\((\d+) bytes, gas (\d+)\)/g)) gas.push({ what: `upload ${m[1]} (${m[2]} B)`, gas: Number(m[3]) });
+    for (const m of out.matchAll(/chunk\s+(\S+)\s+(\d+)\/(\d+)\s+\((\d+) bytes, gas (\d+)\)/g)) gas.push({ what: `upload ${m[1]} chunk ${m[2]}/${m[3]} (${m[4]} B)`, gas: Number(m[5]) });
     console.log(`   ${out.match(/Published[^\n]*/)?.[0]}`);
 
     // ---------------------------------------------------------------- 4. Guard on the real site
@@ -120,9 +132,11 @@ async function main() {
     const ext = mkdtempSync(join(tmpdir(), 'guard-ext-'));
     sh(process.execPath, [join(ROOT, 'packages/extension/scripts/build.mjs')], { SIGNET_NETWORK: 'mainnet', SIGNET_RPC_URL: FORK, SIGNET_RPC_URL2: FORK, GUARD_OUT: ext }, join(ROOT, 'packages/extension'));
     const ctx = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), 'guard-profile-')), { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`] });
-    const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker', { timeout: 90000 }));
+    const isGuard = (w: { url(): string }) => w.url().startsWith('chrome-extension://');
+    const sw = ctx.serviceWorkers().find(isGuard) ?? (await ctx.waitForEvent('serviceworker', { predicate: isGuard, timeout: 90000 }));
+    for (let i = 0; i < 60 && !(await sw.evaluate(() => typeof chrome !== 'undefined' && !!chrome.storage?.local).catch(() => false)); i++) await new Promise((r) => setTimeout(r, 500));
     for (let i = 0; i < 180; i++) {
-      if (await sw.evaluate(async (d: string) => (((await chrome.storage.local.get('domains')).domains as { list?: string[] } | undefined)?.list ?? []).includes(d), DOMAIN)) break;
+      if (await sw.evaluate(async (d: string) => (((await chrome.storage.local.get('domains')).domains as { list?: string[] } | undefined)?.list ?? []).includes(d), DOMAIN).catch(() => false)) break;
       await new Promise((r) => setTimeout(r, 500));
     }
     await sw.evaluate(async ([d, g]: string[]) => chrome.storage.local.set({ proofs: { [d!]: g!.toLowerCase() } }), [DOMAIN, cfg.gate]); // misthos.world doesn't serve the proof yet
@@ -131,7 +145,7 @@ async function main() {
     for (const p of VISIT) {
       await page.goto(`${SITE}${p}`, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(2500);
-      const tab = await sw.evaluate(async (u: string) => (await chrome.tabs.query({})).find((t) => t.url?.startsWith(u))?.id ?? -1, SITE);
+      const tab = await sw.evaluate(async () => Math.max(-1, ...(await chrome.tabs.query({})).map((t) => t.id ?? -1))); // the newest tab (no "tabs" permission: no URLs)
       const badge = tab >= 0 ? await sw.evaluate((t: number) => chrome.action.getBadgeText({ tabId: t }), tab) : '(no tab)';
       const rep = tab >= 0 ? await sw.evaluate(async (t: number) => (await chrome.storage.session.get(`tab:${t}`))[`tab:${t}`], tab) as { report?: { files: { status: string; url: string; note?: string }[] } } : undefined;
       results.push({ path: p, badge, bad: (rep?.report?.files ?? []).filter((f) => !['ok', 'ok-sri', 'ok-inline', 'ok-ssr'].includes(f.status)).map((f) => `${f.status} ${f.url.slice(0, 100)} ${f.note ?? ''}`.slice(0, 220)) });
@@ -143,8 +157,8 @@ async function main() {
 
     console.log('\n5. Gas on the fork (X Layer mainnet state):');
     let total = 0;
-    for (const g of gas) { console.log(`   ${g.what.padEnd(44)} ${String(g.gas).padStart(10)}`); if (!g.what.startsWith('  ')) total += g.gas; }
-    console.log(`   ${'total (excluding the indented upload lines, already in publish)'.padEnd(44)} ${String(total).padStart(10)}`);
+    for (const g of gas) { console.log(`   ${g.what.padEnd(52)} ${String(g.gas).padStart(10)}`); total += g.gas; }
+    console.log(`   ${'total'.padEnd(52)} ${String(total).padStart(10)}`);
     console.log(`   at 0.020000001 gwei: ${(total * 20000001e-18).toFixed(9)} OKB; at 0.0286 gwei (what Rabby paid): ${(total * 2.86e-11).toFixed(9)} OKB`);
     console.log(`\nproject folder (fork only): ${dir}`);
   } finally {
