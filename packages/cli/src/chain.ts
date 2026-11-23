@@ -26,6 +26,7 @@ export interface ProjectConfig {
   allowlist?: Record<string, AllowlistRules>;
   transfers?: Transfers;
   origins?: { include?: string[]; exclude?: string[] };
+  pages?: { mode: 'ssr'; crawl?: string[]; serviceWorkers?: string[] };
 }
 
 export type Network = ReturnType<typeof loadNetwork>;

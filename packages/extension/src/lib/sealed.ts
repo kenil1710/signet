@@ -5,7 +5,7 @@
 //   filesRoot     = Merkle root (sorted pairs) over sha256(abi.encode(domain, path, contentType, sha256(bytes)))
 //                   for every listed file plus signet/files.json itself
 import { encodeAbiParameters, sha256, concat } from 'viem';
-import type { Hex, Sealed, SealedFile } from './types.ts';
+import type { Hex, PagesPolicy, Sealed, SealedFile } from './types.ts';
 
 export const ALLOWLIST_PATH = 'signet/allowlist.json';
 export const ORIGINS_PATH = 'signet/origins.json';
@@ -46,18 +46,31 @@ export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsB
   const text = (b: Uint8Array) => new TextDecoder().decode(b);
   const list = JSON.parse(text(filesBytes)) as { domain?: string; files?: SealedFile[]; calls?: Record<string, number> };
   if (list.domain !== domain || !Array.isArray(list.files)) throw new Error('the file list is for another domain');
-  const o = JSON.parse(text(originsBytes)) as { origins?: string[]; scripts?: Sealed['scripts'] } | string[];
+  const o = JSON.parse(text(originsBytes)) as { origins?: string[]; scripts?: Sealed['scripts']; pages?: unknown } | string[];
   const origins = Array.isArray(o) ? o : o.origins;
   const scripts = Array.isArray(o) ? [] : o.scripts;
   if (!Array.isArray(origins) || !Array.isArray(scripts)) throw new Error('the origins file is malformed');
+  const pages = Array.isArray(o) || o.pages === undefined ? null : parsePages(o.pages);
   const own = { path: FILES_PATH, contentType: 'application/json', sha256: sha256(filesBytes), size: filesBytes.length };
   const filesRoot = merkleRoot(leavesOf(domain, [...list.files, own]));
   const allowlistHash = sha256(allowlistBytes);
   const originsHash = sha256(originsBytes);
   return {
     manifestHash: manifestHashOf(filesRoot, allowlistHash, originsHash), filesRoot, allowlistHash, originsHash,
-    allowlist: JSON.parse(text(allowlistBytes)) as Sealed['allowlist'], origins, scripts, files: list.files, calls: list.calls ?? null,
+    allowlist: JSON.parse(text(allowlistBytes)) as Sealed['allowlist'], origins, scripts, files: list.files, calls: list.calls ?? null, pages,
   };
+}
+
+/// origins.json "pages". Anything Guard doesn't understand is an error (the release is then "could not check"),
+/// never silently ignored: a newer page mode must not be read as a static site.
+export function parsePages(p: unknown): PagesPolicy {
+  const x = p as Partial<PagesPolicy> | null;
+  if (!x || typeof x !== 'object' || x.mode !== 'ssr') throw new Error('unknown page mode in the sealed origins file');
+  const inline = x.inline ?? [];
+  const serviceWorkers = x.serviceWorkers ?? [];
+  if (!Array.isArray(inline) || !inline.every((h) => typeof h === 'string' && /^0x[0-9a-f]{64}$/.test(h))) throw new Error('malformed inline hashes');
+  if (!Array.isArray(serviceWorkers) || !serviceWorkers.every((w) => typeof w === 'string')) throw new Error('malformed service worker list');
+  return { mode: 'ssr', inline, serviceWorkers };
 }
 
 /// Which sealed file a loaded URL must equal, or null if none. `path` comes from pathOfUrl; `has` says whether a

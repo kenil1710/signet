@@ -227,3 +227,49 @@ export function factsOf(verdict: Verdict, ctx: Context): GuardInputs {
     enforceMode: !!ctx.enforced,
   };
 }
+
+/// The chain and the addresses a signing request asks the user to trust as a contract or a spender: each call's
+/// target and any spender it names (token approvals, Permit2), or a typed-data verifying contract and spender.
+/// Used to run sealed factory rules (lib/factory.ts) before decide(); recipients are not included.
+export function trustedBy(req: SignRequest): { chain: string | null; addresses: string[] } {
+  let chain = req.chainId ? safeChain(req.chainId) : null;
+  const params = Array.isArray(req.params) ? req.params : [];
+  const out = new Set<string>();
+  const add = (a: unknown) => { if (typeof a === 'string' && isAddress(a)) out.add(lc(a)); };
+  if (req.method.startsWith('eth_signTypedData')) {
+    let td: { domain?: { chainId?: unknown; verifyingContract?: string }; message?: Record<string, unknown> } | null = null;
+    const raw = typeof params[0] === 'string' && isAddress(params[0]) ? params[1] : params[0];
+    try { td = typeof raw === 'string' ? JSON.parse(raw) : (raw as typeof td); } catch { /* unreadable */ }
+    if (td && typeof td === 'object') {
+      if (td.domain?.chainId !== undefined) chain = safeChain(td.domain.chainId) ?? chain;
+      add(td.domain?.verifyingContract);
+      add(td.message?.spender);
+    }
+  } else if (['eth_sendTransaction', 'eth_signTransaction', 'wallet_sendCalls'].includes(req.method)) {
+    const first = (params[0] ?? {}) as Tx & { calls?: Tx[]; chainId?: string };
+    if (first.chainId !== undefined) chain = safeChain(first.chainId) ?? chain;
+    for (const call of req.method === 'wallet_sendCalls' ? (first.calls ?? []) : [first]) {
+      add(call.to);
+      const data = lc(call.data ?? call.input ?? '0x');
+      const spec = TOKEN_CALLS[data.slice(0, 10)] ?? TARGET_CALLS[data.slice(0, 10)];
+      if (spec?.spender !== undefined) add(decode(spec.types, data)?.[spec.spender]);
+    }
+  }
+  return { chain, addresses: [...out] };
+}
+
+function safeChain(c: unknown): string | null {
+  try {
+    return BigInt(c as string).toString();
+  } catch {
+    return null;
+  }
+}
+
+/// The allowlist with `extra` addresses (each verified by a sealed factory rule for this request) added to that
+/// chain's targets and spenders. A copy: the sealed allowlist itself never changes.
+export function withVerified(allowlist: Allowlist, chain: string, extra: string[]): Allowlist {
+  if (extra.length === 0 || !allowlist[chain]) return allowlist;
+  const a = allowlist[chain]!;
+  return { ...allowlist, [chain]: { ...a, targets: [...a.targets, ...extra], spenders: [...a.spenders, ...extra] } };
+}

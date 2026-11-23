@@ -14,10 +14,21 @@ export interface Net {
   /// The Guard decision circuit Guard asks before every signature (packages/circuit, docs/guard-truth-table.md).
   /// Absent: the local mirror of the same truth table decides.
   guardCircuit?: { processor: Hex; id: number; netlistSha256: Hex; beacon: Hex; implementation: Hex } | null;
+  /// Other chains Guard may read for a sealed factory rule: two independent RPCs each, fixed at build time (a sealed
+  /// release can't choose which RPCs Guard talks to). A chain not listed here can't pass a factory rule.
+  chains?: Record<string, { rpcUrl: string; rpcUrl2: string }>;
 }
 
+/// "Contracts created by this factory" (allowlist.json, per chain): a target or spender that isn't listed passes only
+/// if factory.<predict>(X, target.<id>()) == target for X = the signer or target.<roles[0]>(), and the signer is one
+/// of target.<roles>(). Read on two RPCs that must agree; any failure means "not sealed" (strict).
+export interface FactoryRule { factory: string; predict: string; id: string; roles: string[] }
+
 export interface SealedFile { path: string; contentType: string; sha256: Hex; size: number; chunks?: Hex[] }
-export interface Allowlist { [chainId: string]: { targets: string[]; spenders: string[]; eip712: string[]; transfers?: 'user' | 'allowlist' | 'any' } }
+export interface Allowlist { [chainId: string]: { targets: string[]; spenders: string[]; eip712: string[]; transfers?: 'user' | 'allowlist' | 'any'; factories?: FactoryRule[] } }
+/// Page mode "ssr" (origins.json "pages"): the HTML isn't sealed; every script file must be, and every inline script
+/// must be a sealed hash or a data template (packages/cli/src/inline.ts). serviceWorkers: sealed paths allowed as one.
+export interface PagesPolicy { mode: 'ssr'; inline: string[]; serviceWorkers: string[] }
 export interface Sealed {
   manifestHash: Hex;
   filesRoot: Hex;
@@ -28,6 +39,7 @@ export interface Sealed {
   scripts: { url: string; integrity: string | null }[];
   files: SealedFile[];
   calls?: Record<string, number> | null; // signing-call counts sealed in files.json (Diff Guard); null = sealed before they existed
+  pages?: PagesPolicy | null; // null/absent: a static site, the HTML is sealed like any file
 }
 
 /// What Guard knows about one sealed domain.
@@ -57,7 +69,7 @@ export interface SiteState {
   manifests: Record<string, Sealed>; // by manifest hash; at most the last two
 }
 
-export type FileStatus = 'ok' | 'ok-sri' | 'ok-gateway' | 'mismatch' | 'unknown' | 'unknown-origin' | 'sri-mismatch' | 'not-cached' | 'cross-origin' | 'no-crypto';
+export type FileStatus = 'ok' | 'ok-sri' | 'ok-gateway' | 'ok-inline' | 'ok-ssr' | 'mismatch' | 'unknown' | 'unknown-origin' | 'sri-mismatch' | 'injected' | 'not-cached' | 'cross-origin' | 'no-crypto';
 export interface FileResult { url: string; status: FileStatus; sha256?: string; note?: string }
 export type PageStatus = 'ok' | 'tampered' | 'unverified';
 export interface PageReport { url: string; status: PageStatus; files: FileResult[] }
@@ -73,6 +85,7 @@ export interface PageInfo {
   origins: string[];
   scripts: { url: string; integrity: string | null }[];
   gateway: Record<string, string> | null; // on the gateway's copy of this domain: the pinned hashes of the gateway's own files
+  pages: PagesPolicy | null; // ssr mode: the union of the valid releases' inline hashes and service workers
   proof?: { url: string; gate: string }; // unconfirmed: fetch this same-origin file and send it back (message 'proof')
 }
 

@@ -10,6 +10,7 @@ import { encodeAbiParameters, getAddress, type Hex } from 'viem';
 import { sha256Hex, leafOf, leavesOf, merkleRoot, merkleProof, chunkPath, CHUNK_BYTES, CHUNK_TYPE } from './merkle.ts';
 import { findCalls, countCalls, isCode, type CallCounts } from './calls.ts';
 import { extractAddresses, extractOrigins, DOC_HOSTS, PERMIT2 } from './extract.ts';
+import { inlineHashesOf } from './inline.ts';
 export { extractAddresses, extractOrigins, DOC_HOSTS } from './extract.ts';
 
 export const ALLOWLIST_PATH = 'signet/allowlist.json';
@@ -56,22 +57,40 @@ export interface SealedScript { url: string; integrity: string | null }
 /// allowlist change (tier 10).
 export type Transfers = 'user' | 'allowlist' | 'any';
 export const TRANSFERS: Transfers[] = ['user', 'allowlist', 'any'];
-export type Allowlist = Record<string, { targets: string[]; spenders: string[]; eip712: string[]; transfers: Transfers }>;
+/// "Contracts created by this factory" (signet v2; Guard 0.3.0, extension/src/lib/factory.ts). Sealed in allowlist.json,
+/// so adding or changing one is an allowlist change (tier 10).
+export interface FactoryRule { factory: string; predict: string; id: string; roles: string[] }
+export type Allowlist = Record<string, { targets: string[]; spenders: string[]; eip712: string[]; transfers: Transfers; factories?: FactoryRule[] }>;
+/// Page mode "ssr" (signet v2): the HTML isn't sealed; every script file is, and inline scripts must be one of these
+/// hashes or a data template (inline.ts). Sealed in origins.json, so turning it on or adding an inline script is tier 01.
+export interface PagesPolicy { mode: 'ssr'; inline: Hex[]; serviceWorkers: string[] }
 /// signet/origins.json. Its hash is originsHash, so a new origin, a new cross-origin script and a changed SRI
 /// hash all raise the on-chain tier to 01.
-export interface OriginsFile { origins: string[]; scripts: SealedScript[] }
+export interface OriginsFile { origins: string[]; scripts: SealedScript[]; pages?: PagesPolicy }
 /// signet/files.json. `calls` = signing-call counts found in the code (see calls.ts), for Diff Guard.
 export interface FilesFile { version: 1; domain: string; files: SealedFile[]; calls: CallCounts }
-export interface AllowlistRules { targets?: string[]; spenders?: string[]; eip712?: string[]; exclude?: string[] }
+export interface AllowlistRules { targets?: string[]; spenders?: string[]; eip712?: string[]; exclude?: string[]; factories?: FactoryRule[] }
 export interface SealConfig {
   domain: string;
   chainId: number;
   allowlist?: Record<string, AllowlistRules>;
   transfers?: Transfers; // default "user"
   origins?: { include?: string[]; exclude?: string[] };
+  /// Server-rendered site (Next.js and similar): seal the code, not the HTML. `crawl`: paths of the deployed preview
+  /// whose HTML gives the inline scripts (include a page that streams). `serviceWorkers`: sealed paths allowed as one.
+  pages?: { mode: 'ssr'; crawl?: string[]; serviceWorkers?: string[] };
+}
+/// Pages fetched from the deployed preview for an ssr seal: their HTML, by path.
+export type Crawled = { path: string; html: string }[];
+
+function checkRule(r: FactoryRule, chain: string): FactoryRule {
+  const ok = r && typeof r === 'object' && /^0x[0-9a-fA-F]{40}$/.test(r.factory) && /^[A-Za-z_]\w*\(address,(bytes32|uint256)\)$/.test(r.predict)
+    && /^[A-Za-z_]\w*\(\)$/.test(r.id) && Array.isArray(r.roles) && r.roles.length >= 1 && r.roles.every((x) => /^[A-Za-z_]\w*\(\)$/.test(x));
+  if (!ok) throw new Error(`allowlist["${chain}"].factories: each rule needs factory (address), predict ("name(address,bytes32)"), id ("name()") and roles (["owner()", …])`);
+  return { factory: getAddress(r.factory.toLowerCase()), predict: r.predict, id: r.id, roles: [...r.roles] };
 }
 export interface Manifest {
-  version: 1;
+  version: 1 | 2;
   domain: string;
   filesRoot: Hex;
   allowlistHash: Hex;
@@ -92,6 +111,7 @@ export interface SealResult {
   found: { address: string; files: string[] }[]; // addresses seen in the build, for the team to confirm
   ignoredOrigins: string[];
   warnings: string[];
+  pages: PagesPolicy | null; // ssr: the sealed page policy
 }
 
 export function walk(dir: string, base = ''): string[] {
@@ -149,7 +169,7 @@ export function manifestHashOf(filesRoot: Hex, allowlistHash: Hex, originsHash: 
   return sha256Hex(Buffer.from(enc.slice(2), 'hex'));
 }
 
-export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean } = {}): SealResult {
+export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean; crawled?: Crawled } = {}): SealResult {
   if (!existsSync(buildDir) || !statSync(buildDir).isDirectory()) throw new Error(`${buildDir} is not a directory`);
   if (!isValidDomain(cfg.domain)) throw new Error(`"${cfg.domain}" is not a valid lowercase domain`);
   const warnings: string[] = [];
@@ -206,6 +226,31 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
       }
     }
     allowlist[id] = { targets: sortAddrs(targets), spenders: sortAddrs(spenders), eip712: sortAddrs(eip712), transfers };
+    if (r.factories?.length) allowlist[id]!.factories = r.factories.map((f) => checkRule(f, id));
+  }
+
+  // ssr: the inline scripts of the build's own HTML and of the crawled preview pages; the preview may load no
+  // same-origin script that isn't in this build (that would mean the preview is another build)
+  let pages: PagesPolicy | undefined;
+  if (cfg.pages) {
+    if (cfg.pages.mode !== 'ssr') throw new Error('"pages.mode" must be "ssr"');
+    const crawled = opts.crawled ?? [];
+    if ((cfg.pages.crawl?.length ?? 0) > 0 && crawled.length === 0) throw new Error('this project seals server-rendered pages: run signet seal with --crawl <preview URL> so their inline scripts are sealed');
+    const own = paths.filter((p) => /\.html?$/i.test(p)).map((p) => readFileSync(join(buildDir, p), 'utf8'));
+    const sealedPaths = new Set(paths);
+    for (const c of crawled) {
+      for (const t of tagsOf(c.html, 'script')) {
+        const src = typeof t.attrs.src === 'string' ? t.attrs.src : null;
+        if (!src) continue;
+        const u = new URL(src, `${siteOrigin}${c.path}`);
+        if (u.origin === siteOrigin && !sealedPaths.has(u.pathname.replace(/^\/+/, ''))) throw new Error(`the preview page ${c.path} loads ${u.pathname}, which is not in ${buildDir}: seal the exact build that is deployed`);
+      }
+      externalScripts.push(...externalScriptsOf(c.html, c.path, siteOrigin));
+      for (const o of extractOrigins(c.html)) originSet.add(o);
+    }
+    const workers = (cfg.pages.serviceWorkers ?? []).map((w) => w.replace(/^\/+/, ''));
+    for (const w of workers) if (!sealedPaths.has(w)) throw new Error(`pages.serviceWorkers: ${w} is not a file of ${buildDir}`);
+    pages = { mode: 'ssr', inline: inlineHashesOf([...own, ...crawled.map((c) => c.html)]), serviceWorkers: workers.sort() };
   }
 
   // origins: every origin found in the build except documentation links and the site itself
@@ -230,7 +275,7 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
     .map(({ url, integrity }) => ({ url, integrity }))
     .filter((s, i, all) => all.findIndex((x) => x.url === s.url && x.integrity === s.integrity) === i)
     .sort((a, b) => (a.url < b.url ? -1 : 1));
-  const originsBytes = canonical({ origins: originsList, scripts } satisfies OriginsFile);
+  const originsBytes = canonical((pages ? { origins: originsList, scripts, pages } : { origins: originsList, scripts }) satisfies OriginsFile);
   const calls = countCalls(callSites);
   const filesBytes = canonical({ version: 1, domain: cfg.domain, files, calls } satisfies FilesFile);
   const listEntry: SealedFile = { path: FILES_PATH, contentType: JSON_TYPE, sha256: sha256Hex(filesBytes), size: filesBytes.length };
@@ -243,8 +288,9 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
   const filesRoot = merkleRoot(leavesOf(cfg.domain, sealed));
   const allowlistHash = sha256Hex(allowlistBytes);
   const originsHash = sha256Hex(originsBytes);
+  const v2 = !!pages || Object.values(allowlist).some((a) => a.factories);
   const manifest: Manifest = {
-    version: 1,
+    version: v2 ? 2 : 1,
     domain: cfg.domain,
     filesRoot,
     allowlistHash,
@@ -265,7 +311,7 @@ export function seal(buildDir: string, cfg: SealConfig, opts: { write?: boolean 
   const found = [...seenIn.entries()]
     .map(([address, where]) => ({ address, files: [...where].sort() }))
     .sort((a, b) => (a.address.toLowerCase() < b.address.toLowerCase() ? -1 : 1));
-  return { manifest, files: sealed, allowlist, origins: originsList, scripts, calls, externalScripts, found, ignoredOrigins: ignoredOrigins.sort(), warnings };
+  return { manifest, files: sealed, allowlist, origins: originsList, scripts, calls, externalScripts, found, ignoredOrigins: ignoredOrigins.sort(), warnings, pages: pages ?? null };
 }
 
 /// A sealed build dir, read back from disk and re-checked (propose, publish and upload start here).
@@ -330,6 +376,7 @@ export interface SealedLists {
   scripts: SealedScript[];
   files: SealedFile[]; // without signet/files.json itself
   calls: CallCounts | null; // null: sealed before call counts existed
+  pages: PagesPolicy | null; // ssr releases (signet v2)
 }
 
 export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsBytes: Uint8Array, filesBytes: Uint8Array): SealedLists {
@@ -346,5 +393,6 @@ export function parseSealed(domain: string, allowlistBytes: Uint8Array, originsB
   return {
     filesRoot, allowlistHash, originsHash, manifestHash: manifestHashOf(filesRoot, allowlistHash, originsHash),
     allowlist: JSON.parse(text(allowlistBytes)) as Allowlist, origins: of.origins, scripts: of.scripts, files: list.files, calls: list.calls ?? null,
+    pages: of.pages ?? null,
   };
 }

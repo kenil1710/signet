@@ -82,11 +82,13 @@ program.command('seal <buildDir>')
   .description('hash every file, extract the allowlist and the external origins, write signet-manifest.json')
   .option('--domain <domain>', `the domain (default: from ${CONFIG_NAME})`)
   .option('--chain-id <id>', 'the chain your contracts are on (default: from the config, else 196)')
-  .action((buildDir: string, o: { domain?: string; chainId?: string }) => {
+  .option('--crawl <previewUrl>', 'server-rendered sites ("pages" in the config): the deployed preview of this exact build; its pages give the inline scripts')
+  .action(async (buildDir: string, o: { domain?: string; chainId?: string; crawl?: string }) => {
     const cfg = readConfig(resolve(program.opts().project));
     const domain = o.domain ?? cfg?.domain;
     if (!domain) throw new SignetError('domain', `no domain: pass --domain or run signet init (writes ${CONFIG_NAME})`);
-    const r = seal(buildDir, { domain, chainId: Number(o.chainId ?? cfg?.chainId ?? 196), allowlist: cfg?.allowlist, transfers: cfg?.transfers, origins: cfg?.origins });
+    const crawled = cfg?.pages && o.crawl ? await crawl(o.crawl, cfg.pages.crawl ?? ['/']) : undefined;
+    const r = seal(buildDir, { domain, chainId: Number(o.chainId ?? cfg?.chainId ?? 196), allowlist: cfg?.allowlist, transfers: cfg?.transfers, origins: cfg?.origins, pages: cfg?.pages }, { crawled });
     const m = r.manifest;
     log(`Sealed ${m.fileCount} files (${m.totalBytes} bytes) for ${m.domain}`);
     log(`  filesRoot      ${m.filesRoot}`);
@@ -115,9 +117,33 @@ program.command('seal <buildDir>')
     if (r.scripts.length) log('  A new cross-origin script or a changed SRI hash counts as an origins change (tier 01).');
     for (const w of r.warnings) log(`  warning: ${w}`);
     log();
+    for (const [chain, a] of Object.entries(r.allowlist)) for (const f of a.factories ?? []) {
+      log(`  chain ${chain}: also any contract created by factory ${f.factory} (${f.predict}, id ${f.id}) that the signer is ${f.roles.join(' or ')} of`);
+    }
+    if (r.pages) {
+      log(`Server-rendered pages: the HTML is not sealed; every script file is. ${r.pages.inline.length} inline script(s) sealed by hash from ${crawled?.length ?? 0} crawled page(s) and the build's own HTML; Next.js flight data and React streaming calls are allowed as data.`);
+      for (const h of r.pages.inline) log(`    inline ${h}`);
+      if (r.pages.serviceWorkers.length) log(`  service workers allowed: ${r.pages.serviceWorkers.join(', ')}`);
+    }
     log(`Wrote ${buildDir}/signet-manifest.json and ${buildDir}/signet/{allowlist,origins,files}.json`);
     log(`Next: signet propose ${buildDir}`);
   });
+
+/// Fetches each path of the preview deployment as a browser would (some CDN features only act for browsers). A Vercel
+/// preview behind Deployment Protection is read with VERCEL_AUTOMATION_BYPASS_SECRET (sent as a header, never logged).
+async function crawl(base: string, paths: string[]): Promise<{ path: string; html: string }[]> {
+  const out: { path: string; html: string }[] = [];
+  const headers: Record<string, string> = { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 signet-seal', accept: 'text/html' };
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  for (const p of paths) {
+    const url = new URL(p, base.endsWith('/') ? base : `${base}/`).href;
+    const res = await fetch(url, { headers, redirect: 'follow', signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new SignetError('crawl', `${url} answered HTTP ${res.status}`);
+    out.push({ path: new URL(url).pathname, html: await res.text() });
+    log(`  crawled ${new URL(url).pathname}`);
+  }
+  return out;
+}
 
 program.command('verify <target>')
   .description('check a build directory or a live URL: no-store, cross-origin scripts without SRI, CDN rewrites, SSR')

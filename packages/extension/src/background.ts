@@ -6,11 +6,12 @@ import { decodeFunctionResult, encodeFunctionData, hexToBytes, sha256, zeroAddre
 import { gateAbi, registryAbi, siteAbi } from './lib/abi.ts';
 import { agree, either, RpcError, type Call } from './lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sealed.ts';
-import { decide, factsOf } from './lib/policy.ts';
+import { decide, factsOf, trustedBy, withVerified } from './lib/policy.ts';
+import { checkFactory } from './lib/factory.ts';
 import { decideWithCircuit } from './lib/guard-circuit.ts';
 import { proofNames, PROOF_PATH } from './lib/proof.ts';
 import { domainOfGatewayHost, encodeLabel } from './lib/label.ts';
-import type { Decision, GuardEvent, Hex, Net, PageInfo, PageReport, Sealed, SignRequest, SiteState } from './lib/types.ts';
+import type { Allowlist, Decision, GuardEvent, Hex, Net, PageInfo, PageReport, PagesPolicy, Sealed, SignRequest, SiteState } from './lib/types.ts';
 
 declare const __NET__: Net;
 /// Benchmark-only build (packages/attacks, docs/benchmark.md): the page check alone, as a hash-only checker does it.
@@ -23,6 +24,40 @@ const SYNC_MINUTES = 5;
 const local = chrome.storage.local;
 const session = chrome.storage.session;
 const get = async <T>(area: chrome.storage.StorageArea, key: string): Promise<T | undefined> => (await area.get(key))[key] as T | undefined;
+
+// ---------------------------------------------------------------- v2: page policy and factory rules
+
+/// ssr page policy of the releases a page may match now (current, and the previous one in its grace window). Null
+/// when none of them is a server-rendered release: the static check (the HTML is a sealed file) applies.
+function pagesOf(site: SiteState): PagesPolicy | null {
+  const all = site.valid.map((h) => site.manifests[h]?.pages).filter((p): p is PagesPolicy => !!p);
+  if (all.length === 0) return null;
+  return { mode: 'ssr', inline: [...new Set(all.flatMap((p) => p.inline))], serviceWorkers: [...new Set(all.flatMap((p) => p.serviceWorkers))] };
+}
+
+/// Runs the chain's sealed factory rules on every address the request asks the user to trust that isn't listed.
+async function factoryVerified(req: SignRequest, allowlist: Allowlist): Promise<{ allowlist: Allowlist; notes: string[] }> {
+  const { chain, addresses } = trustedBy(req);
+  const entry = chain ? allowlist[chain] : undefined;
+  if (!chain || !entry?.factories?.length) return { allowlist, notes: [] };
+  const listed = new Set([...entry.targets, ...entry.spenders, ...entry.eip712].map((a) => a.toLowerCase()));
+  const signer = (req.accounts[0] ?? '').toLowerCase();
+  const extra: string[] = [];
+  const notes: string[] = [];
+  const cache = { get: (k: string) => get(local, k), set: (k: string, v: unknown) => local.set({ [k]: v }) };
+  for (const a of addresses.filter((x) => !listed.has(x)).slice(0, 4)) {
+    for (const rule of entry.factories) {
+      const r = await checkFactory(NET, chain, rule, a, signer, cache);
+      if (r.ok) {
+        extra.push(a);
+        notes.push(r.why);
+        break;
+      }
+      notes.push(`factory rule: ${r.why}`);
+    }
+  }
+  return { allowlist: withVerified(allowlist, chain, extra), notes };
+}
 
 // ---------------------------------------------------------------- the list of sealed domains
 
@@ -261,6 +296,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         bypass: !!(await get<boolean>(session, `bypass:${tabId}:${host}`)),
         hashes, origins: cur?.origins ?? [], scripts: site.valid.flatMap((h) => site.manifests[h]!.scripts),
         gateway: viaGateway ? NET.gateway!.pins : null,
+        pages: pagesOf(site),
         ...(site.status === 'unconfirmed' && !viaGateway && site.gate ? { proof: { url: PROOF_PATH, gate: site.gate } } : {}),
       };
       return info;
@@ -290,7 +326,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const bypass = !!(await get<boolean>(session, `bypass:${tabId}:${tab.domain}`));
       const block = site.enforced && !bypass;
       if (before !== 'tampered') {
-        const wrong = msg.report.files.filter((f) => ['mismatch', 'unknown', 'unknown-origin', 'sri-mismatch'].includes(f.status));
+        const wrong = msg.report.files.filter((f) => ['mismatch', 'unknown', 'unknown-origin', 'sri-mismatch', 'injected'].includes(f.status));
         await logEvent({
           at: Date.now(), domain: tab.domain, kind: 'page', refused: block, url: msg.report.url,
           title: site.status === 'revoked' ? 'Release revoked' : "Page doesn't match its sealed release",
@@ -306,8 +342,13 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const allow: Decision = { by: 'none', input: 0, action: 'allow', enforced: false, refused: false, title: '', reason: '', details: [] };
       if (!tab) return allow;
       const site = await siteFor(tab.domain);
-      const ctx = { site: site.status, page: tab.report?.status ?? 'unknown', allowlist: site.current ? (site.manifests[site.current]?.allowlist ?? null) : null, frozen: site.frozen, enforced: site.enforced } as const;
+      const sealedList = site.current ? (site.manifests[site.current]?.allowlist ?? null) : null;
+      // sealed factory rules: an unlisted target or spender is checked on-chain (strict); verified ones count as
+      // sealed for this one request only
+      const viaFactory = sealedList && site.status === 'sealed' ? await factoryVerified(msg.req, sealedList) : { allowlist: sealedList, notes: [] };
+      const ctx = { site: site.status, page: tab.report?.status ?? 'unknown', allowlist: viaFactory.allowlist, frozen: site.frozen, enforced: site.enforced } as const;
       const verdict = decide(msg.req, ctx);
+      verdict.details.push(...viaFactory.notes);
       // the policy names the facts; the Guard decision circuit decides
       const facts = factsOf(verdict, ctx);
       if (__HASH_ONLY__) Object.assign(facts, { targetSealed: true, spenderSealed: true, recipientOk: true, decoded: true });

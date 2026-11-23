@@ -25,6 +25,15 @@ if (n.tapeout.guardCircuitId !== undefined) {
   const art = JSON.parse(readFileSync(`${root}../circuit/artifacts/guard.json`, 'utf8'));
   net.guardCircuit = { processor: n.tapeout.processor, id: n.tapeout.guardCircuitId, netlistSha256: art.netlistSha256, beacon: n.tapeout.circuitBeacon, implementation: n.tapeout.circuitImplementation };
 }
+// Other chains a sealed factory rule may need (two independent RPCs each, fixed here: a release can't pick them).
+// Mainnet build: Arc mainnet and testnet, Circle + dRPC (both checked 2026-11-23: same factory code on each).
+// SIGNET_CHAINS='{"196":{"rpcUrl":"…","rpcUrl2":"…"}}' replaces the list (staging).
+const ARC = {
+  5042: { rpcUrl: 'https://rpc.mainnet.arc.io', rpcUrl2: 'https://arc-mainnet.drpc.org' },
+  5042002: { rpcUrl: 'https://rpc.testnet.arc.io', rpcUrl2: 'https://arc-testnet.drpc.org' },
+};
+net.chains = process.env.SIGNET_CHAINS ? JSON.parse(process.env.SIGNET_CHAINS) : n.name === 'mainnet' ? ARC : {};
+
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
@@ -44,7 +53,7 @@ for (const f of ['popup.html', 'blocked.html', 'copy.html', 'sandbox.html', 'pag
 mkdirSync(`${out}/assets`, { recursive: true });
 for (const f of ['archivo-subset.woff2', 'ibm-plex-mono-latin-400-normal.woff2', 'ibm-plex-mono-latin-500-normal.woff2', 'seal-still.webp']) copyFileSync(`${root}src/pages/assets/${f}`, `${out}/assets/${f}`);
 
-const rpcHosts = [...new Set([net.rpcUrl, net.rpcUrl2].filter(Boolean).map((u) => `${new URL(u).origin}/*`))];
+const rpcHosts = [...new Set([net.rpcUrl, net.rpcUrl2, ...Object.values(net.chains).flatMap((c) => [c.rpcUrl, c.rpcUrl2])].filter(Boolean).map((u) => `${new URL(u).origin}/*`))];
 const manifest = {
   manifest_version: 3,
   name: 'Signet Guard',
@@ -54,7 +63,7 @@ const manifest = {
   background: { service_worker: 'background.js', type: 'module' },
   action: { default_title: 'Signet Guard', default_popup: 'popup.html' },
   permissions: ['storage', 'alarms'],
-  host_permissions: rpcHosts, // only the two RPCs; pages are reached through content scripts
+  host_permissions: rpcHosts, // only the RPCs (X Layer, and per chain for factory rules); pages are reached through content scripts
   content_scripts: [
     { matches: ['http://*/*', 'https://*/*'], js: ['content.js'], run_at: 'document_start' },
     { matches: ['http://*/*', 'https://*/*'], js: ['inpage.js'], run_at: 'document_start', world: 'MAIN' },

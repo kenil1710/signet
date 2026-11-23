@@ -4,11 +4,59 @@
 //     (fetch with cache: 'only-if-cached' never touches the network), hashed, and compared with the sealed
 //     release. Cross-origin scripts can't be read that way: their SRI attribute is compared with the sealed one.
 //  3. Passes signing requests from the in-page wrapper to the service worker and shows why one was refused.
+// Server-rendered releases (page mode "ssr"): the HTML is not sealed; every script file must be, and every inline
+// script must be a sealed hash or a data template (@signet/cli/src/inline.ts). Scripts are recorded from
+// document_start by a MutationObserver (also those that remove themselves), and before every signature Guard takes
+// the pending records synchronously and runs a fresh full check, so a script that runs and signs at once is seen.
 import { pathOfUrl, sealedPathFor } from './lib/sealed.ts';
+import { classifyInline, inlineHash, runs } from '@signet/cli/src/inline.ts';
 import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts';
 
 (() => {
   if (window.top !== window || !/^https?:$/.test(location.protocol)) return;
+
+  // ---- every <script> the page ever has, from document_start (local only: nothing leaves this tab)
+  // Each inline script element keeps every text it was seen with (strong refs: also scripts that removed themselves).
+  // A text later extended by the same element was the parser still streaming it in; every other text must be allowed,
+  // so a script can't run and then rewrite itself into something allowed.
+  const seenInline = new Map<HTMLScriptElement, { runs: boolean; texts: string[] }>();
+  const seenSrc = new Set<string>();
+  const MAX_SEEN = 5000;
+  let overflow = false;
+  const record = (n: Node) => {
+    if (!(n instanceof HTMLScriptElement)) {
+      if (n instanceof Element && n.querySelectorAll) for (const sc of n.querySelectorAll('script')) record(sc);
+      return;
+    }
+    if (n.src) {
+      if (seenSrc.size < MAX_SEEN) seenSrc.add(n.src);
+      else overflow = true;
+      return;
+    }
+    let e = seenInline.get(n);
+    if (!e) {
+      if (seenInline.size >= MAX_SEEN) return void (overflow = true);
+      seenInline.set(n, (e = { runs: false, texts: [] }));
+    }
+    const text = n.text;
+    if (e.texts.at(-1) !== text) e.texts.push(text);
+    if (e.texts.length > 32) e.texts.splice(1, e.texts.length - 32); // keep the first and the latest
+    e.runs ||= runs(n.type); // code if it ever had a type that runs: changing the type afterwards hides nothing
+  };
+  /// The texts of one element that count: all but those a later text of the same element extends.
+  const finalTexts = (texts: string[]) => texts.filter((t, i) => !texts.slice(i + 1).some((later) => later.length > t.length && later.startsWith(t)));
+  const mo = new MutationObserver((list) => {
+    for (const m of list) {
+      for (const n of m.addedNodes) record(n);
+      if (m.type === 'characterData' || m.type === 'childList') if (m.target instanceof HTMLScriptElement) record(m.target);
+    }
+  });
+  mo.observe(document, { childList: true, subtree: true, characterData: true });
+  /// Synchronously: the records not delivered yet, and every script in the DOM now.
+  const scanNow = () => {
+    for (const m of mo.takeRecords()) for (const n of m.addedNodes) record(n);
+    for (const sc of document.scripts) record(sc);
+  };
 
   // ---- link to the in-page wrapper (see inpage.ts)
   const secret = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -41,7 +89,7 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
 
   // ---- page check
   const results = new Map<string, FileResult>();
-  const BAD = ['mismatch', 'unknown', 'unknown-origin', 'sri-mismatch'];
+  const BAD = ['mismatch', 'unknown', 'unknown-origin', 'sri-mismatch', 'injected'];
   const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
   async function checkSameOrigin(u: URL, scripty: boolean, isDocument: boolean): Promise<FileResult | null> {
@@ -104,27 +152,97 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     else results.delete(u.href);
   }
 
+  /// ssr mode: inline scripts (sealed hash or template), event-handler attributes and javascript: URLs.
+  function checkInline(): void {
+    const sealed = new Set(info!.pages!.inline);
+    if (overflow) results.set('inline:overflow', { url: 'inline:overflow', status: 'injected', note: `more than ${MAX_SEEN} scripts on one page` });
+    for (const [, e] of seenInline) {
+      if (!e.runs) continue;
+      for (const text of finalTexts(e.texts)) {
+        const h = inlineHash(text);
+        const key = `inline:${h}`;
+        const kind = classifyInline({ text, type: '' }, sealed);
+        if (results.get(key)?.status === 'injected') continue;
+        results.set(key, kind === 'injected'
+          ? { url: key, sha256: h.slice(2), status: 'injected', note: `an inline script that is not in the sealed release: ${text.slice(0, 120)}` }
+          : { url: key, sha256: h.slice(2), status: 'ok-inline', note: kind });
+      }
+    }
+    const attrs = document.evaluate("//@*[starts-with(translate(name(),'ON','on'),'on')]", document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    for (let i = 0; i < Math.min(attrs.snapshotLength, 50); i++) {
+      const a = attrs.snapshotItem(i) as Attr;
+      const key = `handler:${a.ownerElement?.tagName.toLowerCase()}[${a.name}]`;
+      results.set(key, { url: key, status: 'injected', note: `an inline event handler ${a.name}="${a.value.slice(0, 80)}": code that is not in the sealed release` });
+    }
+    for (const el of document.querySelectorAll<HTMLElement>('a[href],area[href],iframe[src],form[action]')) {
+      const v = el.getAttribute('href') ?? el.getAttribute('src') ?? el.getAttribute('action') ?? '';
+      if (/^\s*javascript:/i.test(v)) results.set(`jsurl:${v.slice(0, 60)}`, { url: `jsurl:${v.slice(0, 60)}`, status: 'injected', note: 'a javascript: URL: code that is not in the sealed release' });
+    }
+  }
+
+  async function checkWorker(scriptURL: string): Promise<void> {
+    let u: URL;
+    try {
+      u = new URL(scriptURL);
+    } catch {
+      return;
+    }
+    const key = `worker:${u.href}`;
+    const path = pathOfUrl(u.pathname);
+    const allowed = info!.pages ? info!.pages.serviceWorkers.includes(path) : !!info!.hashes[path] || !!info!.gateway;
+    if (u.origin !== location.origin || !allowed) {
+      results.set(key, { url: u.href, status: 'unknown', note: 'a service worker that is not in the sealed release' });
+      return;
+    }
+    if (info!.gateway) return void (await checkOne(u.href, true, null)); // the gateway's own pinned worker
+    const valid = info!.hashes[path] ?? [];
+    try {
+      // the bytes the worker was installed from: the HTTP cache, else the same URL from the server now
+      let res = await fetch(u.href, { cache: 'only-if-cached', mode: 'same-origin', credentials: 'same-origin' }).catch(() => null);
+      if (!res?.ok) res = await fetch(u.href, { cache: 'no-cache', credentials: 'same-origin' });
+      const h = hex(await crypto.subtle.digest('SHA-256', await res.arrayBuffer()));
+      results.set(key, { url: u.href, sha256: h, status: valid.includes(h) ? 'ok' : 'mismatch', note: 'service worker' });
+    } catch {
+      results.set(key, { url: u.href, status: 'not-cached', note: 'service worker: could not read its bytes' });
+    }
+  }
+
   async function pass(): Promise<void> {
-    const jobs: Promise<void>[] = [checkOne(location.href, false, null, true)];
+    scanNow();
+    const ssr = !!info!.pages;
+    // ssr: the document itself is not sealed (its scripts are); static: the HTML is a sealed file
+    const jobs: Promise<void>[] = ssr ? [] : [checkOne(location.href, false, null, true)];
+    if (ssr) {
+      results.set(location.href.split('#')[0]!, { url: location.href.split('#')[0]!, status: 'ok-ssr', note: 'server-rendered page: its scripts are checked, not its HTML' });
+      checkInline();
+    }
     for (const s of document.scripts) if (s.src) jobs.push(checkOne(s.src, true, s));
-    for (const l of document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href], link[rel~="modulepreload"][href]')) jobs.push(checkOne(l.href, l.rel.includes('modulepreload'), null));
+    for (const src of seenSrc) jobs.push(checkOne(src, true, [...document.scripts].find((s) => s.src === src) ?? null));
+    for (const l of document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href], link[rel~="modulepreload"][href], link[rel~="preload"][as="script"][href]')) jobs.push(checkOne(l.href, !l.rel.includes('stylesheet'), null));
     for (const e of performance.getEntriesByType('resource') as PerformanceResourceTiming[]) {
       const js = e.initiatorType === 'script' || /\.m?js$/i.test(new URL(e.name).pathname);
       if (js || e.initiatorType === 'link' || e.initiatorType === 'css') jobs.push(checkOne(e.name, js, null));
     }
     try {
       for (const reg of (await navigator.serviceWorker?.getRegistrations()) ?? []) {
-        const sw = reg.active ?? reg.waiting ?? reg.installing;
-        if (sw) jobs.push(checkOne(sw.scriptURL, true, null));
+        for (const sw of [reg.active, reg.waiting, reg.installing]) if (sw) jobs.push(checkWorker(sw.scriptURL));
       }
+      const ctl = navigator.serviceWorker?.controller;
+      if (ctl) jobs.push(checkWorker(ctl.scriptURL));
     } catch { /* no service workers here */ }
     await Promise.all(jobs);
     const files = [...results.values()];
-    const status = files.some((f) => BAD.includes(f.status)) ? 'tampered' : files.some((f) => !['ok', 'ok-sri', 'ok-gateway'].includes(f.status)) ? 'unverified' : 'ok';
+    const status = files.some((f) => BAD.includes(f.status)) ? 'tampered' : files.some((f) => !['ok', 'ok-sri', 'ok-gateway', 'ok-inline', 'ok-ssr'].includes(f.status)) ? 'unverified' : 'ok';
     last = { url: location.href, status, files };
     if (info!.enforce && status === 'tampered') redirecting = true; // known before the answer arrives
     const r = await ask<{ redirect: boolean }>({ type: 'report', report: last });
     redirecting = redirecting || !!r?.redirect;
+  }
+
+  /// A full check that starts after this call (waits out one already running): the state at signing time.
+  async function checkFresh(): Promise<void> {
+    if (running) await running.catch(() => {});
+    await check();
   }
 
   let running: Promise<void> | null = null;
@@ -146,8 +264,10 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
 
   // ---- signing requests
   async function onSign(id: number, req: unknown): Promise<void> {
+    scanNow(); // synchronously, before anything else: a script that inserted itself and signed at once is now recorded
     if (!info) return void down({ type: 'decision', id, refused: false });
     await Promise.race([first, new Promise((r) => setTimeout(r, 5000))]);
+    await Promise.race([checkFresh(), new Promise((r) => setTimeout(r, 8000))]); // the page as it is at signing time
     const d = await ask<Decision>({ type: 'sign', req });
     if (!d) {
       // No answer: the extension is gone, or Guard itself is taking the tab to the warning page and the answer was

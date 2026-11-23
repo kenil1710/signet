@@ -176,6 +176,21 @@ export function diffSealed(domain: string, base: (SealedLists & { release: strin
   for (const s of scripts.sriChanged) flags.push(`CHANGED SRI hash for ${s.url}: the script's bytes are different`);
   for (const s of scripts.added) flags.push(`NEW cross-origin script ${s.url}${s.integrity ? '' : ' WITHOUT an SRI hash'}`);
   if (base) for (const c of calls.added) flags.push(`${baseKnown ? 'NEW' : 'PRESENT'} ${c.label} in the code: ${c.count} (was ${baseKnown ? c.before : 'not recorded'})`);
+  // signet v2: page mode, inline scripts, service workers (origins.json) and factory rules (allowlist.json)
+  const bp = base?.pages ?? null;
+  const np = next.pages ?? null;
+  if (np && !bp) flags.push(`NEW page mode "ssr": the HTML is no longer sealed, only the scripts; ${np.inline.length} inline script(s) sealed by hash, Next.js flight data and React streaming calls allowed as data`);
+  if (!np && bp) flags.push('CHANGED page mode back to static: the HTML is sealed again');
+  if (np && bp) {
+    const added = np.inline.filter((h) => !bp.inline.includes(h));
+    if (added.length) flags.push(`NEW inline script(s) allowed: ${added.length} (${added.map((h) => h.slice(0, 10)).join(', ')})`);
+    for (const w of np.serviceWorkers.filter((x) => !bp.serviceWorkers.includes(x))) flags.push(`NEW service worker allowed: ${w}`);
+  }
+  if (np && !bp) for (const w of np.serviceWorkers) flags.push(`NEW service worker allowed: ${w}`);
+  for (const [chain, a] of Object.entries(next.allowlist)) {
+    const before = new Set((base?.allowlist[chain]?.factories ?? []).map((f) => JSON.stringify(f)));
+    for (const f of a.factories ?? []) if (!before.has(JSON.stringify(f))) flags.push(`NEW factory rule on chain ${chain}: any contract created by ${f.factory} (${f.predict}, id ${f.id}) that the signer is ${f.roles.join(' or ')} of may be called and given allowances`);
+  }
 
   return {
     version: 1, domain,
