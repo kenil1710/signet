@@ -30314,7 +30314,7 @@ function verifyDir(dir, domain = "localhost") {
 	});
 	return report(dir, out);
 }
-async function get(url) {
+async function get$1(url) {
 	const res = await fetch(url, {
 		redirect: "follow",
 		signal: AbortSignal.timeout(15e3),
@@ -30333,7 +30333,7 @@ async function get(url) {
 }
 async function verifyUrl(url, opts = {}) {
 	const out = [];
-	const page = await get(url);
+	const page = await get$1(url);
 	const base = new URL(page.finalUrl);
 	if (page.status !== 200) out.push({
 		level: "error",
@@ -30359,7 +30359,7 @@ async function verifyUrl(url, opts = {}) {
 		message: `HTML Cache-Control: ${cc(page.headers) || "(none)"}`
 	});
 	checkHtml(html, base.pathname, base.origin, out);
-	const dynamic = sha256Hex((await get(page.finalUrl)).body) !== sha256Hex(page.body);
+	const dynamic = sha256Hex((await get$1(page.finalUrl)).body) !== sha256Hex(page.body);
 	if (dynamic) out.push({
 		level: "warn",
 		code: "ssr",
@@ -30414,7 +30414,7 @@ async function verifyUrl(url, opts = {}) {
 	if (!dynamic) compare("the HTML", page.body, htmlPath);
 	const noStore = [];
 	for (const [assetUrl, path] of assets) try {
-		const a = await get(assetUrl);
+		const a = await get$1(assetUrl);
 		if (a.status !== 200) {
 			if (opts.build && !sealedFile(path)) compare(path, a.body, path);
 			else out.push({
@@ -31661,7 +31661,7 @@ var HOSTS = [
 	"other"
 ];
 var DASHBOARD = "https://signetguard.xyz/app#/new";
-var CLI_VERSION = "0.2.0";
+var CLI_VERSION = "0.2.1";
 function deployStep(host, out, o) {
 	if (o.deploy) return {
 		run: o.deploy,
@@ -31829,9 +31829,129 @@ Next:
 		rl?.close();
 	}
 }
+// src/crawl.ts
+var BYPASS_HEADER = "x-vercel-protection-bypass";
+var UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 signet-seal";
+var MAX_REDIRECTS = 10;
+var originOf = (u) => new URL(u).origin;
+var urlOf = (base, p) => new URL(p, base.endsWith("/") ? base : `${base}/`).href;
+function bypassFor(url, base, secret) {
+	return secret && originOf(url) === originOf(base) ? { [BYPASS_HEADER]: secret } : {};
+}
+async function get(url, base, secret) {
+	let hop = url;
+	for (let i = 0; i <= MAX_REDIRECTS; i++) {
+		const res = await fetch(hop, {
+			headers: {
+				"user-agent": UA,
+				accept: "text/html",
+				...bypassFor(hop, base, secret)
+			},
+			redirect: "manual",
+			signal: AbortSignal.timeout(2e4)
+		});
+		const loc = res.headers.get("location");
+		if (res.status < 300 || res.status >= 400 || !loc) return {
+			res,
+			url: hop
+		};
+		await res.body?.cancel();
+		hop = new URL(loc, hop).href;
+	}
+	throw new SignetError("crawl", `${url}: more than ${MAX_REDIRECTS} redirects`);
+}
+async function crawl(base, paths, log, secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+	const out = [];
+	for (const p of paths) {
+		const url = urlOf(base, p);
+		const { res } = await get(url, base, secret);
+		if (res.status >= 500) throw new SignetError("crawl", `${url} answered HTTP ${res.status}`);
+		out.push({
+			path: new URL(url).pathname,
+			html: await res.text()
+		});
+		log(`  crawled ${new URL(url).pathname}${res.ok ? "" : ` (HTTP ${res.status})`}`);
+	}
+	return out;
+}
+async function crawlBrowser(project, base, paths, log, secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET, launch = {}) {
+	let pw;
+	try {
+		const { createRequire } = await import("node:module");
+		const { pathToFileURL } = await import("node:url");
+		const req = createRequire(join(project, "package.json"));
+		const name = ["playwright", "@playwright/test"].find((m) => {
+			try {
+				req.resolve(m);
+				return true;
+			} catch {
+				return false;
+			}
+		});
+		if (!name) throw new Error("no playwright");
+		const mod = await import(pathToFileURL(req.resolve(name)).href);
+		pw = mod.chromium ? mod : mod.default;
+	} catch {
+		throw new SignetError("crawl", `--crawl-browser needs playwright or @playwright/test in ${project} (npm i -D playwright && npx playwright install chromium)`);
+	}
+	const browser = await pw.chromium.launch({
+		headless: true,
+		...launch
+	});
+	const out = [];
+	try {
+		const ctx = await browser.newContext();
+		if (secret) await ctx.route("**/*", async (route) => {
+			const req = route.request();
+			if (!Object.keys(bypassFor(req.url(), base, secret)).length) return route.continue();
+			let url = req.url();
+			let response;
+			for (let i = 0; i <= MAX_REDIRECTS; i++) {
+				response = await route.fetch({
+					url,
+					headers: {
+						...req.headers(),
+						...bypassFor(url, base, secret)
+					},
+					maxRedirects: 0
+				});
+				const loc = response.headers()["location"];
+				if (response.status() < 300 || response.status() >= 400 || !loc) break;
+				const next = new URL(loc, url).href;
+				if (originOf(next) !== originOf(base)) break;
+				url = next;
+			}
+			await route.fulfill({ response });
+		});
+		await ctx.addInitScript({ content: `window.__signetEls = new Set(); new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes)
+      if (n instanceof HTMLScriptElement && !n.src && !n.noModule) window.__signetEls.add(n); }).observe(document, { childList: true, subtree: true });` });
+		const page = await ctx.newPage();
+		for (const p of paths) {
+			const url = urlOf(base, p);
+			const res = await page.goto(url, {
+				waitUntil: "networkidle",
+				timeout: 6e4
+			});
+			if (!res || res.status() >= 500) throw new SignetError("crawl", `${url} answered HTTP ${res?.status()}`);
+			await page.waitForTimeout(1500);
+			const html = await res.text();
+			const runtime = await page.evaluate("[...window.__signetEls].map((e) => e.text)");
+			const path = new URL(url).pathname;
+			out.push({
+				path,
+				html,
+				runtime
+			});
+			log(`  crawled ${path} in Chromium (${runtime.length} inline script(s) seen while it ran)`);
+		}
+	} finally {
+		await browser.close();
+	}
+	return out;
+}
 // src/cli.ts
 var log = (line = "") => console.log(line);
-var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.2.0").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
+var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.2.1").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
 var ctx = () => {
 	const g = program.opts();
 	return makeCtx(resolve(g.project), g.as);
@@ -31868,7 +31988,7 @@ program.command("seal <buildDir>").description("hash every file, extract the all
 	const domain = o.domain ?? cfg?.domain;
 	if (!domain) throw new SignetError("domain", `no domain: pass --domain or run signet init (writes ${CONFIG_NAME})`);
 	const project = resolve(program.opts().project);
-	const crawled = !cfg?.pages ? void 0 : o.crawlBrowser ? await crawlBrowser(project, o.crawlBrowser, cfg.pages.crawl ?? ["/"]) : o.crawl ? await crawl(o.crawl, cfg.pages.crawl ?? ["/"]) : void 0;
+	const crawled = !cfg?.pages ? void 0 : o.crawlBrowser ? await crawlBrowser(project, o.crawlBrowser, cfg.pages.crawl ?? ["/"], log) : o.crawl ? await crawl(o.crawl, cfg.pages.crawl ?? ["/"], log) : void 0;
 	const r = seal(buildDir, {
 		domain,
 		chainId: Number(o.chainId ?? cfg?.chainId ?? 196),
@@ -31914,78 +32034,6 @@ program.command("seal <buildDir>").description("hash every file, extract the all
 	log(`Wrote ${buildDir}/signet-manifest.json and ${buildDir}/signet/{allowlist,origins,files}.json`);
 	log(`Next: signet propose ${buildDir}`);
 });
-async function crawl(base, paths) {
-	const out = [];
-	const headers = {
-		"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 signet-seal",
-		accept: "text/html"
-	};
-	if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers["x-vercel-protection-bypass"] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-	for (const p of paths) {
-		const url = new URL(p, base.endsWith("/") ? base : `${base}/`).href;
-		const res = await fetch(url, {
-			headers,
-			redirect: "follow",
-			signal: AbortSignal.timeout(2e4)
-		});
-		if (res.status >= 500) throw new SignetError("crawl", `${url} answered HTTP ${res.status}`);
-		out.push({
-			path: new URL(url).pathname,
-			html: await res.text()
-		});
-		log(`  crawled ${new URL(url).pathname}${res.ok ? "" : ` (HTTP ${res.status})`}`);
-	}
-	return out;
-}
-async function crawlBrowser(project, base, paths) {
-	let pw;
-	try {
-		const { createRequire } = await import("node:module");
-		const { pathToFileURL } = await import("node:url");
-		const req = createRequire(join(project, "package.json"));
-		const name = ["playwright", "@playwright/test"].find((m) => {
-			try {
-				req.resolve(m);
-				return true;
-			} catch {
-				return false;
-			}
-		});
-		if (!name) throw new Error("no playwright");
-		const mod = await import(pathToFileURL(req.resolve(name)).href);
-		pw = mod.chromium ? mod : mod.default;
-	} catch {
-		throw new SignetError("crawl", `--crawl-browser needs playwright or @playwright/test in ${project} (npm i -D playwright && npx playwright install chromium)`);
-	}
-	const browser = await pw.chromium.launch({ headless: true });
-	const out = [];
-	try {
-		const ctx = await browser.newContext({ extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : {} });
-		await ctx.addInitScript({ content: `window.__signetEls = new Set(); new MutationObserver((list) => { for (const m of list) for (const n of m.addedNodes)
-      if (n instanceof HTMLScriptElement && !n.src && !n.noModule) window.__signetEls.add(n); }).observe(document, { childList: true, subtree: true });` });
-		const page = await ctx.newPage();
-		for (const p of paths) {
-			const url = new URL(p, base.endsWith("/") ? base : `${base}/`).href;
-			const res = await page.goto(url, {
-				waitUntil: "networkidle",
-				timeout: 6e4
-			});
-			if (!res || res.status() >= 500) throw new SignetError("crawl", `${url} answered HTTP ${res?.status()}`);
-			await page.waitForTimeout(1500);
-			const html = await res.text();
-			const runtime = await page.evaluate("[...window.__signetEls].map((e) => e.text)");
-			out.push({
-				path: new URL(url).pathname,
-				html,
-				runtime
-			});
-			log(`  crawled ${new URL(url).pathname} in Chromium (${runtime.length} inline script(s) seen while it ran)`);
-		}
-	} finally {
-		await browser.close();
-	}
-	return out;
-}
 program.command("verify <target>").description("check a build directory or a live URL: no-store, cross-origin scripts without SRI, CDN rewrites, SSR").option("--build <dir>", "with a URL: compare what is served with this build, byte for byte").option("--strict", "exit 1 on warnings too").option("--json", "print the findings as JSON").action(async (target, o) => {
 	const isUrl = /^https?:\/\//i.test(target);
 	if (!isUrl && !(existsSync(target) && statSync(target).isDirectory())) throw new SignetError("target", `${target} is neither a directory nor an http(s) URL`);
