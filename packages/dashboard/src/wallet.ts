@@ -123,7 +123,14 @@ export async function connect(): Promise<Address> {
   return account;
 }
 
+export interface Receipt { status: string; blockNumber: string; logs: { address: string; topics: string[]; data: string }[] }
+
 export async function send(to: Address, functionName: string, args: unknown[] = [], pad = false, abi: Abi = GATE_ABI as Abi): Promise<string> {
+  return (await sendTx(to, functionName, args, pad, abi)).hash;
+}
+
+/// As send, and also the receipt (its block and logs): what the transaction did, without reading the state again.
+export async function sendTx(to: Address, functionName: string, args: unknown[] = [], pad = false, abi: Abi = GATE_ABI as Abi): Promise<{ hash: Hex; receipt: Receipt }> {
   await connect(); // the wallet's current account every time: the user may have switched accounts since
   const tx = { from: account!, to, data: encodeFunctionData({ abi, functionName, args }) };
   let gas: bigint;
@@ -136,10 +143,10 @@ export async function send(to: Address, functionName: string, args: unknown[] = 
   gas = pad ? (gas * 3n) / 2n + 400_000n : (gas * 6n) / 5n;
   const hash = (await provider!.request({ method: 'eth_sendTransaction', params: [{ ...tx, gas: `0x${gas.toString(16)}` }] }).catch((e) => { throw reason(e); })) as Hex;
   for (;;) {
-    const r = await rpc<{ status: string } | null>('eth_getTransactionReceipt', [hash]);
+    const r = await rpc<Receipt | null>('eth_getTransactionReceipt', [hash]);
     if (r) {
       if (r.status !== '0x1') throw new Error(`reverted on-chain (tx ${hash})`);
-      return hash;
+      return { hash, receipt: r };
     }
     await new Promise((res) => setTimeout(res, 300));
   }

@@ -5,7 +5,8 @@
 import { isAddress, getAddress, zeroAddress, type Address, type Hex } from 'viem';
 import { NET, FACTORY_ABI, one } from '../chain.ts';
 import { registryAbi } from '@signet/extension/src/lib/abi.ts';
-import { connect, send, account } from '../wallet.ts';
+import { connect, sendTx, account } from '../wallet.ts';
+import { createdGate } from '../created.ts';
 import { esc, view, $, action } from '../ui.ts';
 
 const FACTORY = ((NET as unknown as { factory?: string | null }).factory ?? undefined) as Address | undefined;
@@ -99,8 +100,8 @@ export async function newPage(): Promise<void> {
     if (bound !== zeroAddress) throw new Error(`${f.domain} is already bound to gate ${bound}.`);
     const salt = `0x${[...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('')}` as Hex;
     const commitment = await one<Hex>(FACTORY, FACTORY_ABI, 'commitmentOf', [f.domain, salt, who]);
-    const tx = await send(FACTORY, 'commit', [commitment], false, FACTORY_ABI);
-    const s: Saved = { form: f, salt, committedAt: await blockNow() };
+    const { hash: tx, receipt } = await sendTx(FACTORY, 'commit', [commitment], false, FACTORY_ABI);
+    const s: Saved = { form: f, salt, committedAt: parseInt(receipt.blockNumber, 16) }; // the commit's own block
     localStorage.setItem(KEY(f.domain, who), JSON.stringify(s));
     watchReady(s);
     return `reserved ${f.domain} (tx ${tx.slice(0, 10)}…). Keep this tab: step 2 needs this browser.`;
@@ -113,9 +114,11 @@ export async function newPage(): Promise<void> {
     if (!raw) throw new Error('No reservation for this domain from this wallet in this browser. Do step 1 first (same wallet).');
     const s = JSON.parse(raw) as Saved;
     const g = s.form;
-    const tx = await send(FACTORY, 'createGate', [[getAddress(g.a), getAddress(g.b), getAddress(g.c)], getAddress(g.proposer), getAddress(g.recovery), g.guardian ? getAddress(g.guardian) : zeroAddress, [{ domain: g.domain, salt: s.salt, circuits: zeroAddress, tokenId: 0n }]], true, FACTORY_ABI);
-    const [gate] = await one<[Address, Address, string]>(REGISTRY, registryAbi as never, 'bindingOf', [g.domain]);
-    localStorage.removeItem(KEY(g.domain, who));
+    const { hash: tx, receipt } = await sendTx(FACTORY, 'createGate', [[getAddress(g.a), getAddress(g.b), getAddress(g.c)], getAddress(g.proposer), getAddress(g.recovery), g.guardian ? getAddress(g.guardian) : zeroAddress, [{ domain: g.domain, salt: s.salt, circuits: zeroAddress, tokenId: 0n }]], true, FACTORY_ABI);
+    localStorage.removeItem(KEY(g.domain, who)); // mined: the reservation is used whatever the reads below say
+    st.textContent = 'Gate created. Confirming the domain binding on both RPCs…';
+    // the gate from the transaction's own GateCreated event, confirmed by the registry at a block no older than it
+    const gate = await createdGate(NET, receipt, FACTORY, who, g.domain, tx);
     const origin = location.origin + location.pathname.replace(/\/app(\.html)?$/, '');
     $('#next', v).innerHTML = `<h2>Your gate</h2>
       <p><b class="ok">${esc(g.domain)}</b> is bound to gate <code>${esc(gate)}</code> (tx <code>${esc(tx.slice(0, 10))}…</code>). It starts in observe mode: Guard reports, never blocks, until you switch to enforce.</p>

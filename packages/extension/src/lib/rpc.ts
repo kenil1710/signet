@@ -3,6 +3,8 @@
 import type { Hex, Net } from './types.ts';
 
 export class RpcError extends Error {}
+/// An RPC has not reached the block asked for yet (agree's minBlock): retry shortly.
+export class RpcBehind extends RpcError {}
 export interface Call { to: Hex; data: Hex }
 type Reply = { result?: unknown; error?: { code: number; message: string; data?: unknown } };
 
@@ -54,10 +56,14 @@ async function callAt(url: string, calls: Call[], block: string): Promise<string
 }
 
 /// The same calls on both RPCs, at the newest block both have. Throws unless every answer is identical.
-export async function agree(net: Net, calls: Call[]): Promise<string[]> {
+/// `minBlock`: read nothing older than this block (e.g. the block of a transaction just mined): throws RpcBehind while
+/// either RPC is behind it, so the caller can wait and retry instead of reading the state from before the transaction.
+export async function agree(net: Net, calls: Call[], minBlock?: number): Promise<string[]> {
   if (!net.rpcUrl2) throw new RpcError('only one RPC is configured, and Guard needs two that agree');
   const heads = await Promise.all([net.rpcUrl, net.rpcUrl2].map((u) => rpc<string>(u, 'eth_blockNumber', [])));
-  const block = `0x${Math.min(...heads.map((h) => parseInt(h, 16))).toString(16)}`;
+  const n = Math.min(...heads.map((h) => parseInt(h, 16)));
+  if (minBlock !== undefined && n < minBlock) throw new RpcBehind(`the RPCs are at block ${n}, not yet at ${minBlock}`);
+  const block = `0x${n.toString(16)}`;
   const [a, b] = await Promise.all([callAt(net.rpcUrl, calls, block), callAt(net.rpcUrl2, calls, block)]);
   for (let i = 0; i < calls.length; i++) if (a[i] !== b[i]) throw new RpcError('the two RPCs disagree about the chain');
   return a!;
