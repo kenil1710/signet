@@ -205,6 +205,18 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #8 proposed (2026-11-24, tier 00): /prove under rate limits, /prove and /llms.txt URLs, docs synced
+
+Built with `SIGNET_REPO_PUBLIC=1` from `b150241` (after #7 was published, so its docs say so) and sealed into
+`packages/dashboard/release/8`; fork-rehearsed first (tier 00, same gas). Allowlist and origins equal #7's (the served
+`llms.txt` names misthos.world's gate, which the site's config excludes: text, never called).
+
+| Tx | From | Call | Block | Gas |
+|---|---|---|---:|---:|
+| [`0x4a54ce4a…46f7`](https://web3.okx.com/explorer/x-layer/evm/tx/0x4a54ce4a0c745f29da4c9478d752c3c80f6e15c9e4a8be22fd6a095828fe46f7) | CI proposer | `proposeRelease` → #8, tier 00 | 76,750,358 (11:23:14 UTC) | 168,996 |
+
+Both RPCs: `proposalCount` = 8, `currentRelease` = 7. Diff Guard vs #7: nothing new to sign, no new origin.
+
 ## Release #7 proposed (2026-11-24, tier 00): the "Create the gate" fix and the Guard 0.3.0 link
 
 Proposal 7 (release numbers are proposal ids; #6 was the SetGuardian admin proposal). Built with `SIGNET_REPO_PUBLIC=1`
