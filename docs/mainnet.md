@@ -205,7 +205,7 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Release #9 proposed (2026-11-24, tier 00): /privacy, CLI 0.2.2 on /start, Guard 0.3.2 links, docs synced
+## Release #9 published (2026-11-24, tier 00): /privacy, CLI 0.2.2 on /start, Guard 0.3.2 links, docs synced
 
 Built with `SIGNET_REPO_PUBLIC=1` and sealed into `packages/dashboard/release/9`; fork-rehearsed (tier 00, same gas).
 Allowlist and origins equal #8's. Contents: `/privacy` (Guard's privacy policy, from `docs/PRIVACY.md`, linked from
@@ -216,6 +216,14 @@ through #8 and plan B. Deploy and publish: `scripts/release-site.sh 9` (back to 
 | Tx | From | Call | Gas |
 |---|---|---|---:|
 | [`0xf4be7b86…2dcb`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf4be7b865c4b63cbe450be3c7e362f8efb2dbabb9eecfd3feffbe01dc8962dcb) | CI proposer | `proposeRelease` → #9, tier 00 | 168,996 |
+| [`0xe4bf89c6…5ed5`](https://web3.okx.com/explorer/x-layer/evm/tx/0xe4bf89c6ec94463620cb20e799949053bfd72169f1a9a1ab693b0c4e8fef5ed5) | approver A | `approve(9)` (15:51:19 UTC) | |
+| [`0xd1778f82…c4c3`](https://web3.okx.com/explorer/x-layer/evm/tx/0xd1778f82adf6be8a670e4c6d95d4df6c1f92627ebf892dde035a316e9da9c4c3) | CI proposer | `publish(9)` at 16:52:33 UTC, block 76,770,117 (`policyInputs` = 9) | 292,923 |
+| [`0xff7531ef…7652`](https://web3.okx.com/explorer/x-layer/evm/tx/0xff7531ef798dbb61b780e464e41e401a2fcb0179345c0be528e6e78bf27c7652) | CI proposer | SiteRegistry `signet/files.json` (7,504 B; allowlist/origins unchanged), read back | 1,859,992 |
+
+`scripts/release-site.sh 9`, first real run: the chain said "can publish now" at 16:52 UTC; Cloudflare deployment
+`2cf4cf42` (8 new files, 18 reused); publish sent seconds later; 26/26 live files byte-identical (browser user
+agent). Both RPCs: `currentRelease()` = 9, manifest `0x3dfeafd6…7478`, prev 8. Chromium: 30 responses identical, no
+page errors. Guard 0.3.2 (mainnet build, headless Chromium): OK, release #9, 9/9 files. Site CI key ≈ 0.003186 OKB left.
 
 ## Release #8 published; its files stored on DeWEB (container #5) (2026-11-24)
 
