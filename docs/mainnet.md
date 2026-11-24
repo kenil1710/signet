@@ -247,6 +247,26 @@ signet-ops, whose keystore password does not open in cast: see `scripts/check-ke
 **Dashboard bug found here:** the page showed "gate 0x000…0 created". The transaction was fine; the page read the
 binding through both RPCs at the lower of their two heads, one block before `createGate` (see `docs/decisions.md`).
 
+## Misthos release #1 proposed (2026-11-24, tier 10)
+
+The first `signet-release` run ([45364446803](https://github.com/kenil1710/misthos/actions/runs/45364446803)) failed in
+"Build for production" (Vercel CLI 39 can't read pnpm 12's two-document lockfile; nothing deployed or proposed; Vercel
+did not deploy the merge). Fixed in kenil1710/misthos#2 (Vercel CLI 65.14.0). The second run
+([45369533405](https://github.com/kenil1710/misthos/actions/runs/45369533405)) built, staged
+`https://misthos-eifmwis7m-kenils-projects-a3f732d1.vercel.app` (misthos.world not assigned), sealed it in Chromium and
+proposed:
+
+| Tx | From | Call | Block | Gas |
+|---|---|---|---:|---:|
+| [`0x37e31bd0…511e`](https://web3.okx.com/explorer/x-layer/evm/tx/0x37e31bd0512b026c70b11eeaf58c8e974cb5e7c6a55c367996a1a6546330511e) | Misthos CI key `0x88e0…4D06` | `proposeRelease` → **proposal 1**, tier 10 | 76,745,206 (09:57:22 UTC) | 161,802 |
+
+filesRoot `0xaa63…b53f`, allowlistHash `0xce06…7449`, originsHash `0xfd64…1a3b`. Page mode ssr, 7 inline script hashes
+(as in the fork rehearsal), 423 files; allowlist: USDC + the factory on Arc 5042 and 5042002, no spenders, the
+factory rule on both. Checks: the run's artifact hashes to the proposal (Diff Guard); every staged script and style
+matches the artifact byte for byte; an independent `seal --crawl-browser` of the staged URL gives the same three
+hashes. To publish: 2 approvals, then 24 h from the second (`readyAt`), before the proposal expires
+(2026-12-01 09:57:22 UTC, 7 days after proposing); then `signet-promote` with run id 45369533405.
+
 ## Checks after the deploy
 
 - `record-mainnet` re-read all 7 receipts from xlayerrpc.okx.com and xlayer.drpc.org (both succeeded, both from
