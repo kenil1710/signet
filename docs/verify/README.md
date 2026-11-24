@@ -1,5 +1,15 @@
 # Verifying Signet's contracts on OKX Explorer (manual, free, no wallet)
 
+**Done on Sourcify (2026-11-24): exact match (runtime + creation code, metadata included), free, no wallet:**
+[SignetRegistry](https://repo.sourcify.dev/196/0x98dB5B6B1545D0fb374da40a02045B93398E0589),
+[SignetFactory](https://repo.sourcify.dev/196/0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986),
+[ReleaseGate implementation](https://repo.sourcify.dev/196/0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D)
+(submitted with the standard-JSON files below through Sourcify's v2 API; check with
+`curl https://sourcify.dev/server/v2/contract/196/<address>`). Each gate (signetguard.xyz `0xa3d4…4503`, misthos.world
+`0xDfFf…4a59`) is a 45-byte EIP-1167 clone of that implementation: there is no separate source to verify; explorers
+show it as a proxy of the verified implementation. OKX Explorer (below) is still a manual form.
+
+
 Everything in this folder was checked against X Layer mainnet before it was written: `python3 docs/verify/check.py`.
 Each standard-JSON file, compiled with plain solc 0.8.24, gives **exactly** the on-chain code (metadata hash
 included). Each constructor-arguments file is exactly what follows the creation code in the deploy transaction.
