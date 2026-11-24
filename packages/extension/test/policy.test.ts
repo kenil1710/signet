@@ -157,3 +157,23 @@ test('the Guard decision circuit gives the same answer as the policy on every re
   }
   assert.equal(n, reqs.length * ctxs.length);
 });
+
+test("signetguard.xyz release #10: Multicall3 is read-only, so it is not in the sealed allowlist, and any signature to it is refused in enforce mode", async () => {
+  const { readFileSync } = await import('node:fs');
+  const { MULTICALL3 } = await import('../src/lib/abi.ts');
+  const sealed = JSON.parse(readFileSync(new URL('../../dashboard/release/10/signet/allowlist.json', import.meta.url), 'utf8')) as typeof allowlist;
+  assert.ok(!JSON.stringify(sealed).toLowerCase().includes(MULTICALL3.toLowerCase()), 'Multicall3 is not sealed in release #10');
+  const ctx: Context = { site: 'sealed', page: 'ok', allowlist: sealed, enforced: true };
+  const mc = parseAbi(['function aggregate3((address target, bool allowFailure, bytes callData)[] calls) payable returns ((bool success, bytes returnData)[])']);
+  const requests: SignRequest[] = [
+    tx(MULTICALL3, encodeFunctionData({ abi: mc, functionName: 'aggregate3', args: [[{ target: TOKEN, allowFailure: false, callData: data('approve', [DRAINER, 1n]) }]] })),
+    tx(MULTICALL3, '0x', '0x1'),
+    tx(TOKEN, data('approve', [MULTICALL3, 2n ** 256n - 1n])),
+    { method: 'eth_signTypedData_v4', params: [USER, JSON.stringify({ domain: { name: 'x', chainId: 196, verifyingContract: MULTICALL3 }, types: { EIP712Domain: [{ name: 'name', type: 'string' }, { name: 'chainId', type: 'uint256' }, { name: 'verifyingContract', type: 'address' }], M: [{ name: 'a', type: 'uint256' }] }, primaryType: 'M', message: { a: 1 } })], chainId: '0xc4', accounts: [USER] },
+  ];
+  for (const r of requests) {
+    const v = decide(r, ctx);
+    const out = guard(factsOf(v, ctx));
+    assert.equal(out.BLOCK, true, `${r.method} ${JSON.stringify(r.params).slice(0, 120)}: ${v.title}`);
+  }
+});

@@ -22,6 +22,8 @@ export async function reportWrongBlock(domain: string, note: string, into: HTMLE
 export function headline(i: TabInfo): { title: string; text: string } {
   const s = i.site;
   if (i.light === 'green') return { title: 'Sealed', text: `Release #${s.release} · this page matches what the team sealed.` };
+  const hold = i.tab.report?.hold;
+  if (hold && hold.until > Date.now() && s.status === 'sealed') return { title: `Release #${hold.release} is being published`, text: `This page doesn't match release #${s.release}, but the team's release #${hold.release} can be published now. Guard is checking the chain again for up to a minute before it blocks the page. Signing stays refused until then.` };
   if (i.light === 'red') return s.status === 'revoked'
     ? { title: 'Release revoked', text: "The team revoked this site's current release. Don't sign anything here." }
     : { title: "Doesn't match the sealed release", text: `This page is not what the team sealed as release #${s.release}. Don't sign.` };

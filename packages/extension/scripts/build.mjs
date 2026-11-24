@@ -41,7 +41,7 @@ const entries = { background: 'src/background.ts', content: 'src/content.ts', in
 for (const [name, entry] of Object.entries(entries)) {
   await build({
     root, configFile: false, logLevel: 'warn',
-    define: { __NET__: JSON.stringify(net), __HASH_ONLY__: JSON.stringify(process.env.GUARD_MODE === 'hash-only') },
+    define: { __NET__: JSON.stringify(net), __HASH_ONLY__: JSON.stringify(process.env.GUARD_MODE === 'hash-only'), __HOLD_MS__: JSON.stringify(Number(process.env.GUARD_HOLD_MS) || 0) },
     build: {
       outDir: out, emptyOutDir: false, minify: false, target: 'chrome120', sourcemap: false,
       lib: { entry: `${root}${entry}`, formats: [name === 'background' ? 'es' : 'iife'], name: `signetGuard_${name}`, fileName: () => `${name}.js` },

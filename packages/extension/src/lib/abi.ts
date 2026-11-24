@@ -17,6 +17,12 @@ export const gateAbi = parseAbi([
   'function enforced() view returns (bool)',
   'function frozen() view returns (bool)',
   'function getApprovers() view returns (address[3])',
+  // Guard 0.3.3: is a release about to be published (lib/publishing.ts)
+  'function proposalCount() view returns (uint64)',
+  'function approverSet() view returns (uint64)',
+  'struct Proposal { uint8 kind; uint8 tier; bool emergency; bool executed; bool cancelled; uint8 approvals; uint8 proposerSlot; uint40 proposedAt; uint40 readyAt; uint64 baseRelease; uint64 baseline; uint64 approverSet; bytes32 filesRoot; bytes32 allowlistHash; bytes32 originsHash; bytes adminData; }',
+  'function getProposal(uint64 id) view returns (Proposal)',
+  'function policyInputs(uint64 id) view returns (uint16 bits)',
 ]);
 export const siteAbi = parseAbi([
   'function read(address container, string path) view returns (bytes)',

@@ -73,7 +73,9 @@ export interface SiteState {
 export type FileStatus = 'ok' | 'ok-sri' | 'ok-gateway' | 'ok-inline' | 'ok-ssr' | 'stale-release' | 'mismatch' | 'unknown' | 'unknown-origin' | 'sri-mismatch' | 'injected' | 'not-cached' | 'cross-origin' | 'no-crypto';
 export interface FileResult { url: string; status: FileStatus; sha256?: string; note?: string }
 export type PageStatus = 'ok' | 'tampered' | 'unverified';
-export interface PageReport { url: string; status: PageStatus; files: FileResult[] }
+/// hold (0.3.3, enforce mode): the page doesn't match, but release #release can be published now; until `until` (ms,
+/// this computer's clock) Guard re-reads the chain instead of showing the red page. Signing stays refused meanwhile.
+export interface PageReport { url: string; status: PageStatus; files: FileResult[]; hold?: { release: number; until: number } }
 
 /// What the content script gets for a sealed domain. Null = not a sealed domain: do nothing at all.
 export interface PageInfo {

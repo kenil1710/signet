@@ -10,6 +10,7 @@
 // the pending records synchronously and runs a fresh full check, so a script that runs and signs at once is seen.
 import { pathOfUrl, sealedPathFor } from './lib/sealed.ts';
 import { decideRecheck } from './lib/recheck.ts';
+import { HOLD_MS, POLL_MS } from './lib/hold.ts';
 import { classifyInline, inlineHash, runs } from '@signet/cli/src/inline.ts';
 import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts';
 
@@ -88,6 +89,7 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
   let last: PageReport | null = null;
   let redirecting = false;
   let rechecked = false;
+  let held = false; // 0.3.3: the page waited once for a release being published
   let firstDone: () => void = () => {};
   const first = new Promise<void>((r) => (firstDone = r));
 
@@ -275,6 +277,27 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     }
     files = [...results.values()];
     const status = files.some((f) => BAD.includes(f.status)) ? 'tampered' : files.some((f) => !['ok', 'ok-sri', 'ok-gateway', 'ok-inline', 'ok-ssr'].includes(f.status)) ? 'unverified' : 'ok';
+    if (info!.enforce && status === 'tampered' && !held && !info!.bypass) {
+      // 0.3.3: the team may have deployed a release seconds before publishing it. If a release proposal of this gate
+      // can be published now, report the page as not matching (signing stays refused) but hold the red page, and
+      // re-read the chain every few seconds for up to a minute. Once per page; then the normal answer.
+      held = true;
+      const p = await ask<{ release: number } | null>({ type: 'publishing' });
+      if (p) {
+        const until = Date.now() + HOLD_MS;
+        last = { url: location.href, status, files, hold: { release: p.release, until } };
+        await ask({ type: 'report', report: last });
+        while (Date.now() < until) {
+          await new Promise((r) => setTimeout(r, POLL_MS));
+          const now = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href, fresh: true, again: true });
+          if (now && now.site === info!.site && now.release !== info!.release) {
+            info = { ...now, proof: info!.proof };
+            results.clear();
+            return pass();
+          }
+        }
+      }
+    }
     last = { url: location.href, status, files };
     if (info!.enforce && status === 'tampered') redirecting = true; // known before the answer arrives
     const r = await ask<{ redirect: boolean }>({ type: 'report', report: last });

@@ -9,6 +9,8 @@ import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sea
 import { decide, factsOf, trustedBy, withVerified } from './lib/policy.ts';
 import { checkFactory } from './lib/factory.ts';
 import { decideWithCircuit } from './lib/guard-circuit.ts';
+import { publishableRelease } from './lib/publishing.ts';
+import { HOLD_MS } from './lib/hold.ts';
 import { proofNames, PROOF_PATH } from './lib/proof.ts';
 import { domainOfGatewayHost, encodeLabel } from './lib/label.ts';
 import type { Allowlist, Decision, GuardEvent, Hex, Net, PageInfo, PageReport, PagesPolicy, Sealed, SignRequest, SiteState } from './lib/types.ts';
@@ -235,8 +237,10 @@ interface TabState { domain: string; url: string; report: PageReport | null }
 type Light = 'green' | 'red' | 'grey';
 const BADGE: Record<Light, { text: string; color: string }> = { green: { text: 'OK', color: '#1a7f37' }, red: { text: '!', color: '#cf222e' }, grey: { text: '?', color: '#6e7781' } };
 
+const holding = (r: PageReport | null) => !!r?.hold && r.hold.until > Date.now() && r.hold.until - Date.now() <= HOLD_MS + 5_000;
 export function lightOf(site: SiteState, report: PageReport | null): Light {
   if (site.status === 'revoked') return 'red';
+  if (holding(report) && site.status === 'sealed') return 'grey';
   if (report?.status === 'tampered' && site.status === 'sealed') return 'red';
   if (site.status !== 'sealed' || !report || report.status !== 'ok') return 'grey';
   return 'green';
@@ -252,7 +256,7 @@ async function paint(tabId: number, site: SiteState | null, report: PageReport |
     const light = lightOf(site, report);
     await chrome.action.setBadgeText({ tabId, text: BADGE[light].text });
     await chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE[light].color });
-    const words = light === 'green' ? `Sealed · release #${site.release}` : light === 'red' ? "This page doesn't match its sealed release" : site.reason || 'Not fully checked';
+    const words = light === 'green' ? `Sealed · release #${site.release}` : holding(report) ? `Release #${report!.hold!.release} is being published: checking again` : light === 'red' ? "This page doesn't match its sealed release" : site.reason || 'Not fully checked';
     await chrome.action.setTitle({ tabId, title: `Signet Guard: ${site.domain}\n${words}` });
   } catch { /* the tab is gone */ }
 }
@@ -270,6 +274,7 @@ const blockedUrl = (tabId: number, domain: string, url: string) => `${chrome.run
 type Msg =
   | { type: 'site'; host: string; url: string; fresh?: boolean; again?: boolean }
   | { type: 'report'; report: PageReport }
+  | { type: 'publishing' }
   | { type: 'sign'; req: SignRequest }
   | { type: 'tab-info'; tabId: number }
   | { type: 'proof'; host: string; body: string | null }
@@ -339,6 +344,8 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       void paint(tabId, site, msg.report);
       const bad = site.status === 'revoked' || (site.status === 'sealed' && msg.report.status === 'tampered');
       if (!bad) return { redirect: false };
+      // 0.3.3: a release is being published (the page asked, and the chain said so): wait, keep signing refused
+      if (site.status === 'sealed' && holding(msg.report)) return { redirect: false };
       const bypass = !!(await get<boolean>(session, `bypass:${tabId}:${tab.domain}`));
       const block = site.enforced && !bypass;
       if (before !== 'tampered') {
@@ -352,6 +359,20 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       }
       if (block) void chrome.tabs.update(tabId, { url: blockedUrl(tabId, tab.domain, msg.report.url) });
       return { redirect: block };
+    }
+    case 'publishing': {
+      // enforce mode, a page that doesn't match: can a release of this gate be published right now? (lib/publishing.ts)
+      if (tabId === undefined) return null;
+      const tab = await get<TabState>(session, `tab:${tabId}`);
+      if (!tab) return null;
+      const site = await siteFor(tab.domain);
+      if (site.status !== 'sealed' || !site.enforced || !site.gate) return null;
+      try {
+        const id = await publishableRelease(NET, site.gate as Hex);
+        return id === null ? null : { release: id };
+      } catch {
+        return null; // can't tell: show the red page at once, as before
+      }
     }
     case 'sign': {
       const tab = tabId === undefined ? undefined : await get<TabState>(session, `tab:${tabId}`);
