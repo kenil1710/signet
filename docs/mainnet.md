@@ -207,25 +207,24 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 
 ## Release #10 sealed and fork-rehearsed, NOT proposed (2026-11-25): /prove in ~6 s, no "coming soon", /check fix, Functions back
 
-Built from `d5783f6`+docs with `SIGNET_REPO_PUBLIC=1` and sealed into `packages/dashboard/release/10` (manifest
-`0xfdd83af7…e372`). Contents: /prove reads through Multicall3 (128 `eval`s per `eth_call`), all checks in parallel at
-one pinned block, row progress, and the watchtower's last /prove run shown at once (headless Chromium on these bytes
-against mainnet: 6.2, 7.0, 6.5 s; was ~4 min); footer/landing/start without "coming soon" (X link live, Telegram
-removed, setup help = an X DM to @vekariya_kenil); /check counts `modulepreload` as scripts; docs: #9, Telegram alerts set up.
+Built with `SIGNET_REPO_PUBLIC=1` and sealed into `packages/dashboard/release/10` (manifest `0x262eac1f…4605`, 28
+files). Contents: /prove reads through Multicall3 (128 `eval`s per `eth_call`), all checks in parallel at one pinned
+block, row progress, and the watchtower's last /prove run shown at once (headless Chromium against mainnet: 6.2–7.0 s;
+was ~4 min); footer/landing/start without "coming soon" (X link live, Telegram removed, setup help = an X DM to
+@vekariya_kenil); /check counts `modulepreload` as scripts; docs: #9, Telegram alerts set up.
 
-- **Tier 10, not 00:** the allowlist gains Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` (its address is now in
-  the dashboard bundle; read-only `eth_call`, never a wallet request). Origins are unchanged. So #10 needs **2
-  approvals + 24 h**. Alternative (the team's call): exclude it in `signet.config.json` like other non-signing
-  addresses, reseal, and #10 is tier 00 (1 approval + 1 h). Read-only targets (processor, beacon, SiteRegistry) have
-  stayed in the allowlist so far, so the default was left as is.
-- **Fork rehearsal** (anvil fork of mainnet, approvers impersonated, 24 h skipped): propose 168,971 gas (tier 10, needs
-  2 + 1d); approve A 39,750, B 42,239; `policyInputs` 35 → 59 after 24 h; publish 293,672; writes: allowlist.json
-  335,711 + files.json 1,859,935 (origins same), read back. `currentRelease` = 10, manifest equal to the seal. On
-  mainnet at 0.020000001 gwei: CI key ≈ 2.66M gas ≈ **0.000053 OKB** (has ≈ 0.003186), each approver ≈ 0.0000008 OKB.
-  (The fork suggests a 1 gwei tip, so its CI key ran short there; mainnet's tip is 1 wei.)
+- **Tier 00.** Multicall3 (`0xcA11bde05977b3631167028862bE2a173976CA11`) is now in the dashboard bundle, but the team
+  decided (2026-11-25) to exclude it in `signet.config.json`: the site only reads through it (`eth_call`), never asks a
+  wallet to sign to it. So the allowlist and origins equal #9's. Guard refuses any signature to it (call, value,
+  spender, EIP-712 domain), tested against this release's sealed allowlist (`packages/extension/test/policy.test.ts`).
+  A first seal that kept it (`0xfdd83af7…e372`, tier 10) was replaced; it was never proposed.
+- **Fork rehearsal** (anvil fork of mainnet): propose 168,984 gas (tier 00, needs 1 + 1h); approve A 39,958;
+  `policyInputs` 1 → 9 after 1 h; publish 292,923; files.json 1,857,163 (allowlist and origins "same"), read back;
+  `currentRelease` = 10, manifest equal to the seal. On mainnet at 0.020000001 gwei: CI key ≈ 2.32M gas ≈ **0.000046
+  OKB** (has ≈ 0.003186); approver A ≈ 0.0000008 OKB.
 - **Deploy with `scripts/release-site.sh 10`**, which now deploys from `packages/dashboard`, so the Pages Functions
-  (`/api/check`, `/api/watchtower`) ship again: releases #7–#9 were deployed without them, and both answer the landing
-  page today (found 2026-11-25). Step 4 now checks both answer JSON.
+  (`/api/check`, `/api/watchtower`) ship again: releases #7–#9 were deployed without them (found 2026-11-25). Step 4
+  checks both answer JSON.
 
 ## Release #9 published (2026-11-24, tier 00): /privacy, CLI 0.2.2 on /start, Guard 0.3.2 links, docs synced
 

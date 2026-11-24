@@ -20,7 +20,8 @@
     "196": {
       "exclude": [
         "0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D",
-        "0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59"
+        "0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59",
+        "0xcA11bde05977b3631167028862bE2a173976CA11"
       ]
     }
   }
