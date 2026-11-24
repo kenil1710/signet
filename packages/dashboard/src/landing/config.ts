@@ -15,7 +15,7 @@ export function linksFor(repoPublic: boolean) {
     /** The team's Telegram (support / "talk to us"). */
     telegram: 'TODO: https://t.me/<group>',
     /** Signet Guard's signed pre-release zip on GitHub (load unpacked), until the store listing exists. */
-    guardPrerelease: repoPublic ? `${REPO}/releases/tag/guard-v0.2.0` : 'TODO: the Guard pre-release is on GitHub once the repository is public',
+    guardPrerelease: repoPublic ? `${REPO}/releases/tag/guard-v0.3.0` : 'TODO: the Guard pre-release is on GitHub once the repository is public',
     /** Signet Guard on the Chrome Web Store (not submitted yet). */
     chromeWebStore: 'TODO: Chrome Web Store listing URL',
     /** The wallet-free proof page of this same app. */
