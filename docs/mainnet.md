@@ -205,6 +205,27 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Misthos gate created: misthos.world bound (2026-11-24)
+
+Sent by the team from Approver A in Rabby on https://signetguard.xyz/app#/new (the live release #5 dashboard), to the
+factory `0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986`, value 0, at 0.0286 gwei.
+
+| Tx | Call | Block | Gas | Fee (OKB) | Events |
+|---|---|---:|---:|---:|---|
+| [`0x4327ca55…7270`](https://web3.okx.com/explorer/x-layer/evm/tx/0x4327ca55038d50e8e59b6ea4e98cade792e016ba306dc2fdafca2e41be967270) | `factory.commit(…)` | 76,739,001 (08:13:57 UTC) | 45,549 | 0.0000013027014 | `Committed` |
+| [`0xf2ac22f0…d8bc`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf2ac22f0566995dd00c2054262f6d3287ef85395c05ba15011b9184c187bd8bc) | `factory.createGate(…)` | 76,739,048 (08:14:44 UTC) | 536,383 | 0.0000153405538 | registry `0xad0c0064…` (gate), `GateCreated(gate, creator = A)` |
+
+Total 581,932 gas, 0.0000166432552 OKB (the fork measured 581,944). **Gate `0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59`**
+(a minimal clone of the implementation `0xD146…3B3D`), the address the fork predicted.
+
+After (xlayerrpc.okx.com and xlayer.drpc.org agree): `registry.bindingOf("misthos.world")` = gate `0xDfFf…4a59`,
+container `0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`, prefix `projects/misthos.world/`; `isGate` = true; approvers
+A `0xB9ef…2416`, B `0x3280…6dc`, C `0x1C47…c74c`; proposer (Misthos CI) `0x88e003256804Df5b916E19849C7a26c4e1cC4D06`;
+recovery `0x6940…cD93`; guardian signet-ops `0x9275…E291`; observe mode (`enforced` = false).
+
+**Dashboard bug found here:** the page showed "gate 0x000…0 created". The transaction was fine; the page read the
+binding through both RPCs at the lower of their two heads, one block before `createGate` (see `docs/decisions.md`).
+
 ## Checks after the deploy
 
 - `record-mainnet` re-read all 7 receipts from xlayerrpc.okx.com and xlayer.drpc.org (both succeeded, both from
