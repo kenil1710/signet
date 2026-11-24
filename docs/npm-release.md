@@ -27,6 +27,7 @@ and 4 as an automatic gate.
 
 | Version | Published | npm `dist.shasum` (SHA-1) | Tarball SHA-256 | Checked after publishing |
 |---|---|---|---|---|
+| 0.2.2 (`verify --build` is ssr-aware: no false "HTML not in the build"; `upload` reads `.signet/proposer.key`) | 2026-11-24, `latest` | `46256788e9f58adedd5a03215b3e3004ce168857` | `a3772161c436657ccb539fcc4f87e0cb0b59c35e5ca908a2f564e7e763301a5b` | registry tarball byte-identical to the build (SHA-512 = npm `integrity`); clean `npm install -g` → `signet --version` = 0.2.2 |
 | 0.2.1 (security fix: the Vercel bypass secret goes to the deployment's own origin only; 0.2.0 sent it to every origin in `--crawl-browser` and across cross-origin redirects in `--crawl`. Also: a proposer key from the environment is trimmed, so a secret set from `.signet/proposer.key` with its trailing newline works) | 2026-11-24, `latest` | `e72b93add49a0a1af280b70f211ee874f907d140` | `c883244cdedc672541ff00d26b61daf66ac8df7661794d05b0e1326dbbdd9815` | see below |
 | 0.2.0 (Signet v2: page mode `ssr`, `seal --crawl` / `--crawl-browser`, factory rule, chunked `files.json`) | 2026-11-23, `latest` | `c50c2e36ad26e28d677276eeefd461b7a77d68f2` | `c9a75897dcc603d5f962ae7063c7c5c164bb9956c16cb7a613a60767d5e1d528` | see below |
 
