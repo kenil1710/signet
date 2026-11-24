@@ -1,0 +1,32 @@
+# Public test CI: every push and pull request runs the typecheck and all unit tests (no keys, no network writes):
+# 190 Foundry tests for ReleaseGate, SignetRegistry and SignetFactory (every tier row and edge case), both circuits'
+# netlists against their reference functions on all 512 inputs, and the CLI, Guard, dashboard, gateway, watchtower
+# and GitHub Action unit tests. The staging suites (local fork) and the attack suite run locally: docs/TRY-IT-LOCALLY.md.
+name: test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.18, cache: pnpm }
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: pnpm install --frozen-lockfile
+      - name: Chromium for the browser tests (dashboard wallet switch, CLI crawl)
+        run: pnpm --filter @signet/dashboard exec playwright install --with-deps chromium
+      - run: pnpm -r run typecheck
+      - name: Unit tests (Foundry, circuits 512/512, CLI, Guard, dashboard, gateway, watchtower, action)
+        run: pnpm -r --workspace-concurrency=1 run test
