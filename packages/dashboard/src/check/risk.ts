@@ -11,7 +11,7 @@ export interface Report {
   url: string;
   status: number;
   checkedAt: string;
-  scripts: { src: string; origin: string; sri: boolean; sameOrigin: boolean }[];
+  scripts: { src: string; origin: string; sri: boolean; sameOrigin: boolean; preload?: boolean }[]; // preload: <link rel=modulepreload> or preload as=script
   origins: string[];
   inlineScripts: number;
   headers: Record<string, string | null>;
@@ -92,16 +92,27 @@ export function parseHtml(html: string, base: string) {
     if (u.protocol === 'http:') mixed.push(u.href);
     scripts.push({ src: u.href, origin: u.origin, sri: !!attr(tag, 'integrity'), sameOrigin: u.origin === baseOrigin });
   }
+  // <link>: a stylesheet (or preload as=style) is a style; a modulepreload (or preload as=script) is code the page runs,
+  // so it counts as a script (found 2026-11-25: app.uniswap.org's 719 modulepreloads were reported as "stylesheets");
+  // fonts, images and other preloads are neither.
+  const seen = new Set(scripts.map((x) => x.src));
   for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
     const tag = m[0];
-    const rel = (attr(tag, 'rel') ?? '').toLowerCase();
-    if (!/stylesheet|modulepreload|preload/.test(rel)) continue;
+    const rel = (attr(tag, 'rel') ?? '').toLowerCase().split(/\s+/);
+    const as = (attr(tag, 'as') ?? '').toLowerCase();
+    const kind = rel.includes('modulepreload') || (rel.includes('preload') && as === 'script') ? 'script'
+      : rel.includes('stylesheet') || (rel.includes('preload') && as === 'style') ? 'style'
+      : rel.includes('preload') ? 'other' : null;
+    if (!kind) continue;
     const href = attr(tag, 'href');
     if (!href) continue;
     let u: URL;
     try { u = new URL(href, base); } catch { continue; }
     if (u.protocol === 'http:') mixed.push(u.href);
-    if (u.origin !== baseOrigin) styles.push({ href: u.href, sri: !!attr(tag, 'integrity') });
+    if (kind === 'script' && !seen.has(u.href)) {
+      seen.add(u.href);
+      scripts.push({ src: u.href, origin: u.origin, sri: !!attr(tag, 'integrity'), sameOrigin: u.origin === baseOrigin, preload: true });
+    } else if (kind === 'style' && u.origin !== baseOrigin) styles.push({ href: u.href, sri: !!attr(tag, 'integrity') });
   }
   for (const m of html.matchAll(/\s(?:src|href)\s*=\s*["']?(http:\/\/[^"'\s>]+)/gi)) if (!mixed.includes(m[1]!) && /\.(js|css|png|jpe?g|gif|svg|webp|woff2?)(\?|$)/i.test(m[1]!)) mixed.push(m[1]!);
   return { scripts, styles, inline, mixed };
@@ -181,9 +192,9 @@ export async function analyze(domainInput: string, f: Fetch = fetch, opts: { ori
   const ext = p.scripts.filter((s) => !s.sameOrigin);
   const noSri = ext.filter((s) => !s.sri);
   if (ext.length === 0) findings.push({ level: 'ok', area: 'Scripts', text: 'No scripts from other origins in the HTML' });
-  else findings.push({ level: noSri.length ? 'risk' : 'ok', area: 'Scripts', text: `${ext.length} script(s) from ${new Set(ext.map((s) => s.origin)).size} other origin(s); ${noSri.length ? `${noSri.length} without SRI (integrity), so whoever controls ${[...new Set(noSri.map((s) => new URL(s.src).host))].join(', ')} can change the site's code` : 'all with SRI'}` });
+  else findings.push({ level: noSri.length ? 'risk' : 'ok', area: 'Scripts', text: `${ext.length} script(s)${ext.some((s) => s.preload) ? ` (${ext.filter((s) => s.preload).length} of them preloaded modules)` : ''} from ${new Set(ext.map((s) => s.origin)).size} other origin(s); ${noSri.length ? `${noSri.length} without SRI (integrity), so whoever controls ${[...new Set(noSri.map((s) => new URL(s.src).host))].join(', ')} can change the site's code` : 'all with SRI'}` });
   const cssNoSri = p.styles.filter((s) => !s.sri);
-  if (cssNoSri.length) findings.push({ level: 'warn', area: 'Styles', text: `${cssNoSri.length} stylesheet(s) or preloaded file(s) from ${[...new Set(cssNoSri.map((x) => new URL(x.href).host))].join(', ')} without SRI` });
+  if (cssNoSri.length) findings.push({ level: 'warn', area: 'Styles', text: `${cssNoSri.length} stylesheet(s) from ${[...new Set(cssNoSri.map((x) => new URL(x.href).host))].join(', ')} without SRI` });
   if (p.inline) findings.push({ level: 'info', area: 'Scripts', text: `${p.inline} inline script(s) in the HTML` });
   if (p.mixed.length) findings.push({ level: 'risk', area: 'Mixed content', text: `${p.mixed.length} resource(s) over plain http://, e.g. ${p.mixed[0]}` });
   const csp = headers['content-security-policy'];

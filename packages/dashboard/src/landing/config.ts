@@ -10,10 +10,8 @@ export function linksFor(repoPublic: boolean) {
     domain: 'https://signetguard.xyz',
     /** The public GitHub repository. */
     github: repoPublic ? REPO : 'TODO: the repository goes public in December 2026',
-    /** The project's X account. */
-    x: 'TODO: https://x.com/<handle>',
-    /** The team's Telegram (support / "talk to us"). */
-    telegram: 'TODO: https://t.me/<group>',
+    /** The team's X account: also the contact for setup help (a DM). */
+    x: 'https://x.com/vekariya_kenil',
     /** Signet Guard's signed pre-release zip on GitHub (load unpacked), until the store listing exists. */
     guardPrerelease: repoPublic ? `${REPO}/releases/tag/guard-v0.3.2` : 'TODO: the Guard pre-release is on GitHub once the repository is public',
     /** Signet Guard on the Chrome Web Store (not submitted yet). */

@@ -16,7 +16,7 @@ function render(r: Report): string {
     <p class="dim">${esc(r.url)} · HTTP ${r.status} · checked ${esc(new Date(r.checkedAt).toUTCString())}</p>
     <p class="summary ${risks ? 'bad' : warns ? 'warnsum' : 'ok'}">${risks} risk(s), ${warns} warning(s)</p>
     <ul class="findings">${f.map((x) => `<li class="fd ${x.level}"><b>${ICON[x.level]}</b> <span class="area">${esc(x.area)}</span> ${esc(x.text)}</li>`).join('')}</ul>
-    ${r.scripts.length ? `<details><summary>Scripts in the HTML (${r.scripts.length})</summary><ul>${r.scripts.map((s) => `<li><code>${esc(s.src)}</code> ${s.sameOrigin ? '' : s.sri ? '· SRI' : '· <b>no SRI</b>'}</li>`).join('')}</ul></details>` : ''}
+    ${r.scripts.length ? `<details><summary>Scripts in the HTML (${r.scripts.length})</summary><ul>${r.scripts.map((s) => `<li><code>${esc(s.src)}</code>${s.preload ? ' · preloaded module' : ''} ${s.sameOrigin ? '' : s.sri ? '· SRI' : '· <b>no SRI</b>'}</li>`).join('')}</ul></details>` : ''}
     ${r.dns ? `<details><summary>DNS and registrar</summary><ul><li>Name servers: ${esc(r.dns.ns.join(', ') || 'unknown')}</li><li>CAA: ${esc(r.dns.caa.join('; ') || 'none')}</li><li>DNSSEC validated: ${r.dns.dnssec === null ? 'unknown' : r.dns.dnssec ? 'yes' : 'no'}</li>${r.registrar ? `<li>Registrar: ${esc(r.registrar.name ?? 'unknown')}; transfer lock: ${r.registrar.locked === null ? 'unknown' : r.registrar.locked ? 'on' : 'off'}${r.registrar.expires ? `; expires ${esc(r.registrar.expires.slice(0, 10))}` : ''}</li>` : ''}</ul></details>` : ''}
     <p class="dim">Not seen by this check: ${r.cannotSee.map(esc).join('; ')}.</p>
     ${r.sealed ? '' : '<p><a class="btn" href="start">Seal your releases: free setup</a></p>'}

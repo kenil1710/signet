@@ -19,6 +19,17 @@ test('parseHtml: external scripts with and without SRI, inline scripts, mixed co
   assert.deepEqual(p.mixed, ['http://old.example.com/a.png']);
 });
 
+test('parseHtml: modulepreloads are scripts, not stylesheets; font preloads are neither (app.uniswap.org showed "723 stylesheets")', () => {
+  const html = `<script type="module" src="https://cdn.example.net/main.js"></script>
+    <link rel="modulepreload" crossorigin href="https://cdn.example.net/main.js"><link rel="modulepreload" href="https://cdn.example.net/a.js">
+    <link rel="modulepreload" href="/local.js"><link rel="preload" href="https://cdn.example.net/b.js" as="script" integrity="sha384-x">
+    <link rel="preload" href="https://cdn.example.net/f.woff2" as="font" crossorigin><link rel="preload" href="https://cdn.example.net/s.css" as="style">
+    <link rel="stylesheet" href="https://cdn.example.net/t.css"><link rel="stylesheet" href="/own.css"><link rel="preconnect" href="https://rpc.example.net">`;
+  const p = parseHtml(html, 'https://site.example.org/');
+  assert.deepEqual(p.scripts.map((s) => [new URL(s.src).pathname, s.sri, s.sameOrigin, !!s.preload]), [['/main.js', false, false, false], ['/a.js', false, false, true], ['/local.js', false, true, true], ['/b.js', true, false, true]]);
+  assert.deepEqual(p.styles.map((s) => new URL(s.href).pathname), ['/s.css', '/t.css']);
+});
+
 test('analyze: a local site with an unpinned CDN script, no CSP, no proof', async () => {
   const srv = http.createServer((q, r) => {
     if (q.url === '/') { r.setHeader('content-type', 'text/html'); r.end('<script src="https://cdn.example.net/wallet.js"></script>'); return; }
