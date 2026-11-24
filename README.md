@@ -33,7 +33,7 @@ It's live on mainnet: [signetguard.xyz](https://signetguard.xyz) runs on it, and
 | `packages/extension` | Guard (Chrome MV3): page check from the browser cache, signing check decided by the Guard circuit | staging; not in the Web Store |
 | `packages/gateway` | The verified copy as a normal web page, every file checked against the sealed hashes | staging; not deployed |
 | `packages/dashboard` | Landing page, projects, proposals with Diff Guard, approvals, freeze/revoke, `/prove`, badge | live on Cloudflare Pages, reading mainnet |
-| `packages/watchtower` | Loads each watched site, alerts the team on a mismatch confirmed by two loads | live for signetguard.xyz: scheduled every 5 minutes on GitHub Actions, which in practice runs it every 4–12 hours; status at `/prove`; Telegram alerts not configured yet |
+| `packages/watchtower` | Loads each watched site, alerts the team on a mismatch confirmed by two loads | live for signetguard.xyz: scheduled every 5 minutes on GitHub Actions, which in practice runs it every 4–12 hours; status and its last `/prove` run at `/prove`; Telegram alerts set up (test alert accepted 2026-11-20) |
 | `packages/attacks` | The attack suite and the benchmark | staging |
 
 ## Protect your own site

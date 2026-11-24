@@ -7,12 +7,12 @@
 Status (2026-11-24): live on X Layer mainnet (chain 196) since 2026-11-18 (docs/mainnet.md):
 - Release-policy circuit #6 and Guard decision circuit #7 on TapeOut processor #101 (0x73153e5fd2Acac604D49d6ca9fea27b750718F22), each verified on all 512 inputs on two RPCs.
 - SignetRegistry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, SignetFactory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, ReleaseGate implementation 0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D.
-- Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz): releases #3, #4 and #5 published 2026-11-20, #6 was the tier-11 guardian change, #7 and #8 published 2026-11-24 (#8's files are also stored in TapeOut's SiteRegistry, circuit #5's container). Observe mode.
+- Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz): releases #3, #4 and #5 published 2026-11-20, #6 was the tier-11 guardian change, #7, #8 and #9 published 2026-11-24 (#8's files are also stored in TapeOut's SiteRegistry, circuit #5's container). Observe mode.
 - misthos.world gate 0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59: the team's own app (on Arc, not an outside adopter), sealed in server-rendered mode; release 1 proposed by its CI and approved 2026-11-24, publishable from 2026-11-25. Observe mode.
 - `pnpm verify:claims`: every claim checked on mainnet or in the repo (claims.json).
 - Site (landing, dashboard, /prove against mainnet, no wallet): https://signetguard.xyz (Cloudflare Pages).
 - CLI: `signetguard` on npm (0.2.2). Guard: a signed pre-release zip on GitHub (0.3.2), not in the Chrome Web Store yet; its privacy policy: https://signetguard.xyz/privacy.
-- Not live: enforce mode on any mainnet gate, the gateway (staging only), watchtower alerts (the watchtower runs for signetguard.xyz on GitHub Actions' schedule, every 4–12 hours in practice, and publishes its status; Telegram not configured).
+- Not live: enforce mode on any mainnet gate, the gateway (staging only). The watchtower runs for signetguard.xyz on GitHub Actions' schedule (every 4–12 hours in practice) and publishes its status and its last /prove run; Telegram alerts to the team's chat are set up (a test alert was accepted by Telegram on 2026-11-20, watchtower run 44746304914).
 
 ## Built on TapeOut (what is really used)
 - Two TapeOut circuits on processor #101: #6 decides when a release may publish (ReleaseGate calls it on every publish and unfreeze; a Solidity copy of the same gates decides only if that call fails or returns a malformed answer, with an on-chain event; the circuit's beacon has no owner, so the rule can't be upgraded); #7 decides Guard's allow/warn/block at signing.
