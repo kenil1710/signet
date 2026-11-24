@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { parseEventLogs, getAddress, isAddress, zeroAddress, formatEther, type Address, type Hex, type TransactionReceipt } from 'viem';
 import { gateAbi, factoryAbi, registryAbi, siteReadAbi } from './abi.ts';
 import {
-  SignetError, CONFIG_NAME, needDeployed, needProject, signerFor, resolveAddress, newKeyFile, addressOfKeyFile, statePath,
+  SignetError, CONFIG_NAME, STATE_DIR, needDeployed, needProject, signerFor, resolveAddress, newKeyFile, addressOfKeyFile, statePath,
   read, send, errorName, chainTime, fmtTime, fmtSpan, showPath, type Ctx, type ProjectConfig, type Signer,
 } from './chain.ts';
 import { sha256Hex } from './merkle.ts';
@@ -466,7 +466,8 @@ export async function upload(ctx: Ctx, buildDir: string, o: { full?: boolean }, 
   if (container === zeroAddress) throw new SignetError('NotBoundGate', `${cfg.domain} has no valid container binding`);
   const sites = ctx.net.tapeout.siteRegistry as Address;
   // anyone may relay these bytes (the registry checks them against the current release), so CI's key works too
-  const signer = await signerFor(ctx, [...KEYS, 'SIGNET_PROPOSER_KEY']);
+  // the key file too, as wait --publish does (it calls this right after publishing with that key)
+  const signer = await signerFor(ctx, [...KEYS, 'SIGNET_PROPOSER_KEY'], join(ctx.dir, STATE_DIR, 'proposer.key'));
 
   const wanted: { path: string; contentType: string; proof: Hex[] }[] = [
     { path: ALLOWLIST_PATH, contentType: 'application/json', proof: [] },
