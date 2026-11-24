@@ -26,7 +26,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Approver C | `0x1C4704480E258bdBF8719ffba1679dD0e158c74c` |
 | CI proposer (can propose and publish; never approve) | `0x93272103b49B955dF493999F4B9Dea4852FA9453` (key from `signet keygen`, not in the repo) |
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
-| Guardian (freeze only) | signet-ops `0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291` since 2026-11-23 (keystore with scrypt n = 2^18; tier-11 `SetGuardian`, proposal #6). Before: signet-dev until 2026-11-20, then none |
+| Guardian (freeze only) | **none** since 2026-11-24 (signet-ops `0x9275…E291` removed by approvers A and B with `voteRemoveGuardian()`: its keystore password was lost, see "Plan B" below). Before: signet-ops 2026-11-23 → 24 (tier-11 `SetGuardian`, proposal #6); signet-dev until 2026-11-20, then none |
 
 Mode: **observe** (a new gate starts there). Current release: **#7** (published 2026-11-24); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
 
@@ -205,6 +205,32 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Plan B: signet-ops's keystore password lost; guardian removed from both gates (2026-11-24)
+
+signet-ops (`0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291`) was the guardian of both gates. Its keystore is a standard V3
+file (scrypt n = 2^18, AES-128-CTR, keccak MAC; cast opens keystores made by the same script), but no password the team
+tried opens it: not in cast, and not with `scripts/check-keystore.mjs`, which reads the password with the creator's own
+raw-mode reader and tries 5 interpretations of the keystrokes. Likely cause: `scripts/new-keystore.mjs` stored control
+characters typed at creation (it treated only DEL as backspace); fixed in `825aaa2` (^H erases, control characters are
+refused). signet-ops never sent a transaction (nonce 0), so the password was never exercised after creation.
+
+**Consequences:** its **0.043355534124840684 OKB** is unrecoverable. As guardian it could only freeze, so nothing it
+held could publish or change either gate. It was removed from both gates by approvers A and B (`voteRemoveGuardian()`,
+2 of 3, takes effect at once; no timelock, and open proposals are unaffected), from the dashboard in Rabby, after a
+fork test of the same four calls. Approver A also approved release #8 first (11:26:49 UTC).
+
+| Tx | From | Gate | Block (UTC) | Gas | Fee (OKB) | Log |
+|---|---|---|---:|---:|---:|---|
+| [`0xc138fd29…835c`](https://web3.okx.com/explorer/x-layer/evm/tx/0xc138fd29ea7093eead38c9c81fccdff452739f3c605b52c85f5682163761835c) | Approver A | signetguard.xyz `0xa3d4…4503` | 76,750,713 (11:29:09) | 51,939 | 0.0000014855 | none (first vote) |
+| [`0xddac68f9…3e1d`](https://web3.okx.com/explorer/x-layer/evm/tx/0xddac68f900d8cc5f127162aea8b5171aa671ad0ecc0752520699ba7856f63e1d) | Approver A | misthos.world `0xDfFf…4a59` | 76,750,741 (11:29:37) | 51,939 | 0.0000014855 | none (first vote) |
+| [`0xf70abd8c…37ce`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf70abd8c67a0dd5749059b9f339fd000b04ba7b6ee21899bca4ae142f02037ce) | Approver B | signetguard.xyz | 76,750,756 (11:29:52) | 36,398 | 0.0000010410 | `GuardianRemoved()` |
+| [`0x251214a3…87be`](https://web3.okx.com/explorer/x-layer/evm/tx/0x251214a3cde952d4c3763311e194e0cdb64febeab1961d5e918ef314587be0fa) | Approver B | misthos.world | 76,750,764 (11:30:00) | 36,398 | 0.0000010410 | `GuardianRemoved()` |
+
+After (xlayerrpc.okx.com and xlayer.drpc.org): `guardian()` = `0x0` and `guardianVoteAt(0..2)` = 0 on both gates.
+Unaffected: release #8 (1 approval, timelock running; `policyInputs(8)` = 1) and Misthos proposal 1 (2 approvals, tier
+10, 24 h running; `policyInputs(1)` = 35). Both gates now have no guardian; a new one would need a keystore made with the
+fixed script and opened with cast **before** use, then `SetGuardian` (tier 11, 3 of 3 + 24 h) on each gate.
+
 ## Release #8 proposed (2026-11-24, tier 00): /prove under rate limits, /prove and /llms.txt URLs, docs synced
 
 Built with `SIGNET_REPO_PUBLIC=1` from `b150241` (after #7 was published, so its docs say so) and sealed into
@@ -261,7 +287,7 @@ Total 581,932 gas, 0.0000166432552 OKB (the fork measured 581,944). **Gate `0xDf
 After (xlayerrpc.okx.com and xlayer.drpc.org agree): `registry.bindingOf("misthos.world")` = gate `0xDfFf…4a59`,
 container `0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`, prefix `projects/misthos.world/`; `isGate` = true; approvers
 A `0xB9ef…2416`, B `0x3280…6dc`, C `0x1C47…c74c`; proposer (Misthos CI) `0x88e003256804Df5b916E19849C7a26c4e1cC4D06`;
-recovery `0x6940…cD93`; guardian signet-ops `0x9275…E291`; observe mode (`enforced` = false).
+recovery `0x6940…cD93`; guardian signet-ops `0x9275…E291` (removed 2026-11-24, see "Plan B"); observe mode (`enforced` = false).
 
 **Misthos CI key funded** (2026-11-24 08:47:41 UTC): [`0x7814a003…5e0b`](https://web3.okx.com/explorer/x-layer/evm/tx/0x7814a003312fa8fe1e625465bd06182839a9f448fca3d97b6bd01c9881475e0b),
 block 76,741,025, 0.002 OKB from `0xe619216b27a37dde4238e0541bbc0e16916497f8` (the team's personal X Layer wallet, in Rabby) to the CI proposer
