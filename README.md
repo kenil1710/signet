@@ -1,5 +1,7 @@
 # Signet: the website can only ask your wallet for what its team sealed on X Layer
 
+[![test](https://github.com/kenil1710/signet/actions/workflows/test.yml/badge.svg)](https://github.com/kenil1710/signet/actions/workflows/test.yml) Contracts verified on [Sourcify](https://repo.sourcify.dev/196/0x98dB5B6B1545D0fb374da40a02045B93398E0589) (exact match: registry, factory, ReleaseGate implementation; `docs/verify/`).
+
 > **Judges: start with [`JUDGES.md`](JUDGES.md)** (5 minutes: what to check, in order, with links). Machine-readable: [`claims.json`](claims.json), [`llms.txt`](llms.txt).
 
 **Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign anything your team didn't approve.
