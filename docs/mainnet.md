@@ -205,6 +205,22 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #7 proposed (2026-11-24, tier 00): the "Create the gate" fix and the Guard 0.3.0 link
+
+Proposal 7 (release numbers are proposal ids; #6 was the SetGuardian admin proposal). Built with `SIGNET_REPO_PUBLIC=1`
+from `6bd8231` and sealed into `packages/dashboard/release/7` **before** any deploy; fork-rehearsed first (same tier and
+gas). Contents: the wizard reads the created gate from its `GateCreated` event (the 0x0 bug, see below), `/start`
+pins CLI 0.2.1 and serves only its tarball, `/start` links Signet Guard 0.3.0.
+
+| Tx | From | Call | Block | Gas | Fee (OKB) |
+|---|---|---|---:|---:|---:|
+| [`0xe0f5d175…34d4`](https://web3.okx.com/explorer/x-layer/evm/tx/0xe0f5d1755ae08a0fc9a9e5f6c5e0fd04cd8c7f9b0013495588f7e940f90d34d4) | CI proposer `0x9327…9453` | `proposeRelease` → #7, tier 00 | 76,741,678 (08:58:34 UTC) | 168,996 | 0.00000338 |
+
+filesRoot `0xc8d3…8973`; allowlistHash `0x5a48…efc5` and originsHash `0xfa18…85cf`, unchanged from #5 (Diff Guard: no new
+contract, spender, origin, SRI hash or approve/permit/transfer call). Both RPCs: `proposalCount` = 7, `currentRelease` = 5.
+Proposer balance after: 0.000341675452083773 OKB. **Next:** 1 approval, 1 h, deploy `release/7` to Cloudflare and check
+every live file with a browser user agent, then publish (shown to the team first). The live site stays release #5 until then.
+
 ## Misthos gate created: misthos.world bound (2026-11-24)
 
 Sent by the team from Approver A in Rabby on https://signetguard.xyz/app#/new (the live release #5 dashboard), to the
@@ -224,7 +240,7 @@ A `0xB9ef…2416`, B `0x3280…6dc`, C `0x1C47…c74c`; proposer (Misthos CI) `0
 recovery `0x6940…cD93`; guardian signet-ops `0x9275…E291`; observe mode (`enforced` = false).
 
 **Misthos CI key funded** (2026-11-24 08:47:41 UTC): [`0x7814a003…5e0b`](https://web3.okx.com/explorer/x-layer/evm/tx/0x7814a003312fa8fe1e625465bd06182839a9f448fca3d97b6bd01c9881475e0b),
-block 76,741,025, 0.002 OKB from `0xe619216b27a37dde4238e0541bbc0e16916497f8` (the team's Rabby wallet) to the CI proposer
+block 76,741,025, 0.002 OKB from `0xe619216b27a37dde4238e0541bbc0e16916497f8` (the team's personal X Layer wallet, in Rabby) to the CI proposer
 `0x88e0…4D06`; 21,000 gas at 0.0286 gwei (0.0000006006 OKB). CI key balance 0.002 OKB on both RPCs. (Planned from
 signet-ops, whose keystore password does not open in cast: see `scripts/check-keystore.mjs`.)
 
