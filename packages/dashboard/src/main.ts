@@ -11,14 +11,21 @@ import { onChainChange, switchToXLayer, walletChain } from './wallet.ts';
 import { action } from './ui.ts';
 
 // "Switch to X Layer": shown under the header whenever the wallet is on another chain
+// (the bar's text is not in the static HTML: a page read without a wallet, or without JS, never mentions a wallet)
 const bar = document.getElementById('chainbar')!;
+let barReady = false;
 const refreshChain = async () => {
   const id = await walletChain();
   const wrong = id !== null && id !== NET.chainId;
+  if (wrong && !barReady) {
+    bar.innerHTML = `<div class="cb-in"><span>Your wallet is on <b class="cb-now"></b>. Signet's contracts are on <b>X Layer (chain ${NET.chainId})</b>.</span>
+      <button id="switchchain" class="primary">Switch to X Layer</button></div>`;
+    action(bar.querySelector('#switchchain') as HTMLButtonElement, switchToXLayer, () => void refreshChain());
+    barReady = true;
+  }
   bar.hidden = !wrong;
   if (wrong) bar.querySelector('.cb-now')!.textContent = `chain ${id}`;
 };
-action(bar.querySelector('#switchchain') as HTMLButtonElement, switchToXLayer, () => void refreshChain());
 onChainChange(() => void refreshChain());
 void refreshChain();
 

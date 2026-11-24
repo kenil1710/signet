@@ -308,7 +308,7 @@ Each criterion has one piece of proof we must show, in the product and in the vi
 - [ ] Team background and elevator pitch
 - [ ] GitHub repo (public)
 - [ ] Demo video link, ≤ 3 min (longer may be disqualified)
-- [x] Website link: https://signet-6l4.pages.dev (landing page + dashboard + `/prove`; `signetguard.xyz` once its nameservers move). On DeWEB: planned, not built
+- [x] Website link: https://signetguard.xyz (landing page + dashboard + `/prove`). On DeWEB: planned, not built
 - [ ] Description covering: product, target users and how to reach them, revenue model, why users pay and keep using it
 - [ ] Circuit info required for circuit projects: **Processor contract address and circuit ID**
 - [ ] List of the TapeOut features used (circuits #6 and #7 on processor #101, Circuit Container, SiteRegistry/DeWEB, TapeKit's verification rule; TapeSend only if built)

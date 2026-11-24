@@ -1,15 +1,18 @@
 # Signet
 
-> Your contracts are audited. Your website isn't. Signet protects what your users actually load: no single hacked key can change a dApp's site (CI only proposes; approvers approve; TapeOut circuit #6 decides, with a timelock nobody can bypass), the team knows within minutes if anyone does (watchtower alerts), it can freeze instantly, and users with Signet Guard can't sign anything the team didn't approve: Guard blocks the signature. Signet builds on TapeKit's on-chain file verification and adds the signing-time allowlist (circuit #7), risk-tiered approvals with timelocks decided by circuit #6, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; live with Pro).
+> Your contracts are audited. Your website isn't. Signet protects what your users actually load: no single hacked key can change a dApp's site (CI only proposes; approvers approve; TapeOut circuit #6 decides, with a timelock nobody can bypass), a watchtower checks what the site serves, it can freeze instantly, and users with Signet Guard can't sign anything the team didn't approve: Guard blocks the signature. Signet builds on TapeKit's on-chain file verification and adds the signing-time allowlist (circuit #7), risk-tiered approvals with timelocks decided by circuit #6, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; live with Pro).
 >
 > Signet lets a dApp team seal each release of its website on X Layer (file hashes, the contracts and spenders the site may ask a wallet to sign for, the outside origins it may use). A TapeOut circuit decides when a release goes live (CI can propose and publish but never approve; humans approve; risky changes wait 24 h). Users who run the Guard browser extension have every page and every signature checked against the sealed release; the signing decision comes from a second TapeOut circuit. Users without Guard are NOT protected at signing; a watchtower alerts the team instead.
 
-Status (2026-11-18): live on X Layer mainnet (chain 196), deployed 2026-11-18 for 0.002171 OKB (docs/mainnet.md):
+Status (2026-11-24): live on X Layer mainnet (chain 196) since 2026-11-18 (docs/mainnet.md):
 - Release-policy circuit #6 and Guard decision circuit #7 on TapeOut processor #101 (0x73153e5fd2Acac604D49d6ca9fea27b750718F22), each verified on all 512 inputs on two RPCs.
-- SignetRegistry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, SignetFactory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, ReleaseGate implementation 0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D, Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz; observe mode, no release published yet).
-- `pnpm verify:claims`: 9 claims on mainnet, 10 from the repo, 0 pending.
-- Site (landing, dashboard, /prove against mainnet, no wallet): https://signet-6l4.pages.dev (Cloudflare Pages; signetguard.xyz once its nameservers move).
-- Not live: the Guard extension in the Chrome Web Store (a signed pre-release zip is on GitHub; tested with a mock wallet, not MetaMask), the gateway (staging only), watchtower alerts (the watchtower runs every 5 minutes on GitHub Actions for signetguard.xyz and publishes its status; Telegram not configured).
+- SignetRegistry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, SignetFactory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, ReleaseGate implementation 0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D.
+- Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz): releases #3, #4 and #5 published 2026-11-20, #6 was the tier-11 guardian change, #7 proposed 2026-11-24. Observe mode.
+- misthos.world gate 0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59: the team's own app (on Arc, not an outside adopter), sealed in server-rendered mode; release 1 proposed by its CI and approved 2026-11-24, publishable from 2026-11-25. Observe mode.
+- `pnpm verify:claims`: every claim checked on mainnet or in the repo (claims.json).
+- Site (landing, dashboard, /prove against mainnet, no wallet): https://signetguard.xyz (Cloudflare Pages).
+- CLI: `signetguard` on npm (0.2.1). Guard: a signed pre-release zip on GitHub (0.3.0), not in the Chrome Web Store, tested with a mock wallet only.
+- Not live: enforce mode on any mainnet gate, the gateway (staging only), watchtower alerts (the watchtower runs for signetguard.xyz on GitHub Actions' schedule, every 4–12 hours in practice, and publishes its status; Telegram not configured).
 
 ## Built on TapeOut (what is really used)
 - Two TapeOut circuits on processor #101: #6 decides when a release may publish (ReleaseGate calls it on every publish and unfreeze; a Solidity copy of the same gates decides only if that call fails or returns a malformed answer, with an on-chain event; the circuit's beacon has no owner, so the rule can't be upgraded); #7 decides Guard's allow/warn/block at signing.

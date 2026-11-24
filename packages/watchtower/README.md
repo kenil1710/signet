@@ -35,7 +35,7 @@ TapeSend, X posts, the public status page, Guard telemetry.
 
 **Live (built 2026-11-19; switched on when the repository is public):** `.github/workflows/watchtower.yml` runs one
 round every 5 minutes for `signetguard.xyz` on GitHub Actions (free for public repositories; GitHub starts schedules
-on a best-effort basis, so a round can be late). State and the public `status.json` live on the `watchtower-status`
+on a best-effort basis: from 2026-11-20 to 11-24 it actually ran every 4–12 hours, not every 5 minutes). State and the public `status.json` live on the `watchtower-status`
 branch (one commit, replaced each round); `/prove` and the dashboard read the status from there. Alerts go to
 Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` secrets).
 

@@ -38,8 +38,9 @@ Processor #101 = `0x73153e5fd2Acac604D49d6ca9fea27b750718F22`. Dev wallet = `0x7
 
 ## Claims we do not make
 
-- That users without Guard are protected at signing. **They aren't.** The attack suite runs the same DNS hijack against a browser without Guard to show it: the drainer's request reaches the wallet, and the only response is the watchtower alerting the team within about a minute. It is reported in its own section of `docs/attack-report.md` as a limit, not counted among the attacks above.
+- That users without Guard are protected at signing. **They aren't.** The attack suite runs the same DNS hijack against a browser without Guard to show it: the drainer's request reaches the wallet, and the only response is the watchtower alerting the team (within about a minute on the local fork; on mainnet it runs every 4–12 hours). It is reported in its own section of `docs/attack-report.md` as a limit, not counted among the attacks above.
 - That Guard survives being compromised itself (a malicious update, build or Chrome Web Store account). It doesn't; this can't be tested from outside and is documented in `THREAT_MODEL.md` (threat 17).
-- That Signet is on mainnet. Only the release-policy circuit, the container and the spikes are.
+- That Signet protects anyone on mainnet today. Its contracts and circuits are on mainnet (C8, C9), but both gates there (signetguard.xyz and misthos.world) are in **observe** mode: Guard reports, never blocks, until a team switches to enforce.
+- That misthos.world is an outside adopter. It is the team's own app (on Arc), sealed to test Signet on a server-rendered site.
 - That Guard works with MetaMask or OKX Wallet. It was tested with a mock wallet.
 - That TapeOut's contracts are audited or source-verified. They are neither; C5 checks what can be checked on-chain.

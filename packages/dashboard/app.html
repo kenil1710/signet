@@ -17,10 +17,7 @@
         </nav>
       </div>
     </header>
-    <div id="chainbar" role="alert" hidden>
-      <div class="cb-in"><span>Your wallet is on <b class="cb-now">another network</b>. Signet's contracts are on <b>X Layer (chain 196)</b>.</span>
-        <button id="switchchain" class="primary">Switch to X Layer</button></div>
-    </div>
+    <div id="chainbar" role="alert" hidden><!-- filled by main.ts only when a connected wallet is on another chain --></div>
     <div id="app"><section class="static-intro">
       <h1>Signet dashboard</h1>
       <p>Every website sealed with Signet on X Layer mainnet (chain 196), read live from the chain in your browser. No account; a wallet is needed only to approve, freeze or create a gate.</p>

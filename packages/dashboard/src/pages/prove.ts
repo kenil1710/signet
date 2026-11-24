@@ -6,6 +6,7 @@ import { NET, read, enc, dec, domains, project, releaseLists, releaseOf, domainP
 import policy from '@signet/circuit/artifacts/policy.json';
 import guard from '@signet/circuit/artifacts/guard.json';
 import { esc, view, $ } from '../ui.ts';
+import { RpcRateLimited } from '@signet/extension/src/lib/rpc.ts';
 
 const cpuAbi = [
   { type: 'function', name: 'circuitInfo', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint32' }, { type: 'uint32' }, { type: 'uint32' }, { type: 'uint32' }] },
@@ -18,8 +19,8 @@ const beaconAbi = [
 ] as const satisfies Abi;
 const T = NET.tapeout as { processor: Address; circuitBeacon: Address; circuitImplementation: Address; processorCodehash: Hex; guardCircuitId?: number; policyCircuitId: number };
 
-type Row = { claim: string; status: 'PASS' | 'FAIL' | 'PENDING' | 'STALE' | 'UNCONFIRMED' | '…'; detail: string; src: string };
-const LABEL: Record<Row['status'], string> = { PASS: 'Verified', FAIL: 'Failed', PENDING: 'Pending deployment', STALE: 'Stale', UNCONFIRMED: 'Not verified', '…': 'Checking' };
+type Row = { claim: string; status: 'PASS' | 'FAIL' | 'PENDING' | 'STALE' | 'UNCONFIRMED' | 'NOTRUN' | '…'; detail: string; src: string };
+const LABEL: Record<Row['status'], string> = { PASS: 'Verified', FAIL: 'Failed', PENDING: 'Pending deployment', STALE: 'Stale', UNCONFIRMED: 'Not verified', NOTRUN: 'Not checked', '…': 'Checking' };
 // OKX Explorer links only for addresses that exist on X Layer mainnet: TapeOut's (the same on staging, a mainnet fork),
 // and Signet's own only when this build reads mainnet.
 const EXPLORER = 'https://web3.okx.com/explorer/x-layer/evm/address/';
@@ -82,7 +83,9 @@ export async function provePage(): Promise<void> {
       const d = await f();
       Object.assign(r, d === null ? { status: 'PENDING', detail: 'not deployed on this network yet' } : { status: 'PASS', detail: d });
     } catch (e) {
-      Object.assign(r, { status: e instanceof Stale ? 'STALE' : e instanceof Unconfirmed ? 'UNCONFIRMED' : 'FAIL', detail: (e as Error).message.split('\n')[0] });
+      // a public RPC that is still rate-limiting after the retries says nothing about the claim: "not checked", never "failed"
+      if (e instanceof RpcRateLimited) Object.assign(r, { status: 'NOTRUN', detail: `${(e as Error).message}: not checked. Reload this page in a minute.` });
+      else Object.assign(r, { status: e instanceof Stale ? 'STALE' : e instanceof Unconfirmed ? 'UNCONFIRMED' : 'FAIL', detail: (e as Error).message.split('\n')[0] });
     }
     render();
   };
@@ -129,6 +132,7 @@ export async function provePage(): Promise<void> {
   const fails = rows.filter((r) => r.status === 'FAIL').length;
   const stale = rows.filter((r) => r.status === 'STALE').length;
   const unconfirmed = rows.filter((r) => r.status === 'UNCONFIRMED').length;
-  $('#sum', v).className = `summary ${fails ? 'bad' : 'ok'}`;
-  $('#sum', v).textContent = fails ? `${fails} check(s) FAILED.` : `All checks passed (${rows.filter((r) => r.status === 'PENDING').length} pending deployment${stale ? `; ${stale} project(s) with a release whose files were not uploaded` : ''}${unconfirmed ? `; ${unconfirmed} project(s) not verified by their domain` : ''}).`;
+  const notRun = rows.filter((r) => r.status === 'NOTRUN').length;
+  $('#sum', v).className = `summary ${fails ? 'bad' : notRun ? 'warn' : 'ok'}`;
+  $('#sum', v).textContent = fails ? `${fails} check(s) FAILED.` : notRun ? `${notRun} check(s) not run: a public RPC is rate-limiting this browser. Nothing failed; reload in a minute.` : `All checks passed (${rows.filter((r) => r.status === 'PENDING').length} pending deployment${stale ? `; ${stale} project(s) with a release whose files were not uploaded` : ''}${unconfirmed ? `; ${unconfirmed} project(s) not verified by their domain` : ''}).`;
 }

@@ -2,7 +2,7 @@
 
 > **Judges: start with [`JUDGES.md`](JUDGES.md)** (5 minutes: what to check, in order, with links). Machine-readable: [`claims.json`](claims.json), [`llms.txt`](llms.txt).
 
-**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign anything your team didn't approve.
+**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign anything your team didn't approve.
 **What teams get:** release approvals with a timelock nobody can bypass (no single key: CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts, instant freeze, a verified copy read from X Layer (built; live with Pro), and a public proof and badge. **For users:** Guard **blocks the signature** to any contract or spender the team didn't approve (circuit #7). Signet **builds on TapeKit's** on-chain file verification.
 **What it is.** A dApp team seals each release of its website on X Layer; a TapeOut circuit decides when it may go live, and users who run the **Guard** extension get every page and every signature checked against it by a second TapeOut circuit.
 **Benchmark (12 attacks we wrote, on our own local fork of X Layer):** SRI alone blocks 2, Signet Guard with its signature checks switched off ("hash-only") 7, **Signet 12**, with **0 false blocks** ([`docs/benchmark.md`](docs/benchmark.md)).
@@ -19,12 +19,12 @@
 |---|---|---|
 | `packages/circuit` | Release-policy circuit (34 NAND) and Guard decision circuit (22 NAND), reference functions, exhaustive 512-row tests | both on mainnet (#6, #7) |
 | `packages/contracts` | ReleaseGate (one per project), SignetRegistry (domains, enumerable list, chunked file writes), SignetFactory | 189 Foundry tests; on mainnet |
-| `packages/cli` | `signet` CLI: init, verify, seal, propose, diff (Diff Guard), approve, publish, upload, wait, freeze | staging |
+| `packages/cli` | `signet` CLI: init, verify, seal, propose, diff (Diff Guard), approve, publish, upload, wait, freeze | on npm (`signetguard`); used for every mainnet release |
 | `packages/action` | GitHub Action: verify, seal, propose, publish when the circuit allows, then deploy | staging (local runner) |
 | `packages/extension` | Guard (Chrome MV3): page check from the browser cache, signing check decided by the Guard circuit | staging; not in the Web Store |
 | `packages/gateway` | The verified copy as a normal web page, every file checked against the sealed hashes | staging; not deployed |
 | `packages/dashboard` | Landing page, projects, proposals with Diff Guard, approvals, freeze/revoke, `/prove`, badge | live on Cloudflare Pages, reading mainnet |
-| `packages/watchtower` | Loads each watched site, alerts the team on a mismatch confirmed by two loads | live for signetguard.xyz: every 5 minutes on GitHub Actions (best effort), status at `/prove`; Telegram alerts not configured yet |
+| `packages/watchtower` | Loads each watched site, alerts the team on a mismatch confirmed by two loads | live for signetguard.xyz: scheduled every 5 minutes on GitHub Actions, which in practice runs it every 4–12 hours; status at `/prove`; Telegram alerts not configured yet |
 | `packages/attacks` | The attack suite and the benchmark | staging |
 
 ## Protect your own site
@@ -33,7 +33,7 @@
 npm install -g signetguard     # the signet CLI: one file, Node 18+, no repository needed
 ```
 
-Then follow the five steps at [`/start`](https://signet-6l4.pages.dev/start): create your gate in the dashboard, prove
+Then follow the five steps at [`/start`](https://signetguard.xyz/start): create your gate in the dashboard, prove
 your domain (`signet domain public`), add the GitHub workflow, approve your first release.
 
 ## Built on TapeOut: what Signet really uses

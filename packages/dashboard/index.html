@@ -21,7 +21,7 @@
 <noscript><div class="nojs wrap">
   <h2>Signet in short</h2>
   <p><b>Your contracts are audited. Your website isn't.</b> Signet protects what your users actually load: no single
-  hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign
+  hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign
   anything your team didn't approve. The big front-end attacks (Bybit, BadgerDAO, Ledger Connect Kit, Curve, CoW
   Swap) happened after GitHub: on the hosting, the CDN, a package or the domain.</p>
   <p><b>What teams get:</b> release approvals and a timelock nobody can bypass (no single key: CI only proposes),
@@ -30,7 +30,7 @@
   <ul>
     <li><b>Seal:</b> CI hashes every file of a release and lists the contracts it may call; that becomes a proposal on X Layer. The CI key can only propose.</li>
     <li><b>Approve:</b> the team's approvers approve in their own wallets. TapeOut circuit #6 decides when it publishes: code only 1 approval + 1 h; a new origin 2 + 1 h; a new contract or spender 2 + 24 h; admin changes 3 of 3 + 24 h.</li>
-    <li><b>Guard:</b> a browser extension (Chrome Web Store listing coming soon) checks the page against the sealed release, read from two X Layer nodes, and checks every signature request against the sealed allowlist (circuit #7).</li>
+    <li><b>Guard:</b> a browser extension (a signed pre-release on GitHub; not in the Chrome Web Store yet) checks the page against the sealed release, read from two X Layer nodes, and checks every signature request against the sealed allowlist (circuit #7).</li>
     <li><b>Builds on TapeKit:</b> TapeKit already verifies DeWEB files on-chain. Signet adds the signing-time allowlist, risk-tiered approvals with timelocks, CI that can only propose, a domain proof, and a verified copy read from X Layer.</li>
   </ul>
   <p>Benchmark (12 attacks we wrote, on our own local fork of X Layer): 12 of 12 blocked, 0 false blocks in 16 clean sessions. SRI alone: 2/12; Signet Guard with its signature checks off ("hash-only"): 7/12.</p>
@@ -62,7 +62,7 @@
     </nav>
     <div class="nav-r">
       <span class="chain"><i></i>X LAYER · 196</span>
-      <a class="btn btn-wax" href="#cta" data-link="chromeWebStore" data-soon="Guard: coming soon">Add Guard</a>
+      <a class="btn btn-wax" href="#cta" data-link="guardPrerelease">Get Guard (pre-release)</a>
     </div>
   </div>
 </header>
@@ -89,7 +89,7 @@
       </div>
       <div class="h-foot">
         <div class="wrap">
-          <p class="lede" id="lede">Signet protects what your users actually load: no single hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign anything your team didn't approve.</p>
+          <p class="lede" id="lede">Signet protects what your users actually load: no single hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign anything your team didn't approve.</p>
           <div class="cta-row">
             <a class="btn btn-wax" href="start">Protect your dApp<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
             <a class="btn btn-line" href="check">Check your site's risk, free</a>
@@ -511,7 +511,7 @@
     <div class="wrap">
       <h2 class="stamp h2">Seal your<br><em>next release.</em></h2>
       <div class="cta-row">
-        <a class="btn btn-wax" href="#hero" data-link="chromeWebStore" data-soon="Guard for Chrome: coming soon">Add Guard to Chrome<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+        <a class="btn btn-wax" href="#hero" data-link="guardPrerelease">Get Guard for Chrome (pre-release)<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
         <a class="btn btn-line" href="#teams">Protect your dApp</a>
       </div>
     </div>

@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | signet-ops `0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291` since 2026-11-23 (keystore with scrypt n = 2^18; tier-11 `SetGuardian`, proposal #6). Before: signet-dev until 2026-11-20, then none |
 
-Mode: **observe** (a new gate starts there). Current release: **#4** (published 2026-11-20; #3 before it, the same day). See "Release #3 published" and "Release #4 published" below.
+Mode: **observe** (a new gate starts there). Current release: **#5** (published 2026-11-20; #3 and #4 before it, the same day); #6 was the tier-11 guardian change (2026-11-23); #7 proposed 2026-11-24. See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 

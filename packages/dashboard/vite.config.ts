@@ -15,7 +15,7 @@ const net = {
 // Static HTML that reads the same without JavaScript (crawlers, AI judges, reader modes): every outside link is
 // written into the HTML at build time, {{ORIGIN}} is filled in, and the trust documents are served by the site.
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
-const DOCS: Record<string, string> = { 'docs/THREAT_MODEL.md': 'THREAT_MODEL.md', 'docs/CLAIMS.md': 'CLAIMS.md', 'docs/benchmark.md': 'docs/benchmark.md' };
+const DOCS: Record<string, string> = { 'docs/THREAT_MODEL.md': 'THREAT_MODEL.md', 'docs/CLAIMS.md': 'CLAIMS.md', 'docs/benchmark.md': 'docs/benchmark.md', 'llms.txt': 'llms.txt' };
 function staticSite(): Plugin {
   const links = linksFor(process.env.SIGNET_REPO_PUBLIC === '1');
   return {

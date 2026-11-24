@@ -1,6 +1,6 @@
 # Signet in 5 minutes
 
-**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, you know within minutes if anyone does, and users with Signet Guard can't sign anything your team didn't approve.
+**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign anything your team didn't approve.
 **What teams get:** release approvals with a timelock nobody can bypass (no single key: CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts, instant freeze, a verified copy read from X Layer (built; live with Pro), and a public proof and badge. **For users:** Guard **blocks the signature** to any contract or spender the team didn't approve (circuit #7). Signet **builds on TapeKit's** on-chain file verification.
 
 **What it is.** A dApp team seals each release of its website on X Layer: the hash of every file, the contracts and
@@ -45,21 +45,21 @@ cast call 0x73153e5fd2Acac604D49d6ca9fea27b750718F22 "eval(uint256,bytes)(bytes)
 cast call 0x73153e5fd2Acac604D49d6ca9fea27b750718F22 "eval(uint256,bytes)(bytes)" 6 0xa901 --rpc-url https://xlayerrpc.okx.com   # 0x00
 ```
 
-No terminal? Open **[/prove](https://signet-6l4.pages.dev/app#/prove)**: the same circuit checks, run by your
+No terminal? Open **[/prove](https://signetguard.xyz/app#/prove)**: the same circuit checks, run by your
 browser against mainnet, with no wallet (about 3 minutes).
 
 ## What runs on TapeOut (X Layer mainnet)
 
-- **Two circuits on processor #101** ([`0x73153e5f…8F22`]({O}/address/0x73153e5fd2Acac604D49d6ca9fea27b750718F22)):
+- **Two circuits on processor #101** ([`0x73153e5f…8F22`](https://web3.okx.com/explorer/x-layer/evm/address/0x73153e5fd2Acac604D49d6ca9fea27b750718F22)):
   - **#6**, the release policy. ReleaseGate calls `eval(6, …)` inside every publish and unfreeze transaction, and the
     circuit's output decides.
   - **#7**, Guard's ALLOW / WARN / BLOCK decision at signing.
   - Both are checked on all 512 inputs by `verify:claims` (C1–C3, C9).
 - **Circuit Container + SiteRegistry** (DeWEB's storage): the container of circuit #5
-  ([`0x8E2E…94Ed`]({O}/address/0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed)) in SiteRegistry
-  ([`0xd6EF…ADB6`]({O}/address/0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6)) holds each release's sealed manifest and
+  ([`0x8E2E…94Ed`](https://web3.okx.com/explorer/x-layer/evm/address/0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed)) in SiteRegistry
+  ([`0xd6EF…ADB6`](https://web3.okx.com/explorer/x-layer/evm/address/0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6)) holds each release's sealed manifest and
   the files of the verified copy.
-  - [SignetRegistry]({O}/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589) writes there, as the container's 30-day
+  - [SignetRegistry](https://web3.okx.com/explorer/x-layer/evm/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589) writes there, as the container's 30-day
     operator, and only files an approved release lists.
   - Files over 48 KB go in 24 KB pieces (`writeChunk` → `appendChunk`).
   - So far only a test file is stored (C6); no project files yet.
@@ -105,9 +105,9 @@ team). Against the same attacks (12 we wrote, run on our own local fork of X Lay
 [`THREAT_MODEL.md`](THREAT_MODEL.md), especially "Who is protected" and "Honest limits". In short: protection at
 signing needs Guard; Guard starts in observe mode; it fails open when it can't read the chain; a compromised Guard
 extension defeats it. Signet's contracts and the Guard circuit **are on mainnet** ([`docs/mainnet.md`](docs/mainnet.md)), and Signet's own
-site has published two releases through its gate there (#3, tier 10, and #4, tier 00, on 2026-11-20). Guard isn't in
+site has published releases #3 (tier 10), #4 and #5 (tier 00) through its gate there on 2026-11-20 (#6 was the tier-11 guardian change) and proposed #7 on 2026-11-24. misthos.world, the team's own app on Arc, has its gate and a first release approved (publishable 2026-11-25). Both gates are in **observe** mode: Guard reports, it doesn't block yet. Guard isn't in
 the Chrome Web Store (a signed pre-release zip is on GitHub), has been tested with a mock wallet only, and the gateway
-runs on staging. The watchtower checks signetguard.xyz every 5 minutes from GitHub Actions (best effort) and publishes
+runs on staging. The watchtower checks signetguard.xyz on GitHub Actions' schedule (set to every 5 minutes; every 4–12 hours in practice) and publishes
 its result; its Telegram alerts aren't configured yet.
 
 ## Run it yourself (optional, ~15 minutes)
