@@ -32,7 +32,9 @@ echo "$STATUS" | grep -q "can publish now" || { echo "   not publishable now: no
 echo "2/4 deploy release/$ID to Cloudflare Pages"
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 cp -R "$REL/." "$STAGE/"; rm -rf "$STAGE/signet" "$STAGE/signet-manifest.json"
-npx -y wrangler@4 pages deploy "$STAGE" --project-name signet --branch main --commit-dirty=true 2>&1 | grep -E 'Deployment complete|Success|error' || true
+# from packages/dashboard: wrangler takes the Pages Functions (/api/check, /api/watchtower) from ./functions in the
+# directory it runs in. Releases #7-#9 were deployed from elsewhere and went out without them (found 2026-11-25).
+(cd "$DASH" && npx -y wrangler@4 pages deploy "$STAGE" --project-name signet --branch main --commit-dirty=true 2>&1 | grep -E 'Deployment complete|Success|Compiled Worker|functions|error' || true)
 
 echo "3/4 publish #$ID now (seconds after the deploy)"
 "${CLI[@]}" wait "$REL" --publish --timeout 300 --interval 2
@@ -48,4 +50,9 @@ while IFS= read -r f; do
   [ "$live" = "$sealed" ] || { bad=$((bad + 1)); echo "   DIFF $f"; }
 done < <(cd "$REL" && find . -type f ! -name signet-manifest.json ! -path './signet/*' ! -name _headers | sed 's#^\./##' | sort)
 echo "   $n files, $bad differ"
+# the server-side endpoints (not sealed files): they must answer JSON, not the landing page
+for api in "api/check?domain=example.com" "api/watchtower"; do
+  ct="$(curl -s -o /dev/null -w '%{content_type}' -A "$UA" "https://signetguard.xyz/$api")"
+  case "$ct" in application/json*) echo "   /$api: JSON" ;; *) bad=$((bad + 1)); echo "   /$api: NOT JSON ($ct): the Pages Functions were not deployed" ;; esac
+done
 [ "$bad" -eq 0 ]

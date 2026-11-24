@@ -1,6 +1,6 @@
 # The watchtower, live: every 5 minutes, load signetguard.xyz in a real browser, compare every file with the sealed
 # release on X Layer, alert the team on Telegram after two bad loads in a row, renew the shared container's operator
-# grant when fewer than 7 days are left, and publish status.json for /prove and the dashboard.
+# grant when fewer than 7 days are left, run the public /prove page, and publish status.json for /prove and the dashboard.
 # State and status live on the `watchtower-status` branch (one commit, replaced each round).
 # Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (alerts), WATCHTOWER_RENEW_KEY (a small dedicated renewer wallet,
 # never signet-dev). GitHub runs schedules on a best-effort basis: a round can start some minutes late.
@@ -46,6 +46,7 @@ jobs:
           WATCHTOWER_ONLY: signetguard.xyz
           WATCHTOWER_STATE: ${{ github.workspace }}/status/state.json
           WATCHTOWER_STATUS: ${{ github.workspace }}/status/status.json
+          WATCHTOWER_PROVE_URL: https://signetguard.xyz/app#/prove # its rows are kept only if the page finishes within 90 s
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           WATCHTOWER_RENEW_KEY: ${{ secrets.WATCHTOWER_RENEW_KEY }}

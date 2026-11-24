@@ -79,11 +79,27 @@ export async function agree(net: Net, calls: Call[], minBlock?: number): Promise
   const heads = await Promise.all([net.rpcUrl, net.rpcUrl2].map((u) => rpc<string>(u, 'eth_blockNumber', [])));
   const n = Math.min(...heads.map((h) => parseInt(h, 16)));
   if (minBlock !== undefined && n < minBlock) throw new RpcBehind(`the RPCs are at block ${n}, not yet at ${minBlock}`);
-  const block = `0x${n.toString(16)}`;
+  return agreeAt(net, calls, n);
+}
+
+/// The newest block both RPCs have (to pin several reads to one block with agreeAt).
+export async function commonHead(net: Net): Promise<number> {
+  if (!net.rpcUrl2) return parseInt(await rpc<string>(net.rpcUrl, 'eth_blockNumber', []), 16);
+  const heads = await Promise.all([net.rpcUrl, net.rpcUrl2].map((u) => rpc<string>(u, 'eth_blockNumber', [])));
+  return Math.min(...heads.map((h) => parseInt(h, 16)));
+}
+
+/// The same calls on both RPCs at one given block. Throws unless every answer is identical.
+export async function agreeAt(net: Net, calls: Call[], blockNumber: number): Promise<string[]> {
+  if (!net.rpcUrl2) throw new RpcError('only one RPC is configured, and Guard needs two that agree');
+  const block = `0x${blockNumber.toString(16)}`;
   const [a, b] = await Promise.all([callAt(net.rpcUrl, calls, block), callAt(net.rpcUrl2, calls, block)]);
   for (let i = 0; i < calls.length; i++) if (a[i] !== b[i]) throw new RpcError('the two RPCs disagree about the chain');
   return a!;
 }
+
+/// The calls on one RPC at a given block (staging, which has one RPC).
+export const callOne = (url: string, calls: Call[], blockNumber: number): Promise<string[]> => callAt(url, calls, `0x${blockNumber.toString(16)}`);
 
 /// One call on either RPC. Only for bytes that are checked against a hash afterwards.
 export async function either(net: Net, call: Call): Promise<string> {

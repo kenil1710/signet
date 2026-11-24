@@ -180,3 +180,8 @@ body.embed{background:transparent} body.embed .top{display:none} body.embed #app
 .fd.risk b{color:var(--wax-hi)}.fd.warn b{color:var(--warn)}.fd.ok b{color:var(--ok)}
 .fd .area{color:var(--muted);margin-right:6px}
 .summary.warnsum{color:var(--warn)}
+/* /prove: the watchtower's last run, shown while this browser's own check runs */
+.lastrun > summary { cursor: pointer; list-style: none; }
+.lastrun > summary::-webkit-details-marker { display: none; }
+.lastrun > summary .dim { text-decoration: underline; margin-left: 6px; }
+.lastrun .claims { opacity: .72; margin-top: 6px; }

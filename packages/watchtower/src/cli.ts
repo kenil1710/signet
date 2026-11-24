@@ -7,6 +7,7 @@
 //   WATCHTOWER_RENEW_KEY      optional: a small dedicated wallet that renews the shared container's operator grant
 //                             when fewer than WATCHTOWER_RENEW_DAYS (default 7) are left. Never signet-dev.
 //   WATCHTOWER_STATUS         optional: write the public status file here after each round
+//   WATCHTOWER_PROVE_URL      optional (with WATCHTOWER_STATUS): run this /prove page after each round, publish its rows
 //   WATCHTOWER_ONLY           comma-separated domains to watch (default: all bound domains)
 //   WATCHTOWER_URL_TEMPLATE   default https://{domain}/   (staging: http://{domain}:PORT/)
 //   WATCHTOWER_HOST_RULES     Chromium --host-resolver-rules, for staging hosts that don't exist in DNS
@@ -46,6 +47,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       fromIndex: env.WATCHTOWER_FROM_INDEX ? Number(env.WATCHTOWER_FROM_INDEX) : undefined,
       only: env.WATCHTOWER_ONLY ? env.WATCHTOWER_ONLY.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
       statusPath: env.WATCHTOWER_STATUS || undefined,
+      proveUrl: env.WATCHTOWER_PROVE_URL || undefined,
       renew: env.WATCHTOWER_RENEW_KEY ? {
         rpcUrl: net.rpcUrl, chainId: net.chainId, key: env.WATCHTOWER_RENEW_KEY.trim() as `0x${string}`, minDays: Number(env.WATCHTOWER_RENEW_DAYS || 7),
         processor: n.tapeout.processor as `0x${string}`, circuitId: BigInt(n.tapeout.sharedCircuitId), container: n.tapeout.sharedContainer as `0x${string}`, siteRegistry: n.tapeout.siteRegistry as `0x${string}`,

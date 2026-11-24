@@ -3,8 +3,8 @@
 import { decodeFunctionResult, encodeFunctionData, hexToBytes, zeroAddress, type Abi, type Address, type Hex } from 'viem';
 import { gateAbi, factoryAbi } from '@signet/cli/src/abi.ts';
 import { proofNames, PROOF_PATH } from '@signet/extension/src/lib/proof.ts';
-import { registryAbi, siteAbi } from '@signet/extension/src/lib/abi.ts';
-import { agree, either, type Call } from '@signet/extension/src/lib/rpc.ts';
+import { registryAbi, siteAbi, MULTICALL3 } from '@signet/extension/src/lib/abi.ts';
+import { agreeAt, callOne, commonHead, either, MAX_BATCH, type Call } from '@signet/extension/src/lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from '@signet/extension/src/lib/sealed.ts';
 import type { Net, Sealed } from '@signet/extension/src/lib/types.ts';
 
@@ -14,7 +14,9 @@ declare const __SIGNET_PROOF_ORIGIN__: string;
 declare const __SIGNET_WATCHTOWER_STATUS__: string;
 
 // ---- the watchtower's public status (written each round by .github/workflows/watchtower.yml)
-export interface WatchStatus { updatedAt: string; network: string; domains: { domain: string; status: string; checkedAt: string | null; release: number | null }[]; operator: { until: string; daysLeft: number } | null }
+export interface WatchStatus { updatedAt: string; network: string; domains: { domain: string; status: string; checkedAt: string | null; release: number | null }[]; operator: { until: string; daysLeft: number } | null;
+  /// the watchtower's last run of /prove in its browser (absent until one finished)
+  prove?: { checkedAt: string; block: string | null; summary: string; rows: { claim: string; status: string; detail: string }[] } }
 export async function watchtowerStatus(): Promise<WatchStatus | null> {
   if (!__SIGNET_WATCHTOWER_STATUS__) return null;
   try {
@@ -66,8 +68,32 @@ export const dec = <T>(abi: Abi, functionName: string, data: string): T => {
   if (data === 'revert') throw new Error(`${functionName} reverted`);
   return decodeFunctionResult({ abi, functionName, data: data as Hex }) as T;
 };
-/// Facts: two RPCs that must agree (staging may have one; then that one).
-export const read = (calls: Call[]): Promise<string[]> => (NET.rpcUrl2 ? agree(NET, calls) : Promise.all(calls.map((c) => either(NET, c))));
+/// Facts: two RPCs that must agree (staging may have one; then that one), at one block: the newest both have, or
+/// `block` when the caller pins several reads to the same block (/prove).
+/// More calls than one JSON-RPC batch holds (3, xlayer.drpc.org's limit) go through Multicall3's aggregate3 in chunks
+/// of MC_CHUNK, one eth_call each (measured 2026-11-25 on both mainnet RPCs: 128 `eval`s of the policy circuit are
+/// 11.8M gas and answer in 0.4–1.2 s; 512 are 47M, too close to the RPCs' 50M eth_call cap). A call that reverts
+/// inside the multicall is "revert", as in a plain batch, so both RPCs are compared the same way.
+export const MC_CHUNK = 128;
+const mcAbi = [{ type: 'function', name: 'aggregate3', stateMutability: 'payable', inputs: [{ type: 'tuple[]', components: [{ name: 'target', type: 'address' }, { name: 'allowFailure', type: 'bool' }, { name: 'callData', type: 'bytes' }] }], outputs: [{ type: 'tuple[]', components: [{ name: 'success', type: 'bool' }, { name: 'returnData', type: 'bytes' }] }] }] as const satisfies Abi;
+export const head = (): Promise<number> => commonHead(NET);
+const rawAt = (calls: Call[], block: number): Promise<string[]> => (NET.rpcUrl2 ? agreeAt(NET, calls, block) : callOne(NET.rpcUrl, calls, block));
+export async function read(calls: Call[], block?: number): Promise<string[]> {
+  const at = block ?? (await head());
+  if (calls.length <= MAX_BATCH) return rawAt(calls, at);
+  const chunks: Call[][] = [];
+  for (let i = 0; i < calls.length; i += MC_CHUNK) chunks.push(calls.slice(i, i + MC_CHUNK));
+  const wrapped = chunks.map((c) => ({ to: MULTICALL3 as Address, data: encodeFunctionData({ abi: mcAbi, functionName: 'aggregate3', args: [c.map((x) => ({ target: x.to, allowFailure: true, callData: x.data }))] }) }));
+  const out: string[] = [];
+  for (let i = 0; i < wrapped.length; i += MAX_BATCH) {
+    const got = await rawAt(wrapped.slice(i, i + MAX_BATCH), at);
+    for (const g of got) {
+      if (g === 'revert') throw new Error('Multicall3 reverted');
+      for (const r of decodeFunctionResult({ abi: mcAbi, functionName: 'aggregate3', data: g as Hex })) out.push(r.success ? r.returnData : 'revert');
+    }
+  }
+  return out;
+}
 export async function one<T>(to: Address, abi: Abi, fn: string, args: unknown[] = []): Promise<T> {
   const [r] = await read([enc(to, abi, fn, args)]);
   return dec<T>(abi, fn, r!);

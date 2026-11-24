@@ -39,6 +39,7 @@ export interface Config {
   log?: (line: string) => void;
   renew?: RenewConfig; // keep the shared container's operator grant alive (src/renew.ts)
   statusPath?: string; // write a public status file after each round (for /prove and the dashboard)
+  proveUrl?: string; // also run this /prove page in the browser after each round and publish its rows in the status
 }
 
 interface DomainState {
@@ -60,7 +61,9 @@ export interface Status {
   network: string;
   domains: { domain: string; status: DomainState['status']; checkedAt: string | null; release: number | null }[];
   operator: { until: string; daysLeft: number; renewedThisRound: boolean } | null;
-} // nextIndex: how far into the registry's domain list we have read
+  prove?: ProveRun; // the last finished run of /prove (kept from earlier rounds until a newer one finishes)
+}
+export interface ProveRun { checkedAt: string; block: string | null; summary: string; rows: { claim: string; status: string; detail: string }[] } // nextIndex: how far into the registry's domain list we have read
 
 export function loadState(path: string, fromIndex: number): State {
   return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as State) : { nextIndex: fromIndex, domains: {} };
@@ -235,6 +238,8 @@ export async function tick(c: Config, browser: Browser): Promise<TickResult> {
       domains: Object.entries(state.domains).filter(([d]) => watched(d)).map(([domain, d]) => ({ domain, status: d.status, checkedAt: d.checkedAt ? new Date(d.checkedAt).toISOString() : null, release: d.release ?? null })),
       operator,
     };
+    const before = existsSync(c.statusPath) ? (JSON.parse(readFileSync(c.statusPath, 'utf8')) as Partial<Status>) : {};
+    if (before.prove) status.prove = before.prove;
     mkdirSync(dirname(c.statusPath), { recursive: true });
     writeFileSync(c.statusPath, JSON.stringify(status, null, 2) + '\n');
   }
@@ -251,6 +256,15 @@ export async function run(c: Config, o: { intervalSec: number; once?: boolean; c
       try {
         const r = await tick(c, browser);
         log(`[${new Date().toISOString()}] round done: ${r.domains} domain(s), ${r.checked} site(s) loaded, ${r.alerts} alert(s), ${r.posts} post(s)`);
+        if (c.proveUrl && c.statusPath && existsSync(c.statusPath)) {
+          const pr = await proveRun(browser, c.proveUrl);
+          if ('error' in pr) log(`[${new Date().toISOString()}] /prove not recorded: ${pr.error}`);
+          else {
+            const st = JSON.parse(readFileSync(c.statusPath, 'utf8')) as Status;
+            writeFileSync(c.statusPath, JSON.stringify({ ...st, prove: pr }, null, 2) + '\n');
+            log(`[${new Date().toISOString()}] /prove at block ${pr.block}: ${pr.summary}`);
+          }
+        }
       } catch (e) {
         log(`[${new Date().toISOString()}] round failed: ${(e as Error).message.split('\n')[0]}`);
       }
@@ -259,5 +273,29 @@ export async function run(c: Config, o: { intervalSec: number; once?: boolean; c
     }
   } finally {
     await browser.close();
+  }
+}
+
+/// Run the public /prove page in the watchtower's browser (the same code every visitor runs, reading the chain itself)
+/// and keep its rows, so /prove can show the last result at once, dated, while a visitor's own check runs. Only a run
+/// that finished within the time limit is kept; one that didn't is not recorded (the previous one stays, with its date).
+export async function proveRun(browser: Browser, url: string, timeoutMs = 90_000): Promise<ProveRun | { error: string }> {
+  const ctx = await browser.newContext();
+  try {
+    const page = await ctx.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForFunction(() => !!(document.querySelector('#app') as HTMLElement | null)?.dataset.proveDone, null, { timeout: timeoutMs });
+    return await page.evaluate(() => {
+      const t = (e: Element | null) => (e?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const rows = [...document.querySelectorAll('#rows .claim')].map((li) => ({
+        claim: t(li.querySelector('.what')), detail: t(li.querySelector('.detail')),
+        status: [...(li.querySelector('.st')?.classList ?? [])].find((c) => c !== 'st') ?? 'unknown',
+      }));
+      return { checkedAt: new Date().toISOString(), block: (document.querySelector('#app') as HTMLElement).dataset.proveDone ?? null, summary: t(document.querySelector('#sum')), rows };
+    });
+  } catch (e) {
+    return { error: (e as Error).message.split('\n')[0]! };
+  } finally {
+    await ctx.close();
   }
 }
