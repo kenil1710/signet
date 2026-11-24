@@ -1,4 +1,4 @@
-// A rate-limited RPC (HTTP 429/503) is retried with backoff; one that stays limited gives RpcRateLimited, never a
+// A rate-limited RPC (HTTP 429) is retried with backoff; a down one (503) is not (Guard falls back at once); one that stays limited gives RpcRateLimited, never a
 // wrong answer. Found live 2026-11-24: /prove showed "FAILED" because xlayer.drpc.org answered 429 to its 512-row checks.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,4 +47,15 @@ test('an RPC that stays rate-limited gives RpcRateLimited after the retries (an 
   assert.ok(e instanceof RpcRateLimited && e instanceof RpcError, String(e));
   assert.match(e.message, /rate-limiting \(HTTP 429, 4 retries\)/);
   assert.equal(a.count(), RETRY.tries + 1);
+});
+
+test('a down RPC (HTTP 503) is not retried: the caller falls back at once (Guard: cached release or fail-open)', async () => {
+  let n = 0;
+  const srv = http.createServer((_req, res) => { n++; res.statusCode = 503; res.end(); });
+  servers.push(srv);
+  const url = await new Promise<string>((r) => srv.listen(0, '127.0.0.1', () => r(`http://127.0.0.1:${(srv.address() as { port: number }).port}`)));
+  const e = await rpc(url, 'eth_blockNumber', []).catch((x) => x);
+  assert.ok(e instanceof RpcError && !(e instanceof RpcRateLimited), String(e));
+  assert.match(e.message, /HTTP 503/);
+  assert.equal(n, 1);
 });

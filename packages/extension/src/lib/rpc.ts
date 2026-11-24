@@ -9,8 +9,9 @@ export interface Call { to: Hex; data: Hex }
 type Reply = { result?: unknown; error?: { code: number; message: string; data?: unknown } };
 
 /// Public RPCs rate-limit by requests per second (measured 2026-11-24: xlayer.drpc.org and xlayerrpc.okx.com both answer
-/// HTTP 429 to a burst; /prove's 512-row checks hit it). A 429 or 503 is retried with backoff (Retry-After when given);
-/// still limited after the retries: RpcRateLimited, which callers show as "not checked", never as a wrong answer.
+/// HTTP 429 to a burst; /prove's 512-row checks hit it). A 429 is retried with backoff (Retry-After when given); still
+/// limited after the retries: RpcRateLimited, which callers show as "not checked", never as a wrong answer. A node that
+/// is down (503, unreachable) is not retried: Guard must fall back to its cached release or fail open at once.
 export class RpcRateLimited extends RpcError {}
 export const RETRY = { tries: 4, baseMs: 400, maxMs: 5000 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -21,8 +22,8 @@ async function post(url: string, body: unknown): Promise<unknown> {
     const timer = setTimeout(() => ctl.abort(), 8000);
     try {
       const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal, cache: 'no-store', credentials: 'omit' });
-      if (res.status === 429 || res.status === 503) {
-        if (attempt >= RETRY.tries) throw new RpcRateLimited(`${new URL(url).host} is rate-limiting (HTTP ${res.status}, ${attempt} retries)`);
+      if (res.status === 429) {
+        if (attempt >= RETRY.tries) throw new RpcRateLimited(`${new URL(url).host} is rate-limiting (HTTP 429, ${attempt} retries)`);
         const after = Number(res.headers.get('retry-after'));
         await sleep(Math.min(RETRY.maxMs, Number.isFinite(after) && after > 0 ? after * 1000 : RETRY.baseMs * 2 ** attempt));
         continue;

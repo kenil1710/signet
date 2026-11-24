@@ -1,6 +1,6 @@
 {
   "name": "@signet/extension",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Signet Guard: Chrome MV3 extension",
   "license": "MIT",
