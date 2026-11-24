@@ -223,6 +223,11 @@ container `0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed`, prefix `projects/misthos
 A `0xB9ef…2416`, B `0x3280…6dc`, C `0x1C47…c74c`; proposer (Misthos CI) `0x88e003256804Df5b916E19849C7a26c4e1cC4D06`;
 recovery `0x6940…cD93`; guardian signet-ops `0x9275…E291`; observe mode (`enforced` = false).
 
+**Misthos CI key funded** (2026-11-24 08:47:41 UTC): [`0x7814a003…5e0b`](https://web3.okx.com/explorer/x-layer/evm/tx/0x7814a003312fa8fe1e625465bd06182839a9f448fca3d97b6bd01c9881475e0b),
+block 76,741,025, 0.002 OKB from `0xe619216b27a37dde4238e0541bbc0e16916497f8` (the team's Rabby wallet) to the CI proposer
+`0x88e0…4D06`; 21,000 gas at 0.0286 gwei (0.0000006006 OKB). CI key balance 0.002 OKB on both RPCs. (Planned from
+signet-ops, whose keystore password does not open in cast: see `scripts/check-keystore.mjs`.)
+
 **Dashboard bug found here:** the page showed "gate 0x000…0 created". The transaction was fine; the page read the
 binding through both RPCs at the lower of their two heads, one block before `createGate` (see `docs/decisions.md`).
 
