@@ -205,6 +205,18 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #9 proposed (2026-11-24, tier 00): /privacy, CLI 0.2.2 on /start, Guard 0.3.2 links, docs synced
+
+Built with `SIGNET_REPO_PUBLIC=1` and sealed into `packages/dashboard/release/9`; fork-rehearsed (tier 00, same gas).
+Allowlist and origins equal #8's. Contents: `/privacy` (Guard's privacy policy, from `docs/PRIVACY.md`, linked from
+/start, the footer and llms.txt), `/start` pins `signetguard@0.2.2` and serves only its tarball (byte-identical to npm),
+Guard links point to the 0.3.2 pre-release, and the served docs (THREAT_MODEL, CLAIMS, llms.txt) carry the status
+through #8 and plan B. Deploy and publish: `scripts/release-site.sh 9` (back to back).
+
+| Tx | From | Call | Gas |
+|---|---|---|---:|
+| [`0xf4be7b86…2dcb`](https://web3.okx.com/explorer/x-layer/evm/tx/0xf4be7b865c4b63cbe450be3c7e362f8efb2dbabb9eecfd3feffbe01dc8962dcb) | CI proposer | `proposeRelease` → #9, tier 00 | 168,996 |
+
 ## Release #8 published; its files stored on DeWEB (container #5) (2026-11-24)
 
 | Tx | From | Call | Block (UTC) | Gas | Fee (OKB) |

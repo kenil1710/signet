@@ -11,7 +11,7 @@ Status (2026-11-24): live on X Layer mainnet (chain 196) since 2026-11-18 (docs/
 - misthos.world gate 0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59: the team's own app (on Arc, not an outside adopter), sealed in server-rendered mode; release 1 proposed by its CI and approved 2026-11-24, publishable from 2026-11-25. Observe mode.
 - `pnpm verify:claims`: every claim checked on mainnet or in the repo (claims.json).
 - Site (landing, dashboard, /prove against mainnet, no wallet): https://signetguard.xyz (Cloudflare Pages).
-- CLI: `signetguard` on npm (0.2.1). Guard: a signed pre-release zip on GitHub (0.3.0), not in the Chrome Web Store, tested with a mock wallet only.
+- CLI: `signetguard` on npm (0.2.2). Guard: a signed pre-release zip on GitHub (0.3.2), not in the Chrome Web Store yet; its privacy policy: https://signetguard.xyz/privacy.
 - Not live: enforce mode on any mainnet gate, the gateway (staging only), watchtower alerts (the watchtower runs for signetguard.xyz on GitHub Actions' schedule, every 4–12 hours in practice, and publishes its status; Telegram not configured).
 
 ## Built on TapeOut (what is really used)

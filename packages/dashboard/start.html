@@ -22,7 +22,7 @@
 
       <section class="step quick" id="quick"><h2>Fastest: one command</h2>
         <p>In your project folder. It asks for your domain, the gate address (it tells you how to create it in the dashboard), your host and your build command, then writes the proposer key, <code>signet.config.json</code>, the domain proof, your host's header file and <code>.github/workflows/signet.yml</code>. It sends no transaction.</p>
-        <pre data-copy>npx -y signetguard&#64;0.2.1 init</pre>
+        <pre data-copy>npx -y signetguard&#64;0.2.2 init</pre>
         <p class="dim">Same thing without questions (CI, scripts): <code>signet init --domain app.example.org --gate 0x… --host cloudflare --yes</code>. Hosts: <code>cloudflare</code>, <code>netlify</code>, <code>vercel</code>, <code>github-pages</code>, <code>other</code>. Or follow the five steps below by hand.</p>
       </section>
 
@@ -31,7 +31,7 @@
         <pre data-copy>npm install -g signetguard
 signet --version
 signet keygen</pre>
-        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g {{ORIGIN}}/signetguard-0.2.1.tgz</code>.</p>
+        <p class="dim">The <a href="https://www.npmjs.com/package/signetguard">signetguard</a> package: one file, no dependencies, Node 18+. The same package is also served here: <code>npm install -g {{ORIGIN}}/signetguard-0.2.2.tgz</code>.</p>
         <p><code>signet keygen</code> creates your CI proposer key in <code>.signet/proposer.key</code> (git-ignored) and prints only its <b>address</b>. Keep the address for step 2. The key can propose and publish releases; it can never approve one.</p>
       </section>
 
@@ -72,7 +72,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci && npm run build            # your build; output in dist/
-      - run: npm install -g signetguard&#64;0.2.1
+      - run: npm install -g signetguard&#64;0.2.2
       - name: Seal and propose (the CI key can only propose)
         run: signet verify dist && signet seal dist && signet propose dist --reuse
         env:
@@ -109,14 +109,14 @@ jobs:
           <pre data-copy>npx -y vercel&#64;39 deploy dist --prod --yes --token "$VERCEL_TOKEN"</pre>
           <p class="warn"><b>Turn off Vercel Web Analytics, Speed Insights and the Vercel Toolbar</b> for Production (Project → Analytics, Speed Insights, and Settings → General → Vercel Toolbar), and remove <code>@vercel/analytics</code> / <code>@vercel/speed-insights</code> from the app. They add scripts to your pages that you didn't seal, so Guard and the watchtower see a mismatch. <code>signet verify https://your-domain</code> reports them.</p>
         </details>
-        <details><summary><b>Next.js with server-rendered pages (Vercel)</b> <span class="soon-tag">CLI 0.2.1, Guard 0.3.0</span></summary>
+        <details><summary><b>Next.js with server-rendered pages (Vercel)</b> <span class="soon-tag">CLI 0.2.2, Guard 0.3.2</span></summary>
           <p>A server-rendered page is built per request, so its HTML can't be sealed. Signet seals the code instead: every file under <code>/_next/static</code> and <code>public/</code>, and the exact inline scripts the pages run. In <code>signet.config.json</code>:</p>
           <pre data-copy>"pages": { "mode": "ssr", "crawl": ["/", "/a-page-that-streams", "/docs/a-page", "/no-such-page", "/docs/no-such-page"] }</pre>
           <p>Seal the exact build that is deployed. Build once, deploy that build as a preview, seal it (the CLI crawls the preview's pages for their inline scripts), then promote the same deployment:</p>
           <pre data-copy>npx -y vercel&#64;39 build --prod --token "$VERCEL_TOKEN"
 URL=$(npx -y vercel&#64;39 deploy --prebuilt --token "$VERCEL_TOKEN")
-npx signetguard&#64;0.2.1 seal .vercel/output/static --crawl-browser "$URL"
-npx signetguard&#64;0.2.1 propose .vercel/output/static
+npx signetguard&#64;0.2.2 seal .vercel/output/static --crawl-browser "$URL"
+npx signetguard&#64;0.2.2 propose .vercel/output/static
 # after approval and the timelock: promote the same deployment, then publish
 npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
           <p class="dim"><code>--crawl-browser</code> loads each page in headless Chromium (your project's <code>playwright</code>) and seals the inline scripts the page creates while it runs too; React inserts some during hydration. List in <code>crawl</code> one page per layout: a page that streams (Suspense), a page of each nested layout (docs…), and a 404 at the top and inside each nested layout. A page whose scripts weren't crawled shows as "doesn't match" in observe mode: add it to the list before switching to enforce. A preview behind Deployment Protection is read with <code>VERCEL_AUTOMATION_BYPASS_SECRET</code>, sent to that deployment only. Contracts your app deploys per user through a factory (vaults, accounts) can't be listed one by one: add a <code>"factories"</code> rule to that chain's allowlist; Guard then allows a contract the factory created only for its owner. See the threat model for what this mode does not seal.</p>
@@ -138,7 +138,8 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
       </section>
       <section class="step" id="guard"><h2>Try Guard (pre-release)</h2>
         <p>Signet Guard isn’t in the Chrome Web Store yet. A <b>pre-release</b> build for X Layer mainnet is on GitHub, built and signed by this project’s release workflow (a Sigstore build attestation you can check with <code>gh attestation verify</code>):</p>
-        <p><a class="btn" href="#guard" data-link="guardPrerelease">Signet Guard 0.3.0 (pre-release) on GitHub</a></p>
+        <p><a class="btn" href="#guard" data-link="guardPrerelease">Signet Guard 0.3.2 (pre-release) on GitHub</a></p>
+        <p class="dim">What Guard reads, stores and never sends: <a href="./privacy">privacy policy</a>.</p>
         <ol>
           <li>Download the <code>.zip</code> and unzip it into a folder you’ll keep.</li>
           <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
