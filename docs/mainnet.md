@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | **none** since 2026-11-24 (signet-ops `0x9275…E291` removed by approvers A and B with `voteRemoveGuardian()`: its keystore password was lost, see "Plan B" below). Before: signet-ops 2026-11-23 → 24 (tier-11 `SetGuardian`, proposal #6); signet-dev until 2026-11-20, then none |
 
-Mode: **observe** (a new gate starts there). Current release: **#7** (published 2026-11-24); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
+Mode: **observe** (a new gate starts there). Current release: **#8** (published 2026-11-24, after #7 the same day); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 
@@ -204,6 +204,27 @@ Sent by the team: `cast send 0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291 --value 
 After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 25; signet-ops 0.043355534124840684 OKB.
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
+
+## Release #8 published; its files stored on DeWEB (container #5) (2026-11-24)
+
+| Tx | From | Call | Block (UTC) | Gas | Fee (OKB) |
+|---|---|---|---:|---:|---:|
+| [`0x5864887c…f2b5`](https://web3.okx.com/explorer/x-layer/evm/tx/0x5864887cbfed48267774011cb3493fe27e8c5b2e91d9e2fb108673b29387f2b5) | site CI key | `publish(8)`, decided by circuit #6 | 76,754,781 (12:36:57) | 292,923 | 0.0000058585 |
+| [`0x88da9302…4168`](https://web3.okx.com/explorer/x-layer/evm/tx/0x88da9302496b82b75acaab3c9eca7f0b0ba29168bd01190809b88526f8464168) | site CI key | registry write `signet/files.json` (7,364 B; allowlist and origins unchanged), read back | 76,754,785 | 1,829,584 | 0.0000365917 |
+
+Both RPCs: `currentRelease()` = 8, `activeRelease()` filesRoot `0x5b25…5e71`, allowlistHash `0x5a48…efc5`, originsHash
+`0xfa18…85cf`, true.
+
+**The release's files on DeWEB's storage** (`signet upload release/8 --full`, re-measured first on a fork of the
+post-publish state: same gas): SignetRegistry, as the container's operator, wrote every file release #8 lists into
+circuit #5's container `0x8E2E…94Ed` in TapeOut's SiteRegistry under `signet/signetguard.xyz/` (the registry accepts
+only files of the gate's current release). 67 transactions from the site CI key, nonces 19–85:
+first [`0xef1f0bbf…7c07`](https://web3.okx.com/explorer/x-layer/evm/tx/0xef1f0bbffbfabc7a8d918c3cf31bd917d606bffb8add9fe405a854c89f297c07)
+(block 76,755,000, 12:40:36), last [`0xa4e1bf80…6637`](https://web3.okx.com/explorer/x-layer/evm/tx/0xa4e1bf809fe2d7ebbd37ab097194e60c15590915857f1f72d20e1856df3c6637)
+(76,755,156, 12:43:12); **301,117,113 gas = 0.006022342561117113 OKB**. Read back independently on both RPCs: 29/29
+files (25 site files + the 3 lists + `files.json`), 1,296,412 bytes, size, stored SHA-256 and content all equal
+`packages/dashboard/release/8`. Not displayed by DeWEB's own gateway (that needs `DomainBinding.bind` by the
+container's holder, the gate, which can't call it; `docs/deweb-tapesend-plan.md`). Site CI key after: 0.003232245546612293 OKB.
 
 ## Plan B: signet-ops's keystore password lost; guardian removed from both gates (2026-11-24)
 

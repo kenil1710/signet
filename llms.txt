@@ -7,7 +7,7 @@
 Status (2026-11-24): live on X Layer mainnet (chain 196) since 2026-11-18 (docs/mainnet.md):
 - Release-policy circuit #6 and Guard decision circuit #7 on TapeOut processor #101 (0x73153e5fd2Acac604D49d6ca9fea27b750718F22), each verified on all 512 inputs on two RPCs.
 - SignetRegistry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, SignetFactory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, ReleaseGate implementation 0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D.
-- Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz): releases #3, #4 and #5 published 2026-11-20, #6 was the tier-11 guardian change, #7 published 2026-11-24. Observe mode.
+- Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz): releases #3, #4 and #5 published 2026-11-20, #6 was the tier-11 guardian change, #7 and #8 published 2026-11-24 (#8's files are also stored in TapeOut's SiteRegistry, circuit #5's container). Observe mode.
 - misthos.world gate 0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59: the team's own app (on Arc, not an outside adopter), sealed in server-rendered mode; release 1 proposed by its CI and approved 2026-11-24, publishable from 2026-11-25. Observe mode.
 - `pnpm verify:claims`: every claim checked on mainnet or in the repo (claims.json).
 - Site (landing, dashboard, /prove against mainnet, no wallet): https://signetguard.xyz (Cloudflare Pages).
