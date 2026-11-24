@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | signet-ops `0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291` since 2026-11-23 (keystore with scrypt n = 2^18; tier-11 `SetGuardian`, proposal #6). Before: signet-dev until 2026-11-20, then none |
 
-Mode: **observe** (a new gate starts there). Current release: **#5** (published 2026-11-20; #3 and #4 before it, the same day); #6 was the tier-11 guardian change (2026-11-23); #7 proposed 2026-11-24. See the "Release #…" sections below.
+Mode: **observe** (a new gate starts there). Current release: **#7** (published 2026-11-24); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 
@@ -218,8 +218,20 @@ pins CLI 0.2.1 and serves only its tarball, `/start` links Signet Guard 0.3.0.
 
 filesRoot `0xc8d3…8973`; allowlistHash `0x5a48…efc5` and originsHash `0xfa18…85cf`, unchanged from #5 (Diff Guard: no new
 contract, spender, origin, SRI hash or approve/permit/transfer call). Both RPCs: `proposalCount` = 7, `currentRelease` = 5.
-Proposer balance after: 0.000341675452083773 OKB. **Next:** 1 approval, 1 h, deploy `release/7` to Cloudflare and check
-every live file with a browser user agent, then publish (shown to the team first). The live site stays release #5 until then.
+Proposer balance after: 0.000341675452083773 OKB.
+
+**Approved** (1 approval), timelock over 10:02 UTC. **Deployed** `release/7` (without the manifest folder) to Cloudflare
+Pages (`29fd19b5`); all 23 files byte-identical with a browser user agent (with and without a cache-busting query),
+and the 4 pages in Chromium: 30 responses identical, other hosts only the two sealed RPCs, no page errors. Fork
+rehearsal of the publish found the CLI bug fixed in `21c4efc` (the upload didn't read the key file). **Published:**
+
+| Tx | From | Call | Block | Gas |
+|---|---|---|---:|---:|
+| [`0xa44e63c1…0e94`](https://web3.okx.com/explorer/x-layer/evm/tx/0xa44e63c1d32b8c85a77239c475998996ca624da0e3bfb2c72895dde956680e94) | CI proposer | `publish(7)`, decided by circuit #6 | 76,750,284 (11:22:00 UTC) | 292,923 |
+| [`0x4bc08440…4447`](https://web3.okx.com/explorer/x-layer/evm/tx/0x4bc084406e0a81f6a706e088a204ba5579e291910312b8e5f432b8c538304447) | CI proposer | registry write `signet/files.json` (7,090 B; allowlist and origins unchanged), read back and matched | 76,750,288 | 1,769,941 |
+
+Both RPCs: `currentRelease()` = 7, `activeRelease()` = (`0xc8d3…8973`, `0x5a48…efc5`, `0xfa18…85cf`, true). Proposer
+balance after: 0.000300418170020909 OKB.
 
 ## Misthos gate created: misthos.world bound (2026-11-24)
 

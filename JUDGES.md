@@ -105,7 +105,7 @@ team). Against the same attacks (12 we wrote, run on our own local fork of X Lay
 [`THREAT_MODEL.md`](THREAT_MODEL.md), especially "Who is protected" and "Honest limits". In short: protection at
 signing needs Guard; Guard starts in observe mode; it fails open when it can't read the chain; a compromised Guard
 extension defeats it. Signet's contracts and the Guard circuit **are on mainnet** ([`docs/mainnet.md`](docs/mainnet.md)), and Signet's own
-site has published releases #3 (tier 10), #4 and #5 (tier 00) through its gate there on 2026-11-20 (#6 was the tier-11 guardian change) and proposed #7 on 2026-11-24. misthos.world, the team's own app on Arc, has its gate and a first release approved (publishable 2026-11-25). Both gates are in **observe** mode: Guard reports, it doesn't block yet. Guard isn't in
+site has published releases #3 (tier 10), #4 and #5 (tier 00) through its gate there on 2026-11-20 (#6 was the tier-11 guardian change) and #7 on 2026-11-24. misthos.world, the team's own app on Arc, has its gate and a first release approved (publishable 2026-11-25). Both gates are in **observe** mode: Guard reports, it doesn't block yet. Guard isn't in
 the Chrome Web Store (a signed pre-release zip is on GitHub), has been tested with a mock wallet only, and the gateway
 runs on staging. The watchtower checks signetguard.xyz on GitHub Actions' schedule (set to every 5 minutes; every 4–12 hours in practice) and publishes
 its result; its Telegram alerts aren't configured yet.
