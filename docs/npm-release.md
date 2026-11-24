@@ -27,8 +27,20 @@ and 4 as an automatic gate.
 
 | Version | Published | npm `dist.shasum` (SHA-1) | Tarball SHA-256 | Checked after publishing |
 |---|---|---|---|---|
-| 0.2.1 (security fix: the Vercel bypass secret goes to the deployment's own origin only; 0.2.0 sent it to every origin in `--crawl-browser` and across cross-origin redirects in `--crawl`. Also: a proposer key from the environment is trimmed, so a secret set from `.signet/proposer.key` with its trailing newline works) | built 2026-11-23, **not published yet** | `e72b93add49a0a1af280b70f211ee874f907d140` | `c883244cdedc672541ff00d26b61daf66ac8df7661794d05b0e1326dbbdd9815` | before publishing: steps 2–5 passed (CLI tests 44/44, ssr staging 8/8, reproducible pack) |
+| 0.2.1 (security fix: the Vercel bypass secret goes to the deployment's own origin only; 0.2.0 sent it to every origin in `--crawl-browser` and across cross-origin redirects in `--crawl`. Also: a proposer key from the environment is trimmed, so a secret set from `.signet/proposer.key` with its trailing newline works) | 2026-11-24, `latest` | `e72b93add49a0a1af280b70f211ee874f907d140` | `c883244cdedc672541ff00d26b61daf66ac8df7661794d05b0e1326dbbdd9815` | see below |
 | 0.2.0 (Signet v2: page mode `ssr`, `seal --crawl` / `--crawl-browser`, factory rule, chunked `files.json`) | 2026-11-23, `latest` | `c50c2e36ad26e28d677276eeefd461b7a77d68f2` | `c9a75897dcc603d5f962ae7063c7c5c164bb9956c16cb7a613a60767d5e1d528` | see below |
+
+**0.2.1 after publishing (2026-11-24):**
+
+- The registry tarball is **byte-identical** to `packages/cli/release/signetguard-0.2.1.tgz` (same SHA-256 and SHA-1;
+  its SHA-512 equals npm's `integrity`, `sha512-sULWQScgL2UiCJiTHHKAdqQkESeshA/tINrwEG0ysvDZtSemVzf1PJ3fLcNNt0cGUDhcuVOI2vNsHfqCcjIEpQ==`).
+- **Stranger install test** (as for 0.2.0, against the live registry): `bin` = `{ signet: 'signet.mjs' }`, `dist-tags`
+  = `{ latest: '0.2.1' }`; `npm install -g` into an empty prefix installed `signet` (its `signet.mjs` has the same
+  SHA-256 as `release/pkg/signet.mjs`); `signet --version` = `0.2.1`; `--help` and `seal --help` (`--crawl`,
+  `--crawl-browser`) OK; `npx -y -p signetguard@0.2.1 signet --version` with an emptied cache = `0.2.1`; `signet keygen`
+  in an empty folder wrote `.signet/proposer.key` (mode `-rw-------`) next to `.signet/.gitignore` = `*` and printed
+  only the address (a throwaway key, deleted); `signet verify https://signetguard.xyz` ran. No transaction was sent.
+- The Misthos PR (kenil1710/misthos#1) now pins `signetguard@0.2.1`.
 
 **0.2.0 after publishing (2026-11-23):**
 
