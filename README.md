@@ -4,7 +4,7 @@
 
 A dApp team seals each release of its website on X Layer; no single key can ship a change.
 Users with the Guard extension can't sign anything the team didn't approve.
-It's live on mainnet: [signetguard.xyz](https://signetguard.xyz) runs on it, and [`/prove`](https://signetguard.xyz/app#/prove) checks it from your browser in seconds.
+It's live on mainnet: [signetguard.xyz](https://signetguard.xyz) runs on it, and [`/prove`](https://signetguard.xyz/app#/prove) checks it from your browser, with no wallet.
 
 
 [![test](https://github.com/kenil1710/signet/actions/workflows/test.yml/badge.svg)](https://github.com/kenil1710/signet/actions/workflows/test.yml) Contracts verified on [Sourcify](https://repo.sourcify.dev/196/0x98dB5B6B1545D0fb374da40a02045B93398E0589) (exact match: registry, factory, ReleaseGate implementation; `docs/verify/`).
