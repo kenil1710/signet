@@ -2,6 +2,7 @@
 // Usage: node scripts/new-keystore.mjs <name> [outDir]   (outDir defaults to ~/.foundry/keystores)
 // The password is read from the terminal without echo, twice. Only the address is printed; the key never is.
 // TEST ONLY: KS_TEST_PASSWORD=... skips the prompt (never use it for a real key).
+// After writing, check the password opens it the way other tools read it: cast wallet address --keystore <file>
 import { createRequire } from 'node:module';
 import { randomBytes, createCipheriv, randomUUID, scryptSync } from 'node:crypto';
 import { writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs';
@@ -28,7 +29,7 @@ async function askHidden(prompt) {
       for (const c of ch) {
         if (c === '\r' || c === '\n') { process.stdin.setRawMode(false); process.stdin.pause(); process.stdin.off('data', on); process.stdout.write('\n'); return resolve(s); }
         if (c === '\u0003') { process.stdin.setRawMode(false); return reject(new Error('cancelled')); }
-        if (c === '\u007f') s = s.slice(0, -1); else s += c;
+        if (c === '\u007f' || c === '\b') s = s.slice(0, -1); else s += c; // both backspace codes erase
       }
     };
     process.stdin.on('data', on);
@@ -41,6 +42,10 @@ if (!pw) {
   if (pw.length < 16) { console.error('too short'); process.exit(2); }
   if ((await askHidden('Repeat: ')) !== pw) { console.error('passwords differ'); process.exit(2); }
 }
+
+// control characters and escape sequences (arrow keys, Tab, a paste's bracketed-paste markers) would be stored in the
+// password, and other tools' prompts (cast's) can't type them back: refuse them (2026-11-24, signet-ops)
+if (/[\x00-\x1f\x7f]/.test(pw)) { console.error('the password contains a control character (arrow key, Tab, Escape or a paste marker); type it again with letters, digits and symbols only'); process.exit(2); }
 
 let key;
 do { key = randomBytes(32); } while (key.equals(Buffer.alloc(32)));
