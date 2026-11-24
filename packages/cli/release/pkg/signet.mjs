@@ -30331,8 +30331,17 @@ async function get$1(url) {
 		finalUrl: res.url
 	};
 }
+function ssrBuild(build) {
+	if (!build || !existsSync(join(build, "signet", "origins.json"))) return false;
+	try {
+		return JSON.parse(readFileSync(join(build, "signet", "origins.json"), "utf8")).pages?.mode === "ssr";
+	} catch {
+		return false;
+	}
+}
 async function verifyUrl(url, opts = {}) {
 	const out = [];
+	const ssr = opts.ssr ?? ssrBuild(opts.build);
 	const page = await get$1(url);
 	const base = new URL(page.finalUrl);
 	if (page.status !== 200) out.push({
@@ -30360,11 +30369,16 @@ async function verifyUrl(url, opts = {}) {
 	});
 	checkHtml(html, base.pathname, base.origin, out);
 	const dynamic = sha256Hex((await get$1(page.finalUrl)).body) !== sha256Hex(page.body);
-	if (dynamic) out.push({
+	if (ssr) out.push({
+		level: "info",
+		code: "ssr",
+		message: `page mode "ssr": the HTML is rendered per request and not sealed (it ${dynamic ? "differs" : "didn't differ"} between two requests); its scripts are compared`
+	});
+	else if (dynamic) out.push({
 		level: "warn",
 		code: "ssr",
 		message: "the HTML differs between two requests (server-side rendering, per-request tokens or a CDN that injects content)",
-		fix: "Signet v1 seals static builds. Serve the same bytes to everyone, or seal a static export."
+		fix: "Seal a static build, serve the same bytes to everyone, or use page mode \"ssr\" (\"pages\" in signet.config.json)."
 	});
 	else out.push({
 		level: "ok",
@@ -30411,7 +30425,7 @@ async function verifyUrl(url, opts = {}) {
 	};
 	let htmlPath = decodeURIComponent(base.pathname.replace(/^\//, ""));
 	if (htmlPath === "" || htmlPath.endsWith("/")) htmlPath += "index.html";
-	if (!dynamic) compare("the HTML", page.body, htmlPath);
+	if (!dynamic && !ssr) compare("the HTML", page.body, htmlPath);
 	const noStore = [];
 	for (const [assetUrl, path] of assets) try {
 		const a = await get$1(assetUrl);
@@ -31384,7 +31398,7 @@ async function upload(ctx, buildDir, o, log) {
 	});
 	if (container === "0x0000000000000000000000000000000000000000") throw new SignetError("NotBoundGate", `${cfg.domain} has no valid container binding`);
 	const sites = ctx.net.tapeout.siteRegistry;
-	const signer = await signerFor(ctx, [...KEYS, "SIGNET_PROPOSER_KEY"]);
+	const signer = await signerFor(ctx, [...KEYS, "SIGNET_PROPOSER_KEY"], join(ctx.dir, STATE_DIR, "proposer.key"));
 	const wanted = [{
 		path: ALLOWLIST_PATH,
 		contentType: "application/json",
@@ -31661,7 +31675,7 @@ var HOSTS = [
 	"other"
 ];
 var DASHBOARD = "https://signetguard.xyz/app#/new";
-var CLI_VERSION = "0.2.1";
+var CLI_VERSION = "0.2.2";
 function deployStep(host, out, o) {
 	if (o.deploy) return {
 		run: o.deploy,
@@ -31951,7 +31965,7 @@ async function crawlBrowser(project, base, paths, log, secret = process.env.VERC
 }
 // src/cli.ts
 var log = (line = "") => console.log(line);
-var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.2.1").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
+var program = new Command("signet").description("Signet: decide what your dApp's website is allowed to do").version("0.2.2").option("-C, --project <dir>", `project directory (where ${CONFIG_NAME} lives)`, ".").option("--as <who>", "local staging chain only: sign as a test account (approver1, proposer, user1, ... or an address)");
 var ctx = () => {
 	const g = program.opts();
 	return makeCtx(resolve(g.project), g.as);
@@ -32038,7 +32052,10 @@ program.command("verify <target>").description("check a build directory or a liv
 	const isUrl = /^https?:\/\//i.test(target);
 	if (!isUrl && !(existsSync(target) && statSync(target).isDirectory())) throw new SignetError("target", `${target} is neither a directory nor an http(s) URL`);
 	const cfg = readConfig(resolve(program.opts().project));
-	const r = isUrl ? await verifyUrl(target, { build: o.build }) : verifyDir(target, cfg?.domain);
+	const r = isUrl ? await verifyUrl(target, {
+		build: o.build,
+		ssr: cfg?.pages?.mode === "ssr" ? true : void 0
+	}) : verifyDir(target, cfg?.domain);
 	log(o.json ? JSON.stringify(r, null, 2) : formatReport(r));
 	if (r.errors > 0 || o.strict && r.warnings > 0) process.exitCode = 1;
 });

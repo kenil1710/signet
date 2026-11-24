@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { verifyDir, verifyUrl, type Report } from '../src/verify.ts';
@@ -48,6 +48,30 @@ test('url: a correctly served build matches byte for byte', async () => {
     assert.equal(r.errors, 0, JSON.stringify(r.findings, null, 1));
     assert.equal(r.warnings, 0);
     assert.equal(codes(r, 'ok').filter((c) => c === 'bytes').length, 3); // HTML, app script, stylesheet
+  } finally {
+    await s.close();
+  }
+});
+
+test('url: page mode ssr: the served HTML is not compared with the build (it is not sealed); the scripts are', async () => {
+  // the server's HTML (stable across requests) and a sealed ssr build without index.html: the Misthos staged
+  // deployment, where 0.2.1 reported "the HTML is loaded by the page but is not in the build"
+  const site = writeBuild(join(tmp(), 'site'), 'v1');
+  const sealed = join(tmp(), 'sealed');
+  cpSync(site, sealed, { recursive: true });
+  rmSync(join(sealed, 'index.html'));
+  mkdirSync(join(sealed, 'signet'), { recursive: true });
+  writeFileSync(join(sealed, 'signet', 'origins.json'), JSON.stringify({ origins: [], scripts: [], pages: { mode: 'ssr', inline: [], serviceWorkers: [] } }));
+  const s = await serve(site);
+  try {
+    const r = await verifyUrl(s.url, { build: sealed });
+    assert.equal(r.errors, 0, JSON.stringify(r.findings, null, 1));
+    assert.ok(!r.findings.some((f) => f.code === 'not-sealed'), 'the HTML is not reported as missing from the build');
+    assert.equal(codes(r, 'ok').filter((c) => c === 'bytes').length, 2); // the app script and the stylesheet
+    assert.ok(r.findings.some((f) => f.level === 'info' && f.code === 'ssr' && /page mode "ssr"/.test(f.message)));
+    // without the ssr build (a static build without index.html) it still is an error
+    rmSync(join(sealed, 'signet'), { recursive: true });
+    assert.ok((await verifyUrl(s.url, { build: sealed })).findings.some((f) => f.code === 'not-sealed'));
   } finally {
     await s.close();
   }

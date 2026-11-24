@@ -143,7 +143,7 @@ program.command('verify <target>')
     const isUrl = /^https?:\/\//i.test(target);
     if (!isUrl && !(existsSync(target) && statSync(target).isDirectory())) throw new SignetError('target', `${target} is neither a directory nor an http(s) URL`);
     const cfg = readConfig(resolve(program.opts().project));
-    const r = isUrl ? await verifyUrl(target, { build: o.build }) : verifyDir(target, cfg?.domain);
+    const r = isUrl ? await verifyUrl(target, { build: o.build, ssr: cfg?.pages?.mode === 'ssr' ? true : undefined }) : verifyDir(target, cfg?.domain);
     log(o.json ? JSON.stringify(r, null, 2) : formatReport(r));
     if (r.errors > 0 || (o.strict && r.warnings > 0)) process.exitCode = 1;
   });

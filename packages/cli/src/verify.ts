@@ -88,8 +88,20 @@ async function get(url: string): Promise<{ status: number; headers: Headers; bod
   return { status: res.status, headers: res.headers, body: Buffer.from(await res.arrayBuffer()), finalUrl: res.url };
 }
 
-export async function verifyUrl(url: string, opts: { build?: string } = {}): Promise<Report> {
+/// Page mode "ssr" (Signet v2): the HTML is rendered per request and is not sealed, only the scripts are. From the
+/// project config, or from a sealed build's signet/origins.json.
+function ssrBuild(build: string | undefined): boolean {
+  if (!build || !existsSync(join(build, 'signet', 'origins.json'))) return false;
+  try {
+    return (JSON.parse(readFileSync(join(build, 'signet', 'origins.json'), 'utf8')) as { pages?: { mode?: string } }).pages?.mode === 'ssr';
+  } catch {
+    return false;
+  }
+}
+
+export async function verifyUrl(url: string, opts: { build?: string; ssr?: boolean } = {}): Promise<Report> {
   const out: Finding[] = [];
+  const ssr = opts.ssr ?? ssrBuild(opts.build);
   const page = await get(url);
   const base = new URL(page.finalUrl);
   if (page.status !== 200) out.push({ level: 'error', code: 'http', message: `${url} answered HTTP ${page.status}` });
@@ -104,7 +116,8 @@ export async function verifyUrl(url: string, opts: { build?: string } = {}): Pro
   // SSR: static HTML is byte-identical on every request
   const again = await get(page.finalUrl);
   const dynamic = sha256Hex(again.body) !== sha256Hex(page.body);
-  if (dynamic) out.push({ level: 'warn', code: 'ssr', message: 'the HTML differs between two requests (server-side rendering, per-request tokens or a CDN that injects content)', fix: 'Signet v1 seals static builds. Serve the same bytes to everyone, or seal a static export.' });
+  if (ssr) out.push({ level: 'info', code: 'ssr', message: `page mode "ssr": the HTML is rendered per request and not sealed (it ${dynamic ? 'differs' : "didn't differ"} between two requests); its scripts are compared` });
+  else if (dynamic) out.push({ level: 'warn', code: 'ssr', message: 'the HTML differs between two requests (server-side rendering, per-request tokens or a CDN that injects content)', fix: 'Seal a static build, serve the same bytes to everyone, or use page mode "ssr" ("pages" in signet.config.json).' });
   else out.push({ level: 'ok', code: 'ssr', message: 'the HTML is byte-identical across two requests' });
   if (page.headers.get('set-cookie')) out.push({ level: 'warn', code: 'ssr', message: 'the HTML response sets a cookie: this usually means per-user HTML', fix: 'Set cookies from an API route, not on the page itself.' });
 
@@ -130,7 +143,7 @@ export async function verifyUrl(url: string, opts: { build?: string } = {}): Pro
   };
   let htmlPath = decodeURIComponent(base.pathname.replace(/^\//, ''));
   if (htmlPath === '' || htmlPath.endsWith('/')) htmlPath += 'index.html';
-  if (!dynamic) compare('the HTML', page.body, htmlPath);
+  if (!dynamic && !ssr) compare('the HTML', page.body, htmlPath); // ssr: the HTML isn't in the sealed build
 
   const noStore: string[] = [];
   for (const [assetUrl, path] of assets) {
