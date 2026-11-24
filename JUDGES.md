@@ -46,7 +46,7 @@ cast call 0x73153e5fd2Acac604D49d6ca9fea27b750718F22 "eval(uint256,bytes)(bytes)
 ```
 
 No terminal? Open **[/prove](https://signetguard.xyz/app#/prove)**: the same circuit checks, run by your
-browser against mainnet, with no wallet (about 3 minutes).
+browser against mainnet, with no wallet (a few minutes on release #9; about 6 seconds from release #10, sealed and waiting for approval).
 
 ## What runs on TapeOut (X Layer mainnet)
 
@@ -62,7 +62,7 @@ browser against mainnet, with no wallet (about 3 minutes).
   - [SignetRegistry](https://web3.okx.com/explorer/x-layer/evm/address/0x98dB5B6B1545D0fb374da40a02045B93398E0589) writes there, as the container's 30-day
     operator, and only files an approved release lists.
   - Files over 48 KB go in 24 KB pieces (`writeChunk` → `appendChunk`).
-  - So far only a test file is stored (C6); no project files yet.
+  - Release #8's 29 files are stored there in full (2026-11-24, `docs/mainnet.md`); each later release stores its manifest files.
 - **TapeKit / TAP-10 reading rules:** every file is checked for size and SHA-256 against the chain, on two RPCs that
   must agree. The gateway uses TapeKit's service-worker design (staging only).
 - **Not used yet:** TapeSend (alerts are planned; waiting on TapeOut to confirm a hub upgrade made on 2026-11-18),
