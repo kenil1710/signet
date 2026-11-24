@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signet: Guard refuses wallet signatures your dApp team didn't seal</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%23D63D27%27/%3E%3Ctext x=%2716%27 y=%2722%27 text-anchor=%27middle%27 font-family=%27Arial%27 font-weight=%27700%27 font-size=%2717%27 fill=%27%23fff%27%3ES%3C/text%3E%3C/svg%3E">
+<meta name="description" content="Signet Guard refuses any wallet signature to a contract or spender your dApp's team didn't seal. Each release of the site is sealed on X Layer, approved by people, and published by a TapeOut circuit. Built on TapeKit's on-chain file verification.">
+<link rel="canonical" href="https://signetguard.xyz/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://signetguard.xyz/">
+<meta property="og:title" content="Signet: Guard refuses wallet signatures your dApp team didn't seal">
+<meta property="og:description" content="A hacked dApp page can't ask your wallet to approve a contract or spender outside the team's sealed allowlist. Releases are approved on X Layer and published by TapeOut circuit #6.">
+<meta name="twitter:card" content="summary">
+<script>/* old dashboard links (#/prove, #/p/…) now live on app.html */ if (location.hash.indexOf('#/') === 0) location.replace('app.html' + location.hash);</script>
+  <script type="module" crossorigin src="./assets/index-Do6wGwhX.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-P2Xu9kJm.js">
+  <link rel="modulepreload" crossorigin href="./assets/policy-DXwLL7Hq.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-Bxkqk7y-.css">
+</head>
+<body>
+<div id="loader" aria-hidden="true"><b data-t="Signet"></b> <span class="num" id="ldN"></span><div class="bar"><i></i></div></div>
+
+<noscript><div class="nojs wrap">
+  <h2>Signet in short</h2>
+  <p><b>Your contracts are audited. Your website isn't.</b> Signet protects what your users actually load: no single
+  hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign
+  anything your team didn't approve. The big front-end attacks (Bybit, BadgerDAO, Ledger Connect Kit, Curve, CoW
+  Swap) happened after GitHub: on the hosting, the CDN, a package or the domain.</p>
+  <p><b>What teams get:</b> release approvals and a timelock nobody can bypass (no single key: CI only proposes),
+  watchtower alerts, instant freeze, a verified copy (live with Pro), and a public proof and badge. <b>For users:</b>
+  Guard blocks the signature to any contract the team didn't approve.</p>
+  <ul>
+    <li><b>Seal:</b> CI hashes every file of a release and lists the contracts it may call; that becomes a proposal on X Layer. The CI key can only propose.</li>
+    <li><b>Approve:</b> the team's approvers approve in their own wallets. TapeOut circuit #6 decides when it publishes: code only 1 approval + 1 h; a new origin 2 + 1 h; a new contract or spender 2 + 24 h; admin changes 3 of 3 + 24 h.</li>
+    <li><b>Guard:</b> a browser extension (a signed pre-release on GitHub; not in the Chrome Web Store yet) checks the page against the sealed release, read from two X Layer nodes, and checks every signature request against the sealed allowlist (circuit #7).</li>
+    <li><b>Builds on TapeKit:</b> TapeKit already verifies DeWEB files on-chain. Signet adds the signing-time allowlist, risk-tiered approvals with timelocks, CI that can only propose, a domain proof, and a verified copy read from X Layer.</li>
+  </ul>
+  <p>Benchmark (12 attacks we wrote, on our own local fork of X Layer): 12 of 12 blocked, 0 false blocks in 16 clean sessions. SRI alone: 2/12; Signet Guard with its signature checks off ("hash-only"): 7/12.</p>
+  <p><a href="https://signetguard.xyz/app#/prove">Proof page</a> (re-checks the circuits on X Layer in your browser) ·
+  <a href="https://signetguard.xyz/start">Setup guide for teams</a> ·
+  <a href="https://signetguard.xyz/check">Free risk check</a> ·
+  <a href="https://signetguard.xyz/app">Dashboard</a> ·
+  <a href="https://signetguard.xyz/docs/benchmark.md">Benchmark</a> ·
+  <a href="https://signetguard.xyz/docs/THREAT_MODEL.md">Threat model</a> ·
+  <a href="https://signetguard.xyz/docs/CLAIMS.md">Claims</a></p>
+</div></noscript>
+<canvas id="seal-gl" aria-hidden="true"></canvas>
+<img id="seal-still" src="./assets/seal-still-CQPvmGTA.webp" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
+<div class="heat" aria-hidden="true"></div>
+
+<header id="hdr">
+  <div class="wrap nav">
+    <a class="brand" href="#hero">
+      <svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#C8452F"/><circle cx="14" cy="14" r="10" fill="none" stroke="#8E2B1C" stroke-width="1" stroke-dasharray="2 2"/><path d="M17.5 9.5c-.8-1.3-2.1-2-3.6-2-2.2 0-3.7 1.3-3.7 3.1 0 1.8 1.4 2.6 3.9 3.2 1.9.5 2.8 1 2.8 2.2 0 1.2-1.2 2-2.8 2-1.7 0-3-.8-3.6-2.1" fill="none" stroke="#FFF4EC" stroke-width="2" stroke-linecap="round"/></svg>
+      Signet
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#path">The problem</a>
+      <a href="#get">What teams get</a>
+      <a href="#github">Why not GitHub</a>
+      <a href="#how">How it works</a>
+      <a href="#proof">Proof</a>
+      <a href="#teams">Pricing</a>
+    </nav>
+    <div class="nav-r">
+      <span class="chain"><i></i>X LAYER · 196</span>
+      <a href="https://github.com/kenil1710/signet/releases/tag/guard-v0.3.0" class="btn btn-wax" data-link="guardPrerelease" target="_blank" rel="noopener" data-applied="1">Get Guard (pre-release)</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- HERO: pinned, three beats -->
+  <section id="hero" data-beat="0" aria-label="Signet">
+    <div class="h-type" aria-hidden="false">
+      <h1 class="stamp">
+        <span class="h-l1"><span>Your contracts are audited.</span></span>
+        <span class="h-l2"><span>Your website</span> <span><em>isn't.</em></span></span>
+      </h1>
+    </div>
+    <div class="h-ui">
+      <div class="hud l" aria-hidden="true">
+        <div class="hi"><span class="k">Example release</span> <span class="v" id="hRel">#42 · demoswap.xyz</span></div>
+        <div class="hi"><span class="k">Chain</span> <span class="v">X Layer mainnet · 196</span></div>
+        <div class="hi alert"><span class="k">Files</span> <span class="v" id="hFiles">7 / 7 match the seal</span></div>
+      </div>
+      <div class="hud r" aria-hidden="true">
+        <div class="hi"><span class="k">Policy</span> <span class="v">TapeOut circuit #6</span></div>
+        <div class="beats" aria-hidden="true"><span class="on" data-b="0">01 SEALED</span> <span data-b="1">02 TAMPERED</span> <span data-b="2">03 BLOCKED</span></div>
+        <div class="hi alert safe"><span class="k">Status</span> <span class="v" id="hStat">Sealed · 2 of 3 approved</span></div>
+      </div>
+      <div class="h-foot">
+        <div class="wrap">
+          <p class="lede" id="lede">Signet protects what your users actually load: no single hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign anything your team didn't approve.</p>
+          <div class="cta-row">
+            <a class="btn btn-wax" href="start">Protect your dApp<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+            <a class="btn btn-line" href="check">Check your site's risk, free</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="h-prog" aria-hidden="true"><i></i></div>
+  </section>
+
+  <!-- INCIDENT TAPE -->
+  <div class="tape" aria-label="Past frontend attacks">
+    <div class="mq-track">
+      <div class="mq-item"><b>Bybit / Safe{Wallet}</b> <span>tampered JavaScript</span> <span class="tag">~$1.5B</span></div>
+      <div class="mq-item"><b>BadgerDAO</b> <span>injected script</span> <span class="tag">~$120M</span></div>
+      <div class="mq-item"><b>Ledger Connect Kit</b> <span>poisoned npm package</span> <span class="tag">wallet drainer</span></div>
+      <div class="mq-item"><b>Curve Finance</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item"><b>CoW Swap</b> <span>domain hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item"><b>Aerodrome</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Bybit / Safe{Wallet}</b> <span>tampered JavaScript</span> <span class="tag">~$1.5B</span></div>
+      <div class="mq-item" aria-hidden="true"><b>BadgerDAO</b> <span>injected script</span> <span class="tag">~$120M</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Ledger Connect Kit</b> <span>poisoned npm package</span> <span class="tag">wallet drainer</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Curve Finance</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>CoW Swap</b> <span>domain hijack</span> <span class="tag">frontend</span></div>
+      <div class="mq-item" aria-hidden="true"><b>Aerodrome</b> <span>DNS hijack</span> <span class="tag">frontend</span></div>
+    </div>
+  </div>
+
+
+  <!-- THE PROBLEM: where attacks happen -->
+  <section class="sec" id="path" aria-label="Where front-end attacks happen">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">01 / The problem</span>
+        <div>
+          <h2 class="stamp h2">GitHub was clean.<br><em>Users weren't.</em></h2>
+          <p class="sub">Your code passes review on GitHub. Then it's built, hosted, served through a CDN and a domain, and run in the browser. The big front-end attacks happened after GitHub, where nobody was looking.</p>
+        </div>
+      </div>
+      <ol class="path">
+        <li class="pn"><b>GitHub</b> <span>your reviewed code</span> <em class="ok">clean in every case below</em></li>
+        <li class="pn"><b>Build + packages</b> <span>npm dependencies</span> <em class="hit">Ledger Connect Kit, Dec 2023: a poisoned npm package drained wallets on many dApps</em></li>
+        <li class="pn"><b>Hosting / CDN</b> <span>files and scripts served</span> <em class="hit">Bybit / Safe{Wallet}, Feb 2025: one JavaScript file swapped on the hosting, ~$1.5B</em> <em class="hit">BadgerDAO, Dec 2021: a script injected through the CDN, ~$120M</em></li>
+        <li class="pn"><b>Domain / DNS</b> <span>where the name points</span> <em class="hit">Curve Finance and CoW Swap: domain hijacks sent users to a drainer</em></li>
+        <li class="pn"><b>Browser</b> <span>what your users actually load</span> <em class="ok">Signet checks here, against what your team sealed</em></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- WHAT TEAMS GET -->
+  <section class="sec" id="get" aria-label="What teams get">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">02 / What your team gets</span>
+        <div>
+          <h2 class="stamp h2">No single key.<br><em>No silent change.</em></h2>
+          <p class="sub">Signet works for your team even before any user installs anything. Your contracts don't change.</p>
+        </div>
+      </div>
+      <div class="gets">
+        <div class="gc"><h3>Release approvals nobody can bypass</h3><p>CI only proposes. Your approvers approve in their own wallets, and riskier changes wait longer. TapeOut circuit #6 on X Layer decides: no admin, no CI key and no Signet employee can skip it.</p></div>
+        <div class="gc"><h3>Watchtower alerts</h3><p>A checker loads your live site on a schedule and compares every file with the sealed release. A mismatch seen twice in a row alerts your team. Running for signetguard.xyz every 5 minutes; for your site with Pro.</p></div>
+        <div class="gc"><h3>Instant freeze</h3><p>Any one approver can freeze the gate: nothing publishes until two of three unfreeze. One transaction, from a wallet.</p></div>
+        <div class="gc"><h3>A verified copy</h3><p>When your live site doesn't match, users can be sent to a copy of the last sealed release, read from X Layer. Built and tested; live with Pro.</p></div>
+        <div class="gc"><h3>Public proof and a badge</h3><p>Every release, approval and timelock is on X Layer. Anyone can re-check it in the browser, and the "Sealed by Signet" badge links to it.</p></div>
+        <div class="gc guard"><h3>Plus, for your users: Guard</h3><p>The extra layer. Signet Guard checks the page against the seal and <b>blocks the signature</b> to any contract or spender your team didn't approve. Chrome Web Store listing coming soon.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY NOT JUST GITHUB -->
+  <section class="sec" id="github" aria-label="Why not just GitHub">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">03 / Why not just GitHub?</span>
+        <div>
+          <h2 class="stamp h2">Keep your reviews.<br><em>Then watch what ships.</em></h2>
+          <p class="sub">GitHub's required reviews and deployment environments (required reviewers, a wait timer) are good at approving code before it deploys. Use them. They can't see what happens after.</p>
+        </div>
+      </div>
+      <table class="tt gh">
+        <thead><tr><th></th><th>GitHub (reviews, environments)</th><th>Signet</th></tr></thead>
+        <tbody>
+          <tr><th>Approvals before deploy</th><td>Yes: required reviewers (one approval is enough) and a wait timer; on Free, Pro and Team plans, for public repositories</td><td>Yes, on X Layer, with more approvals and a longer wait for riskier changes</td></tr>
+          <tr><th>A compromised admin</th><td>Administrators can bypass the rules by default, and an admin can change them</td><td>No admin can skip the circuit. Changing approvers or waits takes 3 of 3 + 24 h, in public</td></tr>
+          <tr><th>Attacks after deploy (hosting, CDN, domain)</th><td>Not visible to GitHub</td><td>The watchtower and Guard compare the live files with the seal</td></tr>
+          <tr><th>Alerts when the live site changes</th><td>No</td><td>Yes: the watchtower</td></tr>
+          <tr><th>Users can verify what they load</th><td>No</td><td>Yes: Guard, /prove, the badge</td></tr>
+          <tr><th>Blocks the signature to an unapproved contract</th><td>No</td><td>Yes, with Guard</td></tr>
+          <tr><th>A public, permanent record</th><td>Logs visible to your organization</td><td>Every release and approval on X Layer</td></tr>
+        </tbody>
+      </table>
+      <p class="fine">From GitHub's documentation on deployment environments and protected branches, checked 2026-11-19.</p>
+    </div>
+  </section>
+
+  <!-- ATTACK replay -->
+  <section id="attack" aria-label="What your users see">
+    <div class="wrap" style="padding-top:150px">
+      <div class="shead">
+        <span class="label">04 / With Guard: what users see</span>
+        <div>
+          <h2 class="stamp h2">Same page.<br><em>Different code.</em></h2>
+          <p class="sub">A swapped file doesn't change how the site looks. Scroll to watch one attack from the user's side.</p>
+        </div>
+      </div>
+    </div>
+    <div class="atk-pin">
+      <div class="wrap atk">
+        <div class="atk-left">
+          <div class="rail"><i></i></div>
+          <div class="steps">
+            <div class="step"><span class="label">Step 1 of 4</span><h3 class="stamp">A normal release.</h3><p>The team ships version 42. Signet fingerprints every file and seals the set on X Layer.</p></div>
+            <div class="step"><span class="label">Step 2 of 4</span><h3 class="stamp">One file is swapped.</h3><p>A leaked CDN key, a hijacked domain, a poisoned package. One script changes and nobody on the team notices.</p></div>
+            <div class="step"><span class="label">Step 3 of 4</span><h3 class="stamp">The wallet asks to sign.</h3><p>The button still says Swap. The transaction underneath sends the tokens somewhere else.</p><div class="ticker num"><span id="tick">~$1.5B</span> <small>left Bybit this way in February 2025</small></div></div>
+            <div class="step"><span class="label">Step 4 of 4</span><h3 class="stamp">Guard stops it.</h3><p>The signature names a contract that isn't on the sealed allowlist, so it never reaches the wallet, and the page is marked as not matching its seal. A verified copy read from X Layer is built and tested; it goes live with Pro.</p><div class="ticker saved num">$0 <small>sent by a user running Guard</small></div></div>
+          </div>
+        </div>
+        <div class="browser">
+          <div class="b-bar">
+            <div class="b-dots"><i></i><i></i><i></i></div>
+            <div class="b-url"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="5" width="8" height="6" rx="1.5" fill="#6E6560"/><path d="M4 5V3.5a2 2 0 014 0V5" stroke="#6E6560" stroke-width="1.3" fill="none"/></svg>app.demoswap.xyz</div>
+            <span class="badge badge-ok" id="bOk">● Sealed #42</span>
+            <span class="badge badge-bad" id="bBad">● Seal broken</span>
+          </div>
+          <div class="b-body">
+            <div class="dapp">
+              <h4>Swap</h4>
+              <div class="field"><div><small>You pay</small> <b class="num">2,500.00</b></div><span class="tok">USDT</span></div>
+              <div class="field"><div><small>You receive</small> <b class="num">≈ market</b></div><span class="tok">OKB</span></div>
+              <div class="swapbtn">Swap</div>
+            </div>
+            <div class="files">
+              <span class="ttl">Release #42 · sealed files</span>
+              <div class="frow"><span>index.html</span> <span class="st">match</span></div>
+              <div class="frow" id="fApp"><span>assets/app-2aa5a3e0.js</span> <span class="st" id="fAppSt">match</span></div>
+              <div class="frow"><span>assets/vendor-91c0.js</span> <span class="st">match</span></div>
+              <div class="frow"><span>assets/style-77e1.css</span> <span class="st">match</span></div>
+              <div class="frow"><span>manifest.json</span> <span class="st">match</span></div>
+              <div class="frow bad new" id="fNew"><span>cdn-cgi/loader.js</span> <span class="st">not sealed</span></div>
+            </div>
+          </div>
+          <div class="diff" id="diff">
+            <div class="hd"><span>assets/app-2aa5a3e0.js</span> <span>+1 line</span></div>
+            <div class="rm">  const tx = buildSwap(route, amount);</div>
+            <div class="add">+ if (amount &gt; 1000) tx.to = "0x9f3c…e21a";</div>
+            <div class="rm">  return wallet.sendTransaction(tx);</div>
+          </div>
+          <div class="wallet" id="wallet">
+            <div class="wt"><span>Wallet</span> <span>X Layer</span></div>
+            <h5>Confirm transaction</h5>
+            <div class="kv"><span>Action</span> <span>Swap</span></div>
+            <div class="kv"><span>Send to</span> <span>0x9f3c…e21a</span></div>
+            <div class="kv"><span>Amount</span> <span class="num">2,500 USDT</span></div>
+            <div class="wb"><div>Reject</div><div>Confirm</div></div>
+          </div>
+          <div class="blocked" id="blocked">
+            <svg width="60" height="60" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4a28 28 0 1 0 0 56" fill="none" stroke="#FFF6F3" stroke-width="3"/><path d="M36 4.3A28 28 0 0 1 36 59.7" fill="none" stroke="#FFF6F3" stroke-width="3" opacity=".5"/><path d="M33 2l-4 14 6 6-6 10 5 8-4 22" fill="none" stroke="#FFF6F3" stroke-width="2.5" stroke-linejoin="round"/></svg>
+            <h4>Stop. This site's seal is broken.</h4>
+            <p>Signet stopped this page from asking your wallet to sign. Nothing was sent.</p>
+            <div class="bb"><span>Open the verified copy</span> <span>Leave this site</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW -->
+  <section id="how" aria-label="How Signet works">
+    <div class="wrap how-head">
+      <div class="shead">
+        <span class="label">05 / How it works</span>
+        <div>
+          <h2 class="stamp h2">Seal. Approve.<br><em>Guard.</em></h2>
+          <p class="sub">Set it up once. After that, every release takes the same path, and your contracts don't change.</p>
+        </div>
+      </div>
+    </div>
+    <div class="h-pin">
+      <div class="h-track">
+        <article class="panel" id="p1">
+          <div class="pl">
+            <span class="idx">01</span>
+            <h3 class="stamp">Every build gets a fingerprint.</h3>
+            <p>Your CI hashes each file and lists the contracts the site may call. That set becomes a release proposal on X Layer.</p>
+            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="#D63D27" stroke-width="1.4"/><path d="M8 4.5v4M8 11v.5" stroke="#D63D27" stroke-width="1.6" stroke-linecap="round"/></svg><span>A stolen CI key can propose a release. It can never approve one.</span></div>
+          </div>
+          <div class="pr">
+            <div class="term" id="term1">
+              <div class="ln"><span class="p">$</span> signet seal dist</div>
+              <div class="ln dim">  hashing 7 files…</div>
+              <div class="ln"><span class="ok">  ✓</span> index.html             <span class="dim">9f2c…41aa</span></div>
+              <div class="ln"><span class="ok">  ✓</span> assets/app-2aa5a3e0.js <span class="dim">51d0…c3e9</span></div>
+              <div class="ln"><span class="ok">  ✓</span> assets/vendor-91c0.js  <span class="dim">0be4…77d2</span></div>
+              <div class="ln"><span class="ok">  ✓</span> allowlist              <span class="dim">3 contracts</span></div>
+              <div class="ln"><span class="ok">  ✓</span> origins                <span class="dim">no change</span></div>
+              <div class="ln"><span class="p">  →</span> proposed release #43 <span class="dim">· tier 00 · code only</span></div>
+            </div>
+          </div>
+        </article>
+        <article class="panel" id="p2">
+          <div class="pl">
+            <span class="idx">02</span>
+            <h3 class="stamp">A TapeOut circuit makes the call.</h3>
+            <p>Approvals and waiting time go into circuit #6, a fixed NAND circuit on X Layer. Riskier changes need more people and a longer wait.</p>
+            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="#D63D27" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#D63D27" stroke-width="1.4" fill="none"/></svg><span>The circuit's beacon has no owner, so nobody can upgrade the rule, including us.</span></div>
+          </div>
+          <div class="pr">
+            <div class="appr">
+              <div class="who ci"><span class="av">CI</span> CI key proposed #43 <span class="stt">can't approve</span></div>
+              <div class="who" id="wA"><span class="av">A</span> Approver A <span class="stt">waiting</span></div>
+              <div class="who" id="wB"><span class="av">B</span> Approver B <span class="stt">waiting</span></div>
+              <div class="who"><span class="av">C</span> Approver C <span class="stt">waiting</span></div>
+            </div>
+            <div class="lock">
+              <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="none" stroke="#2A2522" stroke-width="3"/><circle id="tlRing" cx="22" cy="22" r="19" fill="none" stroke="#D63D27" stroke-width="3" stroke-dasharray="119.4" stroke-dashoffset="119.4" transform="rotate(-90 22 22)"/></svg>
+              <div><b class="num" id="tlTxt">1:00:00</b> <small>timelock for this risk tier</small></div>
+            </div>
+            <div class="out"><span>circuit #6 → PUBLISH</span> <span class="lamp" id="pubLamp"><i></i> <span id="pubVal">0</span></span></div>
+          </div>
+        </article>
+        <article class="panel" id="p3">
+          <div class="pl">
+            <span class="idx">03</span>
+            <h3 class="stamp">Users are checked as they sign.</h3>
+            <p>Guard reads the sealed release from two separate X Layer nodes, compares it with the page, and only then lets the wallet open.</p>
+            <div class="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l5.5 2v4c0 3.3-2.3 6-5.5 7-3.2-1-5.5-3.7-5.5-7v-4z" fill="none" stroke="#D63D27" stroke-width="1.4"/></svg><span>Built for browser wallets that use the standard EIP-1193 connection.</span></div>
+          </div>
+          <div class="pr">
+            <div class="nodes">
+              <div class="node"><small>Node 1</small> xlayerrpc.okx.com <span>release #43 · 0x51d0…</span></div>
+              <div class="node"><small>Node 2</small> xlayer.drpc.org <span>release #43 · 0x51d0…</span></div>
+            </div>
+            <div class="agree"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7" stroke="currentColor" stroke-width="1.8" fill="none"/></svg>both nodes agree</div>
+            <div class="checks">
+              <div class="chk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.2l3 3 6-6.5" stroke="#5AD9A0" stroke-width="1.8" fill="none"/></svg>7 of 7 files match the seal</div>
+              <div class="chk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.2l3 3 6-6.5" stroke="#5AD9A0" stroke-width="1.8" fill="none"/></svg>Contract is on the sealed allowlist</div>
+              <div class="chk"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.2l3 3 6-6.5" stroke="#5AD9A0" stroke-width="1.8" fill="none"/></svg>Signature request passed to the wallet</div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- RULE -->
+  <section class="sec" id="rule">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">06 / The rule</span>
+        <div>
+          <h2 class="stamp h2">A rule nobody<br><em>can upgrade.</em></h2>
+          <p class="sub">Pick who approved, what changed and how long it has waited. The release policy answers the way circuit #6 does on X Layer.</p>
+        </div>
+      </div>
+      <div class="sim">
+        <div class="ctrl">
+          <div class="cgroup"><span id="lblApp">Who approved</span>
+            <div class="toggles" role="group" aria-labelledby="lblApp">
+              <button class="tg" id="ap-a" aria-pressed="true" type="button">Approver A</button>
+              <button class="tg" id="ap-b" aria-pressed="false" type="button">Approver B</button>
+              <button class="tg" id="ap-c" aria-pressed="false" type="button">Approver C</button>
+            </div></div>
+          <div class="cgroup"><span id="lblTier">What changed</span>
+            <div class="seg" role="radiogroup" aria-labelledby="lblTier">
+              <button class="tg" id="tier-0" role="radio" aria-checked="true" type="button">Code only <small>tier 00</small></button>
+              <button class="tg" id="tier-1" role="radio" aria-checked="false" type="button">New origin <small>tier 01</small></button>
+              <button class="tg" id="tier-2" role="radio" aria-checked="false" type="button">New contract <small>tier 10</small></button>
+              <button class="tg" id="tier-3" role="radio" aria-checked="false" type="button">Admin <small>tier 11</small></button>
+            </div></div>
+          <div class="cgroup"><label for="wait">Time since approvals were reached</label>
+            <input class="range" id="wait" type="range" min="0" max="2" step="1" value="1">
+            <div class="rlabels"><span>under 1 h</span> <span>1 h+</span> <span>24 h+</span></div></div>
+          <div class="cgroup"><span id="lblSw">Switches</span>
+            <div class="toggles" role="group" aria-labelledby="lblSw">
+              <button class="tg" id="sw-f" aria-pressed="false" type="button">Frozen</button>
+              <button class="tg" id="sw-e" aria-pressed="false" type="button">Emergency</button>
+            </div></div>
+        </div>
+        <div class="board">
+          <div class="bits" id="bits"></div>
+          <canvas id="gates" aria-hidden="true"></canvas>
+          <div class="outs">
+            <div class="outbox" id="oPub"><b>PUBLISH</b> <span id="oPubV">0</span></div>
+            <div class="outbox" id="oUnf"><b>UNFREEZE</b> <span id="oUnfV">0</span></div>
+          </div>
+          <p class="why" id="why" aria-live="polite"></p>
+          <p class="fine">9 inputs, 34 NAND gates, 512 possible cases. UNFREEZE is 1 whenever two approve; the gate only uses it while frozen. The wiring above is drawn for clarity; the real netlist is public on X Layer.</p>
+        </div>
+      </div>
+      <div class="tiers" aria-label="The four risk tiers">
+        <table class="tt">
+          <thead><tr><th>Tier</th><th>What changed <small>(computed on-chain)</small></th><th>To publish</th></tr></thead>
+          <tbody>
+            <tr><th>00</th><td>Code only</td><td>1 approval + 1 h, or 3 of 3 with the emergency flag</td></tr>
+            <tr><th>01</th><td>A new external origin, or a changed SRI hash of a cross-origin script</td><td>2 approvals + 1 h</td></tr>
+            <tr><th>10</th><td>A new contract or spender. <b>Every team's first release is tier 10.</b></td><td>2 approvals + 24 h, or 3 of 3 with the emergency flag</td></tr>
+            <tr><th>11</th><td>Admin: approvers, timelocks, domain binding, circuit copy</td><td>3 of 3 + 24 h, no fast lane</td></tr>
+          </tbody>
+        </table>
+        <p class="fine">Frozen: nothing publishes. Any one approver can freeze; unfreezing needs 2 of 3. The 1 h and 24 h waits are the defaults; a team can change them (10 min to 5 days) only through a tier-11 change.</p>
+        <p class="fine"><b>Where the decision is made.</b> On every publish and unfreeze, the gate calls circuit #6 on X Layer. It uses a Solidity copy of the same 34 gates (checked equal on all 512 inputs) only if that call fails or returns a malformed answer, or if the circuit's implementation is no longer the one pinned when the gate was made; each fallback emits an on-chain event. Why a circuit: its beacon has no owner, so its logic can't be upgraded, and a gate can only ever point at a copy of the same netlist. The team can change who approves and how long it waits, never the rule.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENCH -->
+  <section class="sec" id="bench" style="padding-top:40px">
+    <div class="wrap bench">
+      <div>
+        <span class="label">07 / Benchmark</span>
+        <h2 class="stamp h2" style="margin-top:22px">12 attacks.<br><em>12 stopped.</em></h2>
+        <p class="sub">Twelve attacks we wrote, run on our own local fork of X Layer against three kinds of protection. "Hash-only" is Signet Guard with its signature checks switched off, not another product.</p>
+        <div class="statrow">
+          <div><b class="num">0</b> <span>false blocks</span></div>
+          <div><b class="num">16</b> <span>clean sessions tested</span></div>
+        </div>
+        <p class="limit">Guard protects people who have it installed. Visitors without it aren't blocked; the watchtower alerts the team instead.</p>
+        <details class="atk-list"><summary>The 12 attacks, and how to rerun them</summary>
+          <ol>
+            <li>DNS / registrar hijack: whole site replaced, drainer on load</li>
+            <li>One lazy-loaded JS chunk swapped on the CDN</li>
+            <li>Bundle tampered for one request, then swapped back (as at Bybit)</li>
+            <li>A script from an unsealed origin injected into the HTML</li>
+            <li>Code built from data with eval / new Function (no file changed)</li>
+            <li>A malicious service worker that outlives the hijack</li>
+            <li>A swap on the sealed router with the attacker as recipient</li>
+            <li>Permit2 and EIP-2612 permits naming the attacker as spender</li>
+            <li>A poisoned dependency the approvers publish anyway</li>
+            <li>Rollback to an older release inside its 6 h grace window</li>
+            <li>Rollback after the grace window</li>
+            <li>Signing on a release the approvers revoked</li>
+          </ol>
+          <p>Setup: an anvil fork of X Layer mainnet, fresh projects sealed with the real CLI, headless Chromium and a mock wallet that records every request. An attack counts as blocked only if the attacker's request never reached the wallet. Rerun: <code>pnpm install &amp;&amp; pnpm staging:up &amp;&amp; pnpm benchmark</code>. <a href="https://signetguard.xyz/docs/benchmark.md">Full results</a></p>
+        </details>
+      </div>
+      <div>
+        <div class="bars">
+          <div class="bar" style="--h:16.67%"><div class="val num"><span data-count="2">2</span> <small>/12</small></div><div class="fill"></div></div>
+          <div class="bar" style="--h:58.33%"><div class="val num"><span data-count="7">7</span> <small>/12</small></div><div class="fill"></div></div>
+          <div class="bar sig" style="--h:100%"><div class="val num"><span data-count="12">12</span> <small>/12</small></div><div class="fill"></div></div>
+        </div>
+        <div class="blabels">
+          <div><b>Subresource Integrity</b> SRI tags only</div>
+          <div><b>Page hash check</b> Guard, signature checks off</div>
+          <div><b>Signet</b> seal + Guard</div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="wrap compare" aria-label="How Signet compares">
+      <span class="label">How it compares</span>
+      <table class="cmp">
+        <thead><tr><th></th><th>DeWEB site <small>verified by TapeKit</small></th><th>Code-hash checkers <small>Code Verify, WEBCAT, WAICT</small></th><th>Scam detectors <small>Blockaid, Wallet Guard…</small></th><th class="sig">Signet <small>builds on TapeKit</small></th></tr></thead>
+        <tbody>
+          <tr><th>Refuses a signature to a contract the team didn't seal</th><td>No</td><td>No</td><td>Warns on known-bad addresses</td><td class="sig">Yes, before the wallet opens</td></tr>
+          <tr><th>Your own domain, no migration</th><td>No: the site moves on-chain</td><td>Yes</td><td>Any site</td><td class="sig">Yes</td></tr>
+          <tr><th>Page files checked against a public record</th><td>Yes: TapeKit checks each file on X Layer</td><td>Yes</td><td>No</td><td class="sig">Yes: the same on-chain check, by Guard</td></tr>
+          <tr><th>Approval rules for every release</th><td>No: the holder publishes</td><td>Signers only</td><td>No</td><td class="sig">Yes: on-chain tiers, timelocks, a TapeOut circuit</td></tr>
+          <tr><th>What a wallet may sign, per site</th><td>No</td><td>No</td><td>Known-bad lists, simulation</td><td class="sig">Sealed allowlist</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PROOF -->
+  <section class="sec" id="proof" style="padding-top:60px">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">08 / Proof</span>
+        <div>
+          <h2 class="stamp h2">Don't trust us.<br><em>Check it.</em></h2>
+          <p class="sub">One read-only command checks the claims on this page: the on-chain ones against X Layer mainnet, the rest against the repository. No wallet, no keys. No terminal: the proof page runs the circuit checks in your browser.</p>
+        </div>
+      </div>
+      <div class="proof">
+        <div class="shell">
+          <div class="top"><i></i><i></i><i></i> <span style="margin-left:8px">signet</span></div>
+          <pre id="shell"><span class="p">$</span> pnpm verify:claims</pre>
+        </div>
+        <div class="facts-list">
+          <div class="fl"><small>TapeOut processor #101 · X Layer mainnet</small>
+            <div class="addr"><span id="proc">0x73153e5fd2Acac604D49d6ca9fea27b750718F22</span><button class="copy" type="button" id="copyProc">Copy</button></div></div>
+          <div class="fl"><small>Release policy</small> <b>Circuit #6 · 34 NAND · 9 inputs · 2 outputs</b></div>
+          <div class="fl"><small>Upgrade keys</small> <b>None on the circuit. Its beacon owner is 0x0.</b></div>
+          <div class="fl"><small>Fallback</small> <b>A Solidity copy of the same gates, used only if the circuit call fails (emits an event)</b></div>
+          <div class="fl"><small>In your browser</small> <b><a href="app#/prove" data-link="prove" data-applied="1">Open the proof page</a></b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEAMS -->
+  <section class="sec" id="teams" style="padding-top:60px">
+    <div class="wrap">
+      <div class="shead">
+        <span class="label">09 / For teams</span>
+        <div>
+          <h2 class="stamp h2">Set up in<br><em>an afternoon.</em></h2>
+          <p class="sub">Five steps on the setup guide; one step added to your deploy. Nothing changes in your contracts. Your first release is tier 10: two approvals and 24 hours. After that, a code-only release needs one approval and one hour. Always free for your users.</p>
+        </div>
+      </div>
+      <div class="plans">
+        <div class="plan"><h3 class="stamp">Free</h3><p>One domain, sealed releases with on-chain approvals, Diff Guard, the "Sealed by Signet" badge, and Guard protection for every visitor who has it.</p><span class="pp">$0 · start now</span></div>
+        <div class="plan hl"><h3 class="stamp">Pro</h3><p>Three domains, a watchtower that checks every minute, private alerts, automatic renewal of on-chain storage, and a verified copy hosted on X Layer.</p><span class="pp">$49 / month · planned, early access</span></div>
+        <div class="plan"><h3 class="stamp">Enterprise</h3><p>Setup done with your team, incident support, and an API for wallets.</p><span class="pp">from $500 / month · planned</span></div>
+      </div>
+      <p class="fine" style="margin-top:20px">Who pays: dApp teams, per domain. Users never pay, and Guard is free. Pro and Enterprise prices are planned, not yet sold; there are no paying customers yet.</p>
+      <div class="cta-row" style="margin-top:40px">
+        <a href="start" class="btn btn-wax" data-link="setupGuide" data-applied="1">Read the setup guide<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+        <a class="btn btn-line soon" data-link="telegram" aria-disabled="true" title="Coming soon" data-applied="1">Talk to us on Telegram <span class="soon-tag">coming soon</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINALE -->
+  <section id="cta">
+    <span class="ring" id="ring" aria-hidden="true"></span>
+    <div class="wrap">
+      <h2 class="stamp h2">Seal your<br><em>next release.</em></h2>
+      <div class="cta-row">
+        <a href="https://github.com/kenil1710/signet/releases/tag/guard-v0.3.0" class="btn btn-wax" data-link="guardPrerelease" target="_blank" rel="noopener" data-applied="1">Get Guard for Chrome (pre-release)<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
+        <a class="btn btn-line" href="#teams">Protect your dApp</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="brand" href="#hero"><svg width="24" height="24" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="13" fill="#C8452F"/><path d="M17.5 9.5c-.8-1.3-2.1-2-3.6-2-2.2 0-3.7 1.3-3.7 3.1 0 1.8 1.4 2.6 3.9 3.2 1.9.5 2.8 1 2.8 2.2 0 1.2-1.2 2-2.8 2-1.7 0-3-.8-3.6-2.1" fill="none" stroke="#FFF4EC" stroke-width="2" stroke-linecap="round"/></svg>Signet</a>
+        <p style="color:var(--muted);font-size:14px;margin-top:14px;max-width:300px">Release protection for dApp websites. Built on X Layer and TapeOut.</p>
+      </div>
+      <div><h3>Product</h3><a data-link="chromeWebStore" class="soon" aria-disabled="true" title="Coming soon" data-applied="1">Guard for Chrome <span class="soon-tag">coming soon</span></a><a href="#teams">For teams</a><a href="#rule">The rule</a></div>
+      <div><h3>Trust</h3><a href="app#/prove" data-link="prove" data-applied="1">Proof page</a><a href="docs/THREAT_MODEL.md" data-link="threatModel" data-applied="1">Threat model</a><a href="docs/CLAIMS.md" data-link="claims" data-applied="1">Claims</a></div>
+      <div><h3>Community</h3><a href="https://github.com/kenil1710/signet" data-link="github" target="_blank" rel="noopener" data-applied="1">GitHub</a><a data-link="x" class="soon" aria-disabled="true" title="Coming soon" data-applied="1">X <span class="soon-tag">coming soon</span></a><a data-link="telegram" class="soon" aria-disabled="true" title="Coming soon" data-applied="1">Telegram <span class="soon-tag">coming soon</span></a></div>
+    </div>
+    <div class="bigword" aria-hidden="true" data-word="Signet"></div>
+    <div class="legal"><span>Signet · 2026</span> <span>Not affiliated with OKX. X Layer and TapeOut belong to their owners.</span></div>
+  </div>
+</footer>
+
+</body>
+</html>
