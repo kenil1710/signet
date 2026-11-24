@@ -3,7 +3,7 @@
 // list of sealed domains (the registry's own domain list), on a timer. A visited host is compared with that
 // list locally; for a host that is not on it, nothing is sent anywhere.
 import { decodeFunctionResult, encodeFunctionData, hexToBytes, sha256, zeroAddress } from 'viem';
-import { gateAbi, registryAbi, siteAbi } from './lib/abi.ts';
+import { gateAbi, registryAbi, siteAbi, MULTICALL3 } from './lib/abi.ts';
 import { agree, either, RpcError, type Call } from './lib/rpc.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sealed.ts';
 import { decide, factsOf, trustedBy, withVerified } from './lib/policy.ts';
@@ -142,9 +142,20 @@ async function refreshSite(domain: string, cached: SiteState | undefined): Promi
   ]);
   const [filesRoot, allowlistHash, originsHash, ok] = out<[Hex, Hex, Hex, boolean]>(gateAbi, 'activeRelease', r[0]!);
   const current = out<Hex>(gateAbi, 'currentManifestHash', r[1]!);
+  const releaseId = out<bigint>(gateAbi, 'currentRelease', r[2]!);
+  // when the current release was published: a page loaded before that is from the previous release ("reload")
+  // Kept in THIS computer's clock: the release's age (chain time now minus publishedAt, both read at one block on both
+  // RPCs) subtracted from Date.now(). The page's load time is in this clock too, so neither clock's offset matters.
+  let publishedAt = 0;
+  if (releaseId > 0n) {
+    const [rel, now] = await agree(NET, [call(gate, gateAbi, 'releases', [releaseId]), call(MULTICALL3, gateAbi, 'getCurrentBlockTimestamp')]);
+    const at = Number(out<readonly [Hex, Hex, Hex, Hex, number, bigint]>(gateAbi, 'releases', rel!)[4]);
+    const chainNow = Number(out<bigint>(gateAbi, 'getCurrentBlockTimestamp', now!));
+    if (at > 0 && chainNow >= at) publishedAt = Date.now() - (chainNow - at) * 1000;
+  }
   const state = {
-    ...base, gate, container, prefix, current,
-    release: Number(out<bigint>(gateAbi, 'currentRelease', r[2]!)), enforced: out<boolean>(gateAbi, 'enforced', r[3]!),
+    ...base, gate, container, prefix, current, publishedAt,
+    release: Number(releaseId), enforced: out<boolean>(gateAbi, 'enforced', r[3]!),
     frozen: out<boolean>(gateAbi, 'frozen', r[4]!), approvers: [...out<string[]>(gateAbi, 'getApprovers', r[5]!)],
   };
   if (state.release === 0) return { ...state, current: null, status: 'no-release', reason: 'This domain is bound to a gate that has not published a release yet.' };
@@ -188,19 +199,21 @@ async function pin(domain: string, gate: string): Promise<void> {
   await local.set({ proofs: { ...all, [domain]: gate.toLowerCase() } });
 }
 /// The site as Guard may act on it: getSite, downgraded to "unconfirmed" unless the domain confirmed its gate.
-async function siteFor(domain: string): Promise<SiteState> {
-  const site = await getSite(domain);
+async function siteFor(domain: string, force = false): Promise<SiteState> {
+  const site = await getSite(domain, force);
   if (site.status === 'unbound' || !site.gate) return site;
   if ((await pinnedGate(domain)) === site.gate.toLowerCase()) return site;
   return { ...site, status: 'unconfirmed', reason: NOT_CONFIRMED };
 }
 
-function getSite(domain: string): Promise<SiteState> {
+/// `force`: read the chain now even if the cached state is less than a minute old (a page that doesn't match may be
+/// from a release published since: Guard re-reads once before saying so).
+function getSite(domain: string, force = false): Promise<SiteState> {
   const running = inflight.get(domain);
   if (running) return running;
   const p = (async (): Promise<SiteState> => {
       const cached = await get<SiteState>(local, `site:${domain}`);
-      if (cached && !cached.stale && Date.now() - cached.checkedAt < FRESH_MS) return cached;
+      if (!force && cached && !cached.stale && Date.now() - cached.checkedAt < FRESH_MS) return cached;
       try {
         const fresh = await refreshSite(domain, cached);
         await local.set({ [`site:${domain}`]: fresh });
@@ -255,7 +268,7 @@ const blockedUrl = (tabId: number, domain: string, url: string) => `${chrome.run
 // ---------------------------------------------------------------- messages
 
 type Msg =
-  | { type: 'site'; host: string; url: string }
+  | { type: 'site'; host: string; url: string; fresh?: boolean; again?: boolean }
   | { type: 'report'; report: PageReport }
   | { type: 'sign'; req: SignRequest }
   | { type: 'tab-info'; tabId: number }
@@ -281,18 +294,21 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         void paint(tabId, null, null);
         return null;
       }
-      const site = await siteFor(host);
+      const site = await siteFor(host, msg.fresh === true);
       if (site.status === 'unbound') {
-        void paint(tabId, null, null);
+        if (!msg.again) void paint(tabId, null, null);
         return null;
       }
-      await session.set({ [`tab:${tabId}`]: { domain: host, url: msg.url, report: null } satisfies TabState });
-      void paint(tabId, site, null);
+      // a page asking again during its checks (again: true) only reads the info: its tab state and report stay
+      if (!msg.again) {
+        await session.set({ [`tab:${tabId}`]: { domain: host, url: msg.url, report: null } satisfies TabState });
+        void paint(tabId, site, null);
+      }
       const hashes: Record<string, string[]> = {};
       for (const h of site.valid) for (const f of site.manifests[h]!.files) (hashes[f.path] ??= []).push(f.sha256.slice(2));
       const cur = site.current ? site.manifests[site.current] : undefined;
       const info: PageInfo = {
-        domain: host, site: site.status, reason: site.reason, enforce: site.enforced,
+        domain: host, site: site.status, reason: site.reason, release: site.release, publishedAt: site.publishedAt ?? 0, manifests: site.valid, enforce: site.enforced,
         bypass: !!(await get<boolean>(session, `bypass:${tabId}:${host}`)),
         hashes, origins: cur?.origins ?? [], scripts: site.valid.flatMap((h) => site.manifests[h]!.scripts),
         gateway: viaGateway ? NET.gateway!.pins : null,

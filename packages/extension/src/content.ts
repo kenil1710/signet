@@ -9,6 +9,7 @@
 // document_start by a MutationObserver (also those that remove themselves), and before every signature Guard takes
 // the pending records synchronously and runs a fresh full check, so a script that runs and signs at once is seen.
 import { pathOfUrl, sealedPathFor } from './lib/sealed.ts';
+import { decideRecheck } from './lib/recheck.ts';
 import { classifyInline, inlineHash, runs } from '@signet/cli/src/inline.ts';
 import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts';
 
@@ -86,6 +87,7 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
   let info: PageInfo | null = null;
   let last: PageReport | null = null;
   let redirecting = false;
+  let rechecked = false;
   let firstDone: () => void = () => {};
   const first = new Promise<void>((r) => (firstDone = r));
 
@@ -119,10 +121,22 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
       const res = await fetch(u.href, { cache: 'only-if-cached', mode: 'same-origin', credentials: 'same-origin' });
       if (!res.ok) return byWorker() ?? { url: u.href, status: 'not-cached', note: `cache answered ${res.status}` };
       const h = hex(await crypto.subtle.digest('SHA-256', await res.arrayBuffer()));
-      return { url: u.href, sha256: h, status: valid.includes(h) ? 'ok' : 'mismatch' };
+      if (valid.includes(h)) return { url: u.href, sha256: h, status: 'ok' };
+      return await recheck(u, h, res.headers.get('date'), valid);
     } catch {
       return byWorker() ?? { url: u.href, status: 'not-cached', note: 'not in the browser cache (no-store?)' };
     }
+  }
+
+  /// The cached copy doesn't match: check the copy the site serves now before deciding (lib/recheck.ts).
+  async function recheck(u: URL, cachedHash: string, cachedDate: string | null, valid: string[]): Promise<FileResult> {
+    let fresh: { hash: string; date: number } | null = null;
+    try {
+      const f = await fetch(u.href, { cache: 'no-store', credentials: 'same-origin' });
+      if (f.ok) fresh = { hash: hex(await crypto.subtle.digest('SHA-256', await f.arrayBuffer())), date: Date.parse(f.headers.get('date') ?? '') };
+    } catch { /* the network copy can't be read: decide on the cached copy */ }
+    const r = decideRecheck({ cachedHash, cachedDate: Date.parse(cachedDate ?? ''), fresh, sinceLoad: performance.now(), valid, release: info!.release, loadedLocal: performance.timeOrigin, publishedLocal: info!.publishedAt });
+    return { url: u.href, ...r };
   }
 
   function checkCrossOrigin(u: URL, el: HTMLScriptElement | null): FileResult {
@@ -212,6 +226,13 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
 
   async function pass(): Promise<void> {
     scanNow();
+    // the releases this page may match can change while it is open (a new release, the previous one's grace ending):
+    // then every file is checked again against them, not only files seen for the first time
+    const now = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href, again: true });
+    if (now && now.site === info!.site) {
+      if (now.release !== info!.release || now.manifests.join() !== info!.manifests.join()) results.clear();
+      info = { ...now, proof: info!.proof };
+    }
     const ssr = !!info!.pages;
     // ssr: the document itself is not sealed (its scripts are); static: the HTML is a sealed file
     const jobs: Promise<void>[] = ssr ? [] : [checkOne(location.href, false, null, true)];
@@ -240,7 +261,19 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
       if (ctl) jobs.push(checkWorker(ctl.scriptURL));
     } catch { /* no service workers here */ }
     await Promise.all(jobs);
-    const files = [...results.values()];
+    let files = [...results.values()];
+    if (!rechecked && files.some((f) => f.status === 'mismatch')) {
+      // a new release may have been published since Guard last read the chain (it reads at most once a minute): read
+      // it now, then check again, once per page
+      rechecked = true;
+      const now = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href, fresh: true, again: true });
+      if (now) {
+        info = now;
+        for (const [k, f] of results) if (f.status === 'mismatch') results.delete(k);
+        return pass();
+      }
+    }
+    files = [...results.values()];
     const status = files.some((f) => BAD.includes(f.status)) ? 'tampered' : files.some((f) => !['ok', 'ok-sri', 'ok-gateway', 'ok-inline', 'ok-ssr'].includes(f.status)) ? 'unverified' : 'ok';
     last = { url: location.href, status, files };
     if (info!.enforce && status === 'tampered') redirecting = true; // known before the answer arrives

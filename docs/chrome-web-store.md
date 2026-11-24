@@ -1,14 +1,14 @@
-# Chrome Web Store submission: Signet Guard 0.3.1
+# Chrome Web Store submission: Signet Guard 0.3.2
 
 Everything the Developer Dashboard asks for, in its order. Nothing here has been submitted; the team submits it
 (Chrome Web Store developer account, one-time USD 5 registration fee, paid by card to Google: **no OKB**).
 
 ## Package
 
-- File: `signet-guard-0.3.1.zip`, built exactly like the `guard-release` workflow (mainnet build, files sorted, fixed
-  timestamps). Upload the zip the workflow attaches to the `guard-v0.3.1` GitHub release (it carries the Sigstore
+- File: `signet-guard-0.3.2.zip`, built exactly like the `guard-release` workflow (mainnet build, files sorted, fixed
+  timestamps). Upload the zip the workflow attaches to the `guard-v0.3.2` GitHub release (it carries the Sigstore
   attestation), not a local build.
-- Manifest V3, version 0.3.1. No remote code: every script is in the package.
+- Manifest V3, version 0.3.2. No remote code: every script is in the package.
 
 ## Store listing
 
@@ -86,7 +86,7 @@ https://signetguard.xyz/privacy from the next site release).
 
 ## Before submitting
 
-- Tag `guard-v0.3.1` so the workflow builds, attests and attaches the zip; download that zip and check its SHA-256
+- Tag `guard-v0.3.2` so the workflow builds, attests and attaches the zip; download that zip and check its SHA-256
   matches the release notes.
 - Test it once with a real wallet (MetaMask or OKX Wallet) on signetguard.xyz and on misthos.world (observe mode), and
   say so in the listing only after that.

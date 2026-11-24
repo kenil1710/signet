@@ -63,13 +63,14 @@ export interface SiteState {
   enforced: boolean;
   frozen: boolean;
   release: number;
+  publishedAt?: number; // ms in this computer's clock (from the release's age on-chain): when it was published; 0 = unknown
   approvers: string[];
   current: Hex | null; // manifest hash of the current release
   valid: Hex[]; // manifest hashes a page may match now (current, and the previous one during its grace window)
   manifests: Record<string, Sealed>; // by manifest hash; at most the last two
 }
 
-export type FileStatus = 'ok' | 'ok-sri' | 'ok-gateway' | 'ok-inline' | 'ok-ssr' | 'mismatch' | 'unknown' | 'unknown-origin' | 'sri-mismatch' | 'injected' | 'not-cached' | 'cross-origin' | 'no-crypto';
+export type FileStatus = 'ok' | 'ok-sri' | 'ok-gateway' | 'ok-inline' | 'ok-ssr' | 'stale-release' | 'mismatch' | 'unknown' | 'unknown-origin' | 'sri-mismatch' | 'injected' | 'not-cached' | 'cross-origin' | 'no-crypto';
 export interface FileResult { url: string; status: FileStatus; sha256?: string; note?: string }
 export type PageStatus = 'ok' | 'tampered' | 'unverified';
 export interface PageReport { url: string; status: PageStatus; files: FileResult[] }
@@ -79,6 +80,9 @@ export interface PageInfo {
   domain: string;
   site: SiteStatus;
   reason: string;
+  release: number; // the current release
+  manifests: string[]; // the manifest hashes a page may match now (current, and the previous one during its grace window)
+  publishedAt: number; // ms in this computer's clock: when it was published; 0 = unknown
   enforce: boolean;
   bypass: boolean; // the user chose "go back to the site": no redirect to the warning page, signing stays blocked
   hashes: Record<string, string[]>; // sealed path -> the SHA-256 values valid now

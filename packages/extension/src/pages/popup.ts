@@ -45,7 +45,7 @@ void (async () => {
       <dt>Nodes</dt><dd>${nodes.length ? nodes.map(esc).join(' + ') : 'none'}${nodes.length === 2 ? ' (must agree)' : ''}</dd>
     </dl>
     <p class="pp-mode">Mode: <strong>${i.site.enforced ? 'enforce' : 'observe'}</strong> ${i.site.enforced ? '(Guard blocks)' : '(Guard reports, never blocks)'}${i.site.frozen ? ' · gate frozen' : ''}${i.site.stale ? ' · using the release checked earlier' : ''}</p>
-    ${bad.length ? `<h2>Page check</h2><ul class="mono">${bad.map((f) => `<li>${esc(f.status)} · ${esc(f.url)}</li>`).join('')}</ul>` : ''}
+    ${bad.length ? `<h2>Page check</h2><ul class="mono">${bad.map((f) => `<li>${esc(f.status)} · ${esc(f.url)}${f.note ? `<div class="dim">${esc(f.note)}</div>` : ''}</li>`).join('')}</ul>` : ''}
     ${i.events.length ? `<h2>Recent</h2><ul>${i.events.slice(0, 5).map((e) => `<li><strong>${esc(e.title)}</strong> ${e.refused ? '(refused)' : '(reported only)'}<div class="dim">${esc(e.reason)}</div></li>`).join('')}</ul>` : ''}
     <div class="pp-actions"><button id="copy">Open the verified copy</button><button id="wrong">Report wrong block</button></div>
     <p class="dim" id="msg" aria-live="polite"></p>

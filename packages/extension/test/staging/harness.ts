@@ -100,9 +100,10 @@ export async function switchToEnforce(p: Project): Promise<void> {
 // ---------------------------------------------------------------- web server
 
 /// tamper: true = the main bundle is tampered on every request; 'once' = on the next request only, then clean.
+/// root: serve another build (a new release) from now on; html: serve these bytes as index.html instead of the file.
 /// proof: what /.well-known/signet.json answers. undefined = the sealed file (the domain confirms its gate);
 /// 'drop' = 404 (a domain that never confirmed this gate, or a hijack that removes the file); a string = that body.
-export interface Site { port: number; log: string[]; tamper: boolean | 'once'; proof?: 'drop' | string; close(): void }
+export interface Site { port: number; log: string[]; tamper: boolean | 'once'; proof?: 'drop' | string; root?: string; html?: Buffer; close(): void }
 
 /// Serves the sealed build for any *.signet.test host and a small unsealed page for every other host.
 export async function serveSite(dist: string): Promise<Site> {
@@ -131,13 +132,13 @@ export async function serveSite(dist: string): Promise<Site> {
       if (site.proof === 'drop') { res.statusCode = 404; res.end(); } else { res.setHeader('content-type', 'application/json'); res.end(site.proof); }
       return;
     }
-    const file = join(dist, rel);
+    const file = join(site.root ?? dist, rel);
     if (rel.includes('..') || !existsSync(file)) {
       res.statusCode = 404;
       res.end();
       return;
     }
-    let body: Buffer = readFileSync(file);
+    let body: Buffer = rel === 'index.html' && site.html ? site.html : readFileSync(file);
     if (site.tamper && rel === main) {
       body = Buffer.concat([body, Buffer.from(TAMPER)]);
       if (site.tamper === 'once') site.tamper = false;
