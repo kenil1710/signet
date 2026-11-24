@@ -1,17 +1,17 @@
 {
-  "updatedAt": "2026-11-24T15:22:50.087Z",
+  "updatedAt": "2026-11-24T23:58:25.086Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-24T15:22:50.087Z",
-      "release": 8
+      "checkedAt": "2026-11-24T23:58:25.086Z",
+      "release": 9
     }
   ],
   "operator": {
     "until": "2026-12-19T08:05:42.000Z",
-    "daysLeft": 24.7,
+    "daysLeft": 24.3,
     "renewedThisRound": false
   }
 }
