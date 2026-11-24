@@ -243,6 +243,13 @@ Built with `SIGNET_REPO_PUBLIC=1` from `b150241` (after #7 was published, so its
 
 Both RPCs: `proposalCount` = 8, `currentRelease` = 7. Diff Guard vs #7: nothing new to sign, no new origin.
 
+**Approved** by Approver A at 11:26:49 UTC; timelock over 12:26:49. **Deployed** `release/8` (without the manifest folder) to
+Cloudflare Pages (`c474750f`) at 12:28 UTC: all 25 files byte-identical with a browser user agent (with and without a
+cache-busting query); the 4 pages in Chromium: 30 responses identical, other hosts only the two sealed RPCs, no page
+errors; `/prove` redirects to `/app#/prove`, `/llms.txt` is served. The live `/prove` (headless, mainnet): all checks
+passed, with 4 drpc HTTP 429s retried. Site CI key funded with 0.007 + 0.002 OKB from the team's personal X Layer
+wallet (`0x52cf9ddc…33f8` and a second transfer): 0.009297038 OKB before publishing.
+
 ## Release #7 proposed (2026-11-24, tier 00): the "Create the gate" fix and the Guard 0.3.0 link
 
 Proposal 7 (release numbers are proposal ids; #6 was the SetGuardian admin proposal). Built with `SIGNET_REPO_PUBLIC=1`
