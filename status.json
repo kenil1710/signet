@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-25T18:47:14.075Z",
+  "updatedAt": "2026-11-25T18:51:48.435Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-25T18:47:14.075Z",
+      "checkedAt": "2026-11-25T18:51:48.435Z",
       "release": 13
     }
   ],
@@ -15,19 +15,19 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-25T18:47:20.025Z",
-    "block": "76863397",
-    "summary": "All checks passed (0 pending deployment). Checked in 5.7 s.",
+    "checkedAt": "2026-11-25T18:52:01.584Z",
+    "block": "76863672",
+    "summary": "2 check(s) not run: a public RPC didn't answer (or is rate-limiting this browser). Nothing failed; reload in a minute. Checked in 12.8 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
-        "detail": "34 NAND gates, netlist sha256 0x1a2e19870a…, all 512 rows equal the published truth table",
-        "status": "PASS"
+        "detail": "xlayerrpc.okx.com could not be reached: not checked. Reload this page in a minute.",
+        "status": "NOTRUN"
       },
       {
         "claim": "The Guard decision circuit gives its published truth table on all 512 inputs",
-        "detail": "circuit #7: 22 NAND gates, netlist sha256 0x03c94d0295…, all 512 rows equal the published truth table",
-        "status": "PASS"
+        "detail": "xlayerrpc.okx.com could not be reached: not checked. Reload this page in a minute.",
+        "status": "NOTRUN"
       },
       {
         "claim": "A taped-out circuit's behavior can't be upgraded (beacon owner 0x0, pinned implementation, pinned processor code)",
