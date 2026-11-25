@@ -1,7 +1,7 @@
 # Signet in 5 minutes
 
-**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign anything your team didn't approve.
-**What teams get:** release approvals with a timelock nobody can bypass (no single key: CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts, instant freeze, a verified copy read from X Layer (built; live with Pro), and a public proof and badge. **For users:** Guard **blocks the signature** to any contract or spender the team didn't approve (circuit #7). Signet **builds on TapeKit's** on-chain file verification.
+**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single key can publish a release of your site, a hacked host or DNS is detected within minutes and blocked for users with Signet Guard, and those users can't sign anything your team didn't approve.
+**What teams get:** release approvals with on-chain timelocks (CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts, a freeze any one approver can pull at once, a verified copy read from X Layer (built; live with Pro), and a public proof and badge. **For users:** Guard **blocks the signature** to any contract or spender the team didn't approve (circuit #7), and in enforce mode refuses `eth_sign` and any signature it can't read (Guard 0.3.5). Signet **builds on TapeKit's** on-chain file verification.
 
 **What it is.** A dApp team seals each release of its website on X Layer: the hash of every file, the contracts and
 spenders the site may ask a wallet to sign for, and the outside origins it may talk to. A TapeOut circuit decides
@@ -21,7 +21,13 @@ watchtower alerts the team.
 | 10 | A new contract or spender. **Every team's first release is tier 10** | 2 approvals + 24 h, or 3 of 3 with the emergency flag |
 | 11 | Admin: approvers, timelocks, domain binding, circuit copy | 3 of 3 + 24 h, no fast lane |
 
-Frozen: nothing publishes. Any one approver can freeze; unfreezing needs 2 of 3. The 1 h / 24 h waits are defaults.
+Frozen: nothing publishes. The 1 h / 24 h waits are defaults.
+
+**Fast on purpose, slow on purpose.** Safety actions only stop or remove things, so they are fast: any one approver
+can freeze or revoke the current release at once; two can unfreeze, un-revoke, remove the guardian, or remove a file
+from a revoked release. Changes are slow: approvers, the CI key, the recovery address, the guardian, timelocks, the
+domain binding, the circuit copy and switching back to observe mode take **3 of 3 + 24 h** (tier 11). Switching to
+enforce (stricter) takes one approver, after the gate's first 7 days.
 
 ## Minute 1–3: check the claims against mainnet yourself
 
@@ -91,9 +97,10 @@ team). Against the same attacks (12 we wrote, run on our own local fork of X Lay
   - **TapeKit** already checks DeWEB files on X Layer; Signet builds on that verification for sites on their own
     domain. **WAICT** (Mozilla and partners, May 2026, Firefox Nightly prototype) binds JavaScript to a manifest in a
     transparency log.
-  - Signet adds: a **signing-time allowlist** (refused before the wallet opens), **no single key can publish** (CI
-    proposes, humans approve, a TapeOut circuit whose rule nobody can upgrade decides, with on-chain risk tiers and
-    timelocks), a domain proof, and a public on-chain record.
+  - Signet adds: a **signing-time allowlist** (refused before the wallet opens), **no single key can publish a
+    release** (CI proposes, humans approve, a TapeOut circuit whose rule nobody can upgrade decides, with on-chain
+    risk tiers and timelocks), a domain proof, and a public on-chain record. A stolen hosting or DNS credential can
+    still change what visitors load; Signet detects it and refuses Guard users, it doesn't prevent it.
   - They do better: WEBCAT blocks before any script runs and proves domain enrollment, which Signet doesn't yet.
   - Details: [`docs/prior-art.md`](docs/prior-art.md).
 - **Scam detectors** (Blockaid in MetaMask, Wallet Guard, Pocket Universe, Scam Sniffer) flag *known-bad* sites and
@@ -103,22 +110,43 @@ team). Against the same attacks (12 we wrote, run on our own local fork of X Lay
 ## Minute 4–5: read the limits
 
 [`THREAT_MODEL.md`](THREAT_MODEL.md), especially "Who is protected" and "Honest limits". In short: protection at
-signing needs Guard; Guard starts in observe mode; it fails open when it can't read the chain; a compromised Guard
-extension defeats it. Signet's contracts and the Guard circuit **are on mainnet** ([`docs/mainnet.md`](docs/mainnet.md)), and Signet's own
-site has published releases #3 (tier 10), #4 and #5 (tier 00) through its gate there on 2026-11-20 (#6 was the tier-11 guardian change), then #7 and #8 on 2026-11-24 #9 on 2026-11-24 at 16:52 UTC and #10 on 2026-11-25 (each published seconds after its deploy by `scripts/release-site.sh`); #8's files are stored in full in DeWEB's SiteRegistry (circuit #5's container). misthos.world, the team's own app on Arc, has its gate and a first release approved (publishable 2026-11-25). Both gates are in **observe** mode: Guard reports, it doesn't block yet. Guard isn't in
-the Chrome Web Store (a signed pre-release zip is on GitHub), has been tested with a mock wallet only, and the gateway
-runs on staging. The watchtower checks signetguard.xyz every 5 minutes (started by a Cloudflare Worker cron; GitHub's own schedule, which ran every 4–12 hours, is only a fallback) and publishes
-its result, including its last run of `/prove`. Telegram alerts to the team's chat are set up (a test alert was accepted by Telegram on 2026-11-20, watchtower run 44746304914).
+signing needs Guard; a gate starts in observe mode; Guard fails open when it can't read the chain; a compromised Guard
+extension defeats it.
+
+**Where it stands on mainnet** ([`docs/mainnet.md`](docs/mainnet.md); C8–C11 in `CLAIMS.md`):
+- **signetguard.xyz** (Signet's own site) is in **enforce** mode since 2026-11-25 12:25 UTC (`enforce()` by approver A,
+  tx `0x00de5449…2dd0`): Guard users get the red page and refused signatures if it stops matching its seal. Releases
+  #3–#12 went through its gate (#6 was the tier-11 guardian change); #8's files are stored in full in DeWEB's
+  SiteRegistry. Each release is deployed and published seconds apart by `scripts/release-site.sh`; Guard 0.3.4+
+  holds the page for up to 60 s while a release can publish, so a rollout doesn't turn it red.
+- **misthos.world** (the team's own app on Arc, not an outside adopter) published release #1 on 2026-11-25 (tier 10:
+  2 approvals + 24 h) and is in **observe** mode; enforce is possible from 2026-12-01 08:14 UTC.
+- **No guardian on either gate.** The guardian (signet-ops, a freeze-only key) lost its keystore password, so
+  approvers A and B removed it from both gates on 2026-11-24 (`voteRemoveGuardian()`, 2 of 3). A guardian is
+  optional: any approver can still freeze. Naming a new one is tier 11 (3 of 3 + 24 h).
+- **One team.** The three approvers and the recovery address are the same on both gates and held by the Signet team.
+
+Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). The automated suites use a mock wallet;
+one manual test with Rabby passed on 2026-11-25; MetaMask and OKX Wallet are not tested. The gateway runs on staging.
+The watchtower checks signetguard.xyz (not misthos.world yet) every 5 minutes, started by a Cloudflare Worker cron
+(GitHub's own schedule, which ran every 4–12 hours, is only a fallback), and publishes its result, including its last
+run of `/prove`. Telegram alerts to the team's chat are set up (a test alert was accepted by Telegram on 2026-11-20,
+watchtower run 44746304914).
 
 ## Run it yourself (optional, ~15 minutes)
 
 Needs Foundry and an X Layer RPC URL in `.env` (`XLAYER_RPC_URL`, read-only):
 
 ```bash
+pnpm test                # what CI runs: 173 Foundry tests, both circuits on all 512 inputs, unit tests
+(cd packages/contracts && XLAYER_RPC_URL=https://xlayerrpc.okx.com forge test)   # + the 17 fork tests: 190
 pnpm staging:up          # an anvil fork of X Layer with Signet deployed and the Guard circuit taped out
-pnpm attacks             # the attack suite; rewrites docs/attack-report.md
-pnpm test                # 189 Foundry tests, 512-row circuit tests, unit tests
+pnpm attacks             # the attack suite (not in CI); rewrites docs/attack-report.md
 ```
+
+CI skips the 17 Foundry fork tests (they need an X Layer RPC; they include the 512-row check of the Solidity mirror
+against the real circuit #6, and an end-to-end publish against the real circuit and SiteRegistry). The staging and
+attack suites run locally only.
 
 | Where | What |
 |---|---|

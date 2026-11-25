@@ -208,11 +208,11 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 ## Enforce mode on for signetguard.xyz (2026-11-25, 17:55 IST)
 
 Guard now replaces a page of signetguard.xyz that doesn't match the published seal with its red page and refuses
-signatures the seal doesn't allow. Visitors without Guard see no difference. Plan and rollback:
-`internal/launch/07-enforce-plan.md`.
+signatures the seal doesn't allow. Visitors without Guard see no difference.
 
 - **Call:** `enforce()` (`0x58f93ec9`, value 0) on the site gate `0xa3d4…4503`, sent by **approver A** `0xB9ef…2416`
-  with `internal/launch/enforce.js` in Rabby, after the team's yes. Allowed from 2026-11-25 09:52:14 UTC
+  from Rabby (a short console script that first checks the chain, the approver, the 7 days and that the gate isn't
+  frozen), after the team's yes. Allowed from 2026-11-25 09:52:14 UTC
   (`deployedAt` + 7 days).
 - **Tx** [`0x00de5449…2dd0`](https://web3.okx.com/explorer/x-layer/tx/0x00de54492ffa1a2a0574d9d3664e407b0586d8d711bcd95910feabf5b9952dd0),
   block 76,840,474 (12:25:10 UTC), status success, gas 34,702 at 0.0286 gwei = **0.00000099 OKB**, event

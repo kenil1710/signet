@@ -7,7 +7,7 @@ import { gateAbi, registryAbi, siteAbi, MULTICALL3 } from './lib/abi.ts';
 import { agree, callOne, commonHead, either, RpcError, type Call } from './lib/rpc.ts';
 import { fullCopy, type CopyState, type StoredInfo } from './lib/copy.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sealed.ts';
-import { decide, factsOf, trustedBy, withVerified } from './lib/policy.ts';
+import { decide, factsOf, strict, trustedBy, withVerified } from './lib/policy.ts';
 import { checkFactory } from './lib/factory.ts';
 import { decideWithCircuit } from './lib/guard-circuit.ts';
 import { publishableRelease } from './lib/publishing.ts';
@@ -395,7 +395,10 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
         get: () => get(local, 'guardCircuit'),
         set: (c) => local.set({ guardCircuit: c }),
       });
-      const action = answer.out.BLOCK ? 'block' : answer.out.WARN ? 'warn' : 'allow';
+      // Guard 0.3.5: in enforce mode a request Guard can't read is refused, not only warned about (stricter only)
+      const tightened = strict(facts, answer.out.BLOCK ? 'block' : answer.out.WARN ? 'warn' : 'allow');
+      const action = tightened.action;
+      if (tightened.reason) verdict.details.push(tightened.reason);
       const d: Decision = { ...verdict, by: answer.by, why: answer.why, input: answer.input, action, enforced: site.enforced, refused: action === 'block' };
       // shown in the popup: whether the last signature check was decided by the circuit, the mirror or fail-safe
       await local.set({ decider: { by: answer.by, why: answer.why ?? null, at: Date.now() } });

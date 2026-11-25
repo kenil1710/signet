@@ -21,11 +21,11 @@
 <noscript><div class="nojs wrap">
   <h2>Signet in short</h2>
   <p><b>Your contracts are audited. Your website isn't.</b> Signet protects what your users actually load: no single
-  hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign
-  anything your team didn't approve. The big front-end attacks (Bybit, BadgerDAO, Ledger Connect Kit, Curve, CoW
+  key can publish a release of your site, a hacked host or DNS is detected within minutes and blocked for users with
+  Signet Guard, and those users can't sign anything your team didn't approve. The big front-end attacks (Bybit, BadgerDAO, Ledger Connect Kit, Curve, CoW
   Swap) happened after GitHub: on the hosting, the CDN, a package or the domain.</p>
-  <p><b>What teams get:</b> release approvals and a timelock nobody can bypass (no single key: CI only proposes),
-  watchtower alerts, instant freeze, a verified copy (live with Pro), and a public proof and badge. <b>For users:</b>
+  <p><b>What teams get:</b> release approvals with on-chain timelocks (no single key can publish: CI only proposes),
+  watchtower alerts, a freeze any one approver can pull at once, a verified copy (live with Pro), and a public proof and badge. <b>For users:</b>
   Guard blocks the signature to any contract the team didn't approve.</p>
   <ul>
     <li><b>Seal:</b> CI hashes every file of a release and lists the contracts it may call; that becomes a proposal on X Layer. The CI key can only propose.</li>
@@ -89,7 +89,7 @@
       </div>
       <div class="h-foot">
         <div class="wrap">
-          <p class="lede" id="lede">Signet protects what your users actually load: no single hacked key can change your site, a watchtower checks what it serves, and users with Signet Guard can't sign anything your team didn't approve.</p>
+          <p class="lede" id="lede">Signet protects what your users actually load: no single key can publish a release of your site, a hacked host or DNS is detected within minutes and blocked for users with Signet Guard, and those users can't sign anything your team didn't approve.</p>
           <div class="cta-row">
             <a class="btn btn-wax" href="start">Protect your dApp<svg class="arr" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M10 4l5 5-5 5" stroke="currentColor" stroke-width="1.6"/></svg></a>
             <a class="btn btn-line" href="check">Check your site's risk, free</a>
@@ -150,9 +150,9 @@
         </div>
       </div>
       <div class="gets">
-        <div class="gc"><h3>Release approvals nobody can bypass</h3><p>CI only proposes. Your approvers approve in their own wallets, and riskier changes wait longer. TapeOut circuit #6 on X Layer decides: no admin, no CI key and no Signet employee can skip it.</p></div>
+        <div class="gc"><h3>Release approvals no single key can skip</h3><p>CI only proposes. Your approvers approve in their own wallets, and riskier changes wait longer. TapeOut circuit #6 on X Layer decides: no admin, no CI key and no Signet employee can skip it. Changing approvers or waits takes 3 of 3 + 24 h.</p></div>
         <div class="gc"><h3>Watchtower alerts</h3><p>A checker loads your live site on a schedule and compares every file with the sealed release. A mismatch seen twice in a row alerts your team. Running for signetguard.xyz every 5 minutes; for your site with Pro.</p></div>
-        <div class="gc"><h3>Instant freeze</h3><p>Any one approver can freeze the gate: nothing publishes until two of three unfreeze. One transaction, from a wallet.</p></div>
+        <div class="gc"><h3>Instant freeze</h3><p>Any one approver can freeze the gate: nothing publishes until two of three unfreeze. One transaction, from a wallet. Safety actions are fast on purpose; changes are slow.</p></div>
         <div class="gc"><h3>A verified copy</h3><p>When your live site doesn't match, users can be sent to a copy of the last sealed release, read from X Layer. Built and tested; live with Pro.</p></div>
         <div class="gc"><h3>Public proof and a badge</h3><p>Every release, approval and timelock is on X Layer. Anyone can re-check it in the browser, and the "Sealed by Signet" badge links to it.</p></div>
         <div class="gc guard"><h3>Plus, for your users: Guard</h3><p>The extra layer. Signet Guard checks the page against the seal and <b>blocks the signature</b> to any contract or spender your team didn't approve. <a data-link="guardPrerelease" href="#cta">Get the signed pre-release</a> from GitHub (load it unpacked in Chrome).</p></div>

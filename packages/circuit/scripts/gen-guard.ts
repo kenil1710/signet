@@ -43,6 +43,12 @@ ${GUARD_INPUTS.map((k, i) => `| ${i}. ${k} | ${GUARD_MEANING[k]} |`).join('\n')}
 
 Exactly one output is 1 on every row.
 
+**One rule in Guard on top of the circuit (Guard 0.3.5, stricter only).** On a checked site in enforce mode, a
+request Guard can't read (decoded = 0: \`eth_sign\`, typed data without a verifying contract or not readable, an empty
+batch, contract creation) is refused: the circuit's WARN becomes BLOCK. The circuit itself is immutable and unchanged;
+this rule can never turn a BLOCK or WARN into ALLOW, and doesn't apply in observe mode or when checked = 0
+(\`packages/extension/src/lib/policy.ts\`, \`strict\`).
+
 ## The circuit
 
 | | |

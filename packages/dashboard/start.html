@@ -17,7 +17,7 @@
     <main id="app" class="start">
       <div class="kicker">Setup · X Layer mainnet · about 15 minutes of your time</div>
       <h1>Protect your site</h1>
-      <p class="lead">After these five steps, no single key can change what your website asks wallets to sign: your CI only <b>proposes</b> each release, your approvers <b>approve</b> it in their own wallets, and TapeOut circuit #6 decides when it may go live. Users who run Guard are checked against exactly what you sealed.</p>
+      <p class="lead">After these five steps, no single key can publish a release of your website: your CI only <b>proposes</b> each release, your approvers <b>approve</b> it in their own wallets, and TapeOut circuit #6 decides when it may go live. Users who run Guard are checked against exactly what you sealed.</p>
       <p class="dim">You need: Node.js 18+, a static site built by GitHub Actions (output folder such as <code>dist/</code>), a wallet on X Layer with ~0.001 OKB, and three approver addresses.</p>
 
       <section class="step quick" id="quick"><h2>Fastest: one command</h2>
@@ -84,7 +84,7 @@ jobs:
       - name: Deploy (only reached after the release is published)
         run: echo "your deploy command here"</pre>
         <p><code>signet wait --publish</code> also writes the release's 3 manifest files on-chain (allowlist, origins, file list; ≈ 0.00003 OKB), which is what Guard checks your site against. A re-run skips files that are already stored.</p>
-        <p class="dim">Deploy only after <code>signet wait</code> succeeds: that is what makes an unapproved build unable to go live. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
+        <p class="dim">Deploy only after <code>signet wait</code> succeeds: that keeps your own pipeline from shipping an unapproved build. A stolen hosting or DNS credential can still put other files live; the watchtower alerts you within minutes, and Guard users are refused once your gate is in enforce mode. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
       </section>
 
       <section class="step" id="hosts"><h2>Your host</h2>
@@ -109,7 +109,7 @@ jobs:
           <pre data-copy>npx -y vercel&#64;39 deploy dist --prod --yes --token "$VERCEL_TOKEN"</pre>
           <p class="warn"><b>Turn off Vercel Web Analytics, Speed Insights and the Vercel Toolbar</b> for Production (Project → Analytics, Speed Insights, and Settings → General → Vercel Toolbar), and remove <code>@vercel/analytics</code> / <code>@vercel/speed-insights</code> from the app. They add scripts to your pages that you didn't seal, so Guard and the watchtower see a mismatch. <code>signet verify https://your-domain</code> reports them.</p>
         </details>
-        <details><summary><b>Next.js with server-rendered pages (Vercel)</b> <span class="soon-tag">CLI 0.2.2, Guard 0.3.4</span></summary>
+        <details><summary><b>Next.js with server-rendered pages (Vercel)</b> <span class="soon-tag">CLI 0.2.2, Guard 0.3.5</span></summary>
           <p>A server-rendered page is built per request, so its HTML can't be sealed. Signet seals the code instead: every file under <code>/_next/static</code> and <code>public/</code>, and the exact inline scripts the pages run. In <code>signet.config.json</code>:</p>
           <pre data-copy>"pages": { "mode": "ssr", "crawl": ["/", "/a-page-that-streams", "/docs/a-page", "/no-such-page", "/docs/no-such-page"] }</pre>
           <p>Seal the exact build that is deployed. Build once, deploy that build as a preview, seal it (the CLI crawls the preview's pages for their inline scripts), then promote the same deployment:</p>
@@ -138,14 +138,14 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
       </section>
       <section class="step" id="guard"><h2>Try Guard (pre-release)</h2>
         <p>Signet Guard isn’t in the Chrome Web Store yet. A <b>pre-release</b> build for X Layer mainnet is on GitHub, built and signed by this project’s release workflow (a Sigstore build attestation you can check with <code>gh attestation verify</code>):</p>
-        <p><a class="btn" href="#guard" data-link="guardPrerelease">Signet Guard 0.3.4 (pre-release) on GitHub</a></p>
+        <p><a class="btn" href="#guard" data-link="guardPrerelease">Signet Guard 0.3.5 (pre-release) on GitHub</a></p>
         <p class="dim">What Guard reads, stores and never sends: <a href="./privacy">privacy policy</a>.</p>
         <ol>
           <li>Download the <code>.zip</code> and unzip it into a folder you’ll keep.</li>
           <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
           <li>Click <b>Load unpacked</b> and choose the unzipped folder (the one with <code>manifest.json</code>).</li>
         </ol>
-        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Tested with a mock wallet so far.</p>
+        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Tested with a mock wallet in the automated suites and by hand with Rabby; not yet with MetaMask or OKX Wallet. In enforce mode it refuses <code>eth_sign</code> and any signature it can't read.</p>
       </section>
       <section class="step" id="faq"><h2>Questions</h2>
         <dl class="faq">

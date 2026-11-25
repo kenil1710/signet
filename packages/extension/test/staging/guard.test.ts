@@ -49,6 +49,23 @@ async function click(page: Page, id: string, state: 'ok' | 'error'): Promise<str
   await page.evaluate(() => (document.getElementById('status')!.dataset.state = 'idle'));
   return t;
 }
+/// Requests Guard can't read (eth_sign, typed data without a verifying contract, typed data that isn't JSON) and a
+/// login signature, sent straight through window.ethereum: what each one returned (SENT or the error message).
+async function unreadable(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    const eth = (window as unknown as { ethereum: { request(a: unknown): Promise<unknown> } }).ethereum;
+    const me = '0x1111111111111111111111111111111111111111';
+    const mail = JSON.stringify({ primaryType: 'Mail', domain: { name: 'x', chainId: 196 }, types: { EIP712Domain: [{ name: 'name', type: 'string' }, { name: 'chainId', type: 'uint256' }], Mail: [{ name: 'a', type: 'uint256' }] }, message: { a: 1 } });
+    const out: string[] = [];
+    const attempt = async (name: string, method: string, params: unknown[]) => out.push(`${name}: ${await eth.request({ method, params }).then(() => 'SENT', (e: { message: string }) => e.message)}`);
+    await attempt('eth_sign', 'eth_sign', [me, `0x${'ab'.repeat(32)}`]);
+    await attempt('typed data without a verifying contract', 'eth_signTypedData_v4', [me, mail]);
+    await attempt('unreadable typed data', 'eth_signTypedData_v4', [me, '{not json']);
+    await attempt('login', 'personal_sign', ['0x6c6f67696e', me]);
+    return out;
+  });
+}
+const dismiss = (page: Page) => page.evaluate(() => document.getElementById('signet-guard-notice')?.remove());
 async function shot(page: Page, name: string): Promise<void> {
   if (!process.env.SIGNET_SAVE_DEMO) return;
   const dir = process.env.SIGNET_DEMO_DIR ?? DEMO_DIR; // e.g. docs/demo/ui for the UI screenshots
@@ -137,6 +154,17 @@ test('observe mode never blocks: a tampered bundle and an unsealed spender are r
   await s2.close();
 });
 
+test('observe mode: eth_sign and signatures Guard cannot read get a warning and still reach the wallet', async () => {
+  const s = await browser();
+  const { page, tab } = await visit(s);
+  await light(s, tab, 'OK');
+  assert.deepEqual(await unreadable(page), ['eth_sign: SENT', 'typed data without a verifying contract: SENT', 'unreadable typed data: SENT', 'login: SENT']);
+  assert.equal(signed(s).length, 4);
+  const ev = await events(s);
+  assert.equal(ev.filter((e) => e.kind === 'sign' && !e.refused && e.title === 'Unverified signature').length, 3, JSON.stringify(ev.map((e) => e.title)));
+  await s.close();
+});
+
 test('the gate switches to enforce mode', async () => {
   await switchToEnforce(project);
 });
@@ -208,6 +236,26 @@ test('enforce mode, clean code but an unsealed spender: the signature is refused
       assert.equal(evals(), before);
       assert.match((await events(s))[0]!.details.at(-1)!, /, cached$/);
     }
+    await s.close();
+  }
+});
+
+test('enforce mode (Guard 0.3.5): eth_sign and every signature Guard cannot read are refused before the wallet sees them; a login signature goes through', async () => {
+  for (const late of [false, true]) {
+    const s = await browser({ late });
+    const { page, tab } = await visit(s);
+    await light(s, tab, 'OK');
+    const tries = await unreadable(page);
+    await dismiss(page);
+    assert.match(tries[0]!, /^eth_sign: Signet Guard refused this signature: Unverified signature/);
+    assert.match(tries[1]!, /^typed data without a verifying contract: Signet Guard refused this signature: Unverified signature/);
+    assert.match(tries[2]!, /^unreadable typed data: Signet Guard refused this signature: Unverified signature/);
+    assert.equal(tries[3], 'login: SENT');
+    assert.deepEqual(signed(s).map((c) => c.method), ['personal_sign'], 'only the login signature reached the wallet');
+    const refused = (await events(s)).filter((e) => e.kind === 'sign' && e.refused);
+    assert.ok(refused.length >= 3);
+    // circuit #7 answered WARN (row with decoded = 0); Guard 0.3.5 refuses on top of it, and says so
+    assert.ok(refused.every((e) => e.details.some((d) => /^decided by the Guard circuit, row 0x[0-9a-f]{3}/.test(d)) && e.details.some((d) => /refused in enforce mode: Guard can't read this request/.test(d))), JSON.stringify(refused.map((e) => e.details.slice(-2))));
     await s.close();
   }
 });

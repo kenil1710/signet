@@ -49,3 +49,35 @@ test('analyze: a local site with an unpinned CDN script, no CSP, no proof', asyn
     srv.close();
   }
 });
+
+// /api/check said "Releases are not sealed" for signetguard.xyz and misthos.world (judge review 4): Cloudflare Workers
+// throw on fetch(..., { redirect: 'error' }) ("must be one of follow or manual"), and the throw read as "no proof".
+test('analyze: the domain proof is found with a Workers-like fetch (no redirect: "error"); a redirected proof is not accepted', async () => {
+  const GATE = '0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503';
+  let redirectProof = false;
+  const srv = http.createServer((q, r) => {
+    if (q.url === '/') { r.setHeader('content-type', 'text/html'); r.end('<script src="/a.js"></script>'); return; }
+    if (q.url === '/.well-known/signet.json') {
+      if (redirectProof) { r.statusCode = 302; r.setHeader('location', '/elsewhere.json'); r.end(); return; }
+      r.setHeader('content-type', 'application/json'); r.end(JSON.stringify({ signet: 1, chainId: 196, gate: GATE })); return;
+    }
+    if (q.url === '/elsewhere.json') { r.setHeader('content-type', 'application/json'); r.end(JSON.stringify({ signet: 1, chainId: 196, gate: GATE })); return; }
+    r.statusCode = 404; r.end();
+  });
+  await new Promise<void>((res) => srv.listen(0, '127.0.0.1', res));
+  const origin = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+  // what workerd does (checked in wrangler dev, 2026-11-25)
+  const workersFetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.redirect === 'error') throw new TypeError('Invalid redirect value, must be one of "follow" or "manual"');
+    return fetch(input, init);
+  }) as typeof fetch;
+  try {
+    const r = await analyze('signetguard.xyz', workersFetch, { origin });
+    assert.deepEqual(r.sealed, { gate: GATE });
+    assert.match(r.findings.map((f) => `${f.level}:${f.area}:${f.text}`).join('\n'), new RegExp(`ok:Releases:Sealed with Signet: the domain names gate ${GATE}`));
+    redirectProof = true;
+    assert.equal((await analyze('signetguard.xyz', workersFetch, { origin })).sealed, null, 'a proof behind a redirect is not the domain\'s own');
+  } finally {
+    srv.close();
+  }
+});

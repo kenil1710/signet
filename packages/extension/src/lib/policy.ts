@@ -228,6 +228,17 @@ export function factsOf(verdict: Verdict, ctx: Context): GuardInputs {
   };
 }
 
+export const STRICT_NOTE = "refused in enforce mode: Guard can't read this request, so it can't check what it allows (Guard 0.3.5 rule on top of circuit #7's warning)";
+
+/// Guard 0.3.5, stricter only, applied after the Guard circuit decided: on a checked site in enforce mode, a request
+/// Guard can't read (decoded = 0: eth_sign, typed data without a verifying contract or not readable, an empty batch,
+/// contract creation) is refused instead of passed on with a warning. Circuit #7 is immutable and answers WARN for
+/// those rows; this rule can only turn that WARN into BLOCK. Observe mode and unchecked sites (fail-open) are unchanged.
+export function strict(facts: GuardInputs, action: Action): { action: Action; reason?: string } {
+  if (action === 'warn' && facts.enforceMode && facts.checked && !facts.decoded) return { action: 'block', reason: STRICT_NOTE };
+  return { action };
+}
+
 /// The chain and the addresses a signing request asks the user to trust as a contract or a spender: each call's
 /// target and any spender it names (token approvals, Permit2), or a typed-data verifying contract and spender.
 /// Used to run sealed factory rules (lib/factory.ts) before decide(); recipients are not included.

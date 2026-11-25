@@ -210,8 +210,9 @@ export async function analyze(domainInput: string, f: Fetch = fetch, opts: { ori
   // 3. sealed by Signet?
   let sealed: Report['sealed'] = null;
   try {
-    const r = await f(`${baseOrigin}/.well-known/signet.json`, { redirect: 'error', signal: AbortSignal.timeout(6000) });
-    if (r.ok) {
+    // 'manual', not 'error': Cloudflare Workers throw on redirect: 'error'. A proof behind a redirect isn't the domain's own.
+    const r = await f(`${baseOrigin}/.well-known/signet.json`, { redirect: 'manual', signal: AbortSignal.timeout(6000) });
+    if (r.status === 200) {
       const j = JSON.parse((await readCapped(r, 4096)) || '{}') as { signet?: number; gate?: string };
       if (j.signet === 1 && typeof j.gate === 'string' && /^0x[0-9a-fA-F]{40}$/.test(j.gate)) sealed = { gate: j.gate };
     }

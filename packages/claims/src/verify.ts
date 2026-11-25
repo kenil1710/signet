@@ -28,6 +28,9 @@ const cpuAbi = parseAbi([
 const beaconAbi = parseAbi(['function owner() view returns (address)', 'function implementation() view returns (address)']);
 const siteAbi = parseAbi(['function read(address, string) view returns (bytes)', 'function fileInfo(address, string) view returns (uint32, string, bytes32, uint40, uint256)']);
 const openerAbi = parseAbi(['function accountOf(address, uint256) view returns (address)', 'function isOpened(address, uint256) view returns (bool)']);
+const gateAbi = parseAbi(['function enforced() view returns (bool)', 'function frozen() view returns (bool)', 'function currentRelease() view returns (uint64)', 'function guardian() view returns (address)', 'function deployedAt() view returns (uint40)']);
+const ENFORCE_TX = '0x00de54492ffa1a2a0574d9d3664e407b0586d8d711bcd95910feabf5b9952dd0' as Hex;
+const ZERO = '0x0000000000000000000000000000000000000000';
 const probeAbi = parseAbi(['function lastOut() view returns (bool)', 'function cpu() view returns (address)', 'function circuitId() view returns (uint256)']);
 
 type Result = { status: 'PASS' | 'FAIL' | 'PENDING'; detail: string };
@@ -201,6 +204,36 @@ const CLAIMS: Claim[] = [
       if (!existsSync(`${ROOT}docs/demo/chunked-upload.json`)) return fail('docs/demo/chunked-upload.json missing');
       const r = json('docs/demo/chunked-upload.json') as { bytes: number; chunks: number; totalGas: number; maxChunkGas: number };
       return r.bytes === 307200 && r.chunks === 13 && r.maxChunkGas < 16_777_216 ? pass(`${r.chunks} transactions, ${r.totalGas.toLocaleString('en-US')} gas in total, at most ${r.maxChunkGas.toLocaleString('en-US')} per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)`) : fail(JSON.stringify(r));
+    },
+  },
+  {
+    id: 'C10', kind: 'mainnet', text: "signetguard.xyz's gate is in enforce mode since 2026-11-25 (one approver's enforce(), allowed 7 days after the gate was made), is not frozen, has a published release and has no guardian",
+    check: async (b) => {
+      const gate = '0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503' as Address;
+      const [enforced, frozen, current, guardian] = await Promise.all([call<boolean>(b, gate, gateAbi, 'enforced'), call<boolean>(b, gate, gateAbi, 'frozen'), call<bigint>(b, gate, gateAbi, 'currentRelease'), call<Address>(b, gate, gateAbi, 'guardian')]);
+      const r = await both((c) => c.getTransactionReceipt({ hash: ENFORCE_TX }));
+      const ev = r.logs.find((l) => l.address.toLowerCase() === gate.toLowerCase() && l.topics[0] === keccak256(Buffer.from('Enforced(address)')));
+      const ok = enforced && !frozen && current > 0n && guardian === ZERO && r.status === 'success' && !!ev;
+      return ok ? pass(`enforced, not frozen, current release #${current}, guardian 0x0; enforce() in tx ${ENFORCE_TX.slice(0, 10)}… (block ${r.blockNumber}) by ${r.from}`)
+        : fail(`enforced ${enforced}, frozen ${frozen}, release ${current}, guardian ${guardian}, tx ${r.status}, event ${!!ev}`);
+    },
+  },
+  {
+    id: 'C11', kind: 'mainnet', text: "misthos.world's gate (the team's own app, not an outside adopter) has published release #1 and is in observe mode (its team can switch to enforce from 2026-12-01 08:14 UTC); it has no guardian",
+    check: async (b) => {
+      const gate = '0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59' as Address;
+      const [enforced, current, guardian, deployedAt] = await Promise.all([call<boolean>(b, gate, gateAbi, 'enforced'), call<bigint>(b, gate, gateAbi, 'currentRelease'), call<Address>(b, gate, gateAbi, 'guardian'), call<number>(b, gate, gateAbi, 'deployedAt')]);
+      const from = new Date((Number(deployedAt) + 7 * 86400) * 1000).toISOString();
+      return current >= 1n && !enforced && guardian === ZERO ? pass(`current release #${current}, observe mode (enforce allowed from ${from}), guardian 0x0`)
+        : fail(`release ${current}, enforced ${enforced}, guardian ${guardian}: update CLAIMS.md`);
+    },
+  },
+  {
+    id: 'R11', kind: 'repo', text: "Guard 0.3.5 refuses, in enforce mode, eth_sign and any signature it can't decode (circuit #7 only warns for those rows; Guard's rule on top can only turn that warning into a refusal); observe mode and unchecked sites still only warn",
+    check: async () => {
+      const unit = testExists('packages/extension/test/policy.test.ts', 'enforce mode: eth_sign and every signature Guard cannot decode are refused');
+      const staging = testExists('packages/extension/test/staging/guard.test.ts', 'enforce mode (Guard 0.3.5): eth_sign and every signature Guard cannot read are refused');
+      return unit && staging ? pass('unit test in packages/extension/test/policy.test.ts; staging test in packages/extension/test/staging/guard.test.ts (real Chromium, mock wallet)') : fail('test missing');
     },
   },
   {

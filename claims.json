@@ -1,8 +1,8 @@
 {
   "project": "Signet",
-  "checkedAt": "2026-11-21T08:14:58.371Z",
+  "checkedAt": "2026-11-25T13:29:06.291Z",
   "chain": "X Layer mainnet (196)",
-  "block": "76479734",
+  "block": "76844147",
   "rpcs": [
     "https://xlayerrpc.okx.com",
     "https://xlayer.drpc.org"
@@ -65,7 +65,7 @@
       "kind": "mainnet",
       "claim": "Signet's contracts are on mainnet: SignetRegistry (with its enumerable domain list), SignetFactory, the ReleaseGate implementation and Signet's own site gate",
       "status": "PASS",
-      "detail": "registry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, factory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503, 1 domain(s)"
+      "detail": "registry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, factory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503, 2 domain(s)"
     },
     {
       "id": "C9",
@@ -129,6 +129,27 @@
       "claim": "A real-size bundle (300 KB) can be stored on-chain as the verified copy, one proved 24 KB piece per transaction, each under 16.7M gas",
       "status": "PASS",
       "detail": "13 transactions, 70,054,261 gas in total, at most 5,635,682 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
+    },
+    {
+      "id": "C10",
+      "kind": "mainnet",
+      "claim": "signetguard.xyz's gate is in enforce mode since 2026-11-25 (one approver's enforce(), allowed 7 days after the gate was made), is not frozen, has a published release and has no guardian",
+      "status": "PASS",
+      "detail": "enforced, not frozen, current release #12, guardian 0x0; enforce() in tx 0x00de5449… (block 76840474) by 0xb9ef367a86de5150a5390c4148073901587d2416"
+    },
+    {
+      "id": "C11",
+      "kind": "mainnet",
+      "claim": "misthos.world's gate (the team's own app, not an outside adopter) has published release #1 and is in observe mode (its team can switch to enforce from 2026-12-01 08:14 UTC); it has no guardian",
+      "status": "PASS",
+      "detail": "current release #1, observe mode (enforce allowed from 2026-12-01T08:14:44.000Z), guardian 0x0"
+    },
+    {
+      "id": "R11",
+      "kind": "repo",
+      "claim": "Guard 0.3.5 refuses, in enforce mode, eth_sign and any signature it can't decode (circuit #7 only warns for those rows; Guard's rule on top can only turn that warning into a refusal); observe mode and unchecked sites still only warn",
+      "status": "PASS",
+      "detail": "unit test in packages/extension/test/policy.test.ts; staging test in packages/extension/test/staging/guard.test.ts (real Chromium, mock wallet)"
     },
     {
       "id": "R7",

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeFunctionData, parseAbi } from 'viem';
-import { decide, factsOf, type Context } from '../src/lib/policy.ts';
+import { decide, factsOf, strict, type Context } from '../src/lib/policy.ts';
 import { guard } from '@signet/circuit/src/guard-reference.ts';
 import type { SignRequest } from '../src/lib/types.ts';
 
@@ -176,4 +176,46 @@ test("signetguard.xyz release #10: Multicall3 is read-only, so it is not in the 
     const out = guard(factsOf(v, ctx));
     assert.equal(out.BLOCK, true, `${r.method} ${JSON.stringify(r.params).slice(0, 120)}: ${v.title}`);
   }
+});
+
+// Guard 0.3.5: circuit #7 answers WARN for a request Guard can't read (decoded = 0), even in enforce mode. On a
+// checked site in enforce mode Guard refuses it instead (stricter only; observe mode and unchecked sites unchanged).
+test('enforce mode: eth_sign and every signature Guard cannot decode are refused; observe mode and unchecked sites only warn', () => {
+  const unreadable: SignRequest[] = [
+    { method: 'eth_sign', params: [USER, Z], chainId: '0xc4', accounts: [USER] },
+    { method: 'eth_signTypedData_v4', chainId: '0xc4', accounts: [USER], params: [USER, '{not json'] },
+    { method: 'eth_signTypedData_v4', chainId: '0xc4', accounts: [USER], params: [USER, '[1,2]'] },
+    typed('Mail', undefined, {}),
+    { method: 'wallet_sendCalls', params: [{ from: USER, calls: [] }], chainId: '0xc4', accounts: [USER] },
+  ];
+  const enforce: Context = { ...ok, enforced: true };
+  for (const r of unreadable) {
+    const v = decide(r, enforce);
+    const facts = factsOf(v, enforce);
+    assert.equal(facts.decoded, false, `${r.method}: ${v.title}`);
+    const circuit = guard(facts);
+    assert.equal(circuit.WARN, true, 'circuit #7 itself only warns');
+    const s = strict(facts, 'warn');
+    assert.equal(s.action, 'block', `${r.method} ${JSON.stringify(r.params).slice(0, 60)}`);
+    assert.match(s.reason!, /enforce mode/);
+    // observe mode: a warning, the wallet still gets it
+    assert.equal(strict(factsOf(decide(r, ok), ok), 'warn').action, 'warn');
+    // an unchecked site stays fail-open, even if its gate says enforce
+    const unchecked: Context = { site: 'unverified', page: 'unknown', allowlist: null, enforced: true };
+    assert.equal(strict(factsOf(decide(r, unchecked), unchecked), 'warn').action, 'warn');
+  }
+  // readable requests are untouched: a login signature and a sealed call still pass, a refusal stays a refusal
+  for (const [r, want] of [
+    [{ method: 'personal_sign', params: ['0x00', USER], chainId: '0xc4', accounts: [USER] }, 'allow'],
+    [tx(STAKING, data('stake', [5n])), 'allow'],
+    [tx(TOKEN, data('approve', [DRAINER, 1n])), 'block'],
+  ] as [SignRequest, string][]) {
+    const v = decide(r, enforce);
+    const out = guard(factsOf(v, enforce));
+    const a = out.BLOCK ? 'block' : out.WARN ? 'warn' : 'allow';
+    assert.equal(strict(factsOf(v, enforce), a).action, want);
+  }
+  // a frozen gate's warning on a readable, sealed call is not turned into a refusal
+  const frozen: Context = { ...enforce, frozen: true };
+  assert.equal(strict(factsOf(decide(tx(STAKING, data('stake', [5n])), frozen), frozen), 'warn').action, 'warn');
 });
