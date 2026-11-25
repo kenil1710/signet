@@ -64,7 +64,7 @@ const ago = (iso: string) => { const m = Math.round((Date.now() - Date.parse(iso
 /// browser's own check runs. It is the watchtower's word, not this browser's: the live rows below are what count.
 function lastVerified(s: WatchStatus | null): string {
   const pr = s?.prove;
-  if (!pr) return '<p class="summary dim">Last watchtower run of this page: none published yet.</p>';
+  if (!pr) return ''; // nothing to show until the watchtower has run this page once
   const n = (st: string) => pr.rows.filter((r) => r.status === st).length;
   const cls = n('FAIL') ? 'bad' : n('PASS') === pr.rows.filter((r) => r.status !== 'PENDING').length ? 'ok' : 'warnsum';
   return `<details class="lastrun"><summary class="summary ${cls}">Last verified by the watchtower at ${esc(utc(pr.checkedAt))} (${esc(ago(pr.checkedAt))}), block ${pr.block ? Number(pr.block).toLocaleString('en-US') : '?'}: ${esc(pr.summary)} <span class="dim">Show its rows</span></summary>

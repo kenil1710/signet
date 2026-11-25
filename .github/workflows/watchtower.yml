@@ -3,7 +3,8 @@
 # grant when fewer than 7 days are left, run the public /prove page, and publish status.json for /prove and the dashboard.
 # State and status live on the `watchtower-status` branch (one commit, replaced each round).
 # Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (alerts), WATCHTOWER_RENEW_KEY (a small dedicated renewer wallet,
-# never signet-dev). GitHub runs schedules on a best-effort basis: a round can start some minutes late.
+# never signet-dev). Started every 5 minutes by the Cloudflare Worker in packages/watchtower/cron (workflow_dispatch);
+# GitHub's own schedule is best-effort (hours late in practice) and stays only as a fallback.
 name: watchtower
 on:
   schedule:

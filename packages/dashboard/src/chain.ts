@@ -33,7 +33,7 @@ const WORDS: Record<string, string> = { ok: 'matches its sealed release', mismat
 export function watchLine(s: WatchStatus | null, domain?: string): { cls: string; text: string } {
   if (!s) return { cls: 'dim', text: 'Watchtower: no public status yet (it is published once the repository is public).' };
   const stale = Date.now() - Date.parse(s.updatedAt) > 30 * 60000;
-  const head = `Watchtower: last round ${utc(s.updatedAt)} (${ago(s.updatedAt)})${stale ? ' (late: GitHub runs schedules on a best-effort basis)' : ''}`;
+  const head = `Watchtower: last round ${utc(s.updatedAt)} (${ago(s.updatedAt)})${stale ? ' (late: a round runs every 5 minutes)' : ''}`;
   if (!domain) return { cls: s.domains.some((d) => d.status === 'mismatch' || d.status === 'unreachable') ? 'bad' : stale ? 'warnsum' : 'ok', text: `${head}; ${s.domains.map((d) => `${d.domain} ${WORDS[d.status] ?? d.status}${d.release ? ` (release #${d.release})` : ''}`).join('; ') || 'watching no domain'}${s.operator ? `; file-store operator grant valid for ${s.operator.daysLeft} more days` : ''}.` };
   const d = s.domains.find((x) => x.domain === domain);
   if (!d) return { cls: 'dim', text: `${head}; it doesn't watch ${domain} (watched with Pro).` };

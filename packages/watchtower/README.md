@@ -34,8 +34,10 @@ when the site is clean again ("Recovered").
 TapeSend, X posts, the public status page, Guard telemetry.
 
 **Live (built 2026-11-19; switched on when the repository is public):** `.github/workflows/watchtower.yml` runs one
-round every 5 minutes for `signetguard.xyz` on GitHub Actions (free for public repositories; GitHub starts schedules
-on a best-effort basis: from 2026-11-20 to 11-24 it actually ran every 4–12 hours, not every 5 minutes). State and the public `status.json` live on the `watchtower-status`
+round every 5 minutes for `signetguard.xyz` on GitHub Actions (free for public repositories). The clock is a Cloudflare
+Worker cron (`cron/`, free plan) that starts the workflow with `workflow_dispatch` and skips a beat while a round is
+queued or running: GitHub's own schedule is best-effort (from 2026-11-20 to 11-24 it ran every 4–12 hours) and stays
+only as a fallback. State and the public `status.json` live on the `watchtower-status`
 branch (one commit, replaced each round); `/prove` and the dashboard read the status from there. Alerts go to
 Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` secrets).
 

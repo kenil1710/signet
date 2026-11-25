@@ -1,0 +1,17 @@
+# Deploy: cd packages/watchtower/cron && npx wrangler@4 deploy   (then once: npx wrangler@4 secret put GH_TOKEN)
+name = "signet-watchtower-cron"
+main = "worker.ts"
+compatibility_date = "2026-11-01"
+workers_dev = false   # no public URL: it only runs on its cron trigger
+preview_urls = false
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+REPO = "kenil1710/signet"
+WORKFLOW = "watchtower.yml"
+REF = "main"
+
+[observability]
+enabled = true
