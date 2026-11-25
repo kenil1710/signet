@@ -231,6 +231,18 @@ signatures the seal doesn't allow. Visitors without Guard see no difference.
   release #12). Back to observe on-chain is `proposeAdmin(13, 0x)` (SetObserveMode, tier 11: 3 of 3 + 24 h).
 - misthos.world stays in observe mode; its gate allows `enforce()` from 2026-12-01 08:14 UTC.
 
+## Release #13 proposed (2026-11-25, tier 00): Guard links → 0.3.5, /api/check fix, docs in line with the chain
+
+Sealed into `packages/dashboard/release/13` (manifest `0x8069ee21…8462`); allowlist and origins equal #12's, so tier 00
+(computed on-chain). Guard 0.3.5 published first as a pre-release (`guard-v0.3.5` from commit `bfc29ca`, workflow run
+45625063278; zip SHA-256 `51592394…`, checked against the asset; `gh attestation verify` exit 0).
+
+| Tx | From | Call | Gas |
+|---|---|---|---:|
+| [`0x5bc212bc…2336`](https://web3.okx.com/explorer/x-layer/evm/tx/0x5bc212bc6c6774a3c51524e7b6e588edc2d1f95b4ec0d339a25bb8a114d22336) | CI proposer | `proposeRelease` → #13, tier 00, block 76,844,748, 0.020000001 gwei | 168,996 |
+
+Next: approver A `approve(13)`, then after the 1 h timelock `scripts/release-site.sh 13` (deploy + `publish(13)` + `signet/files.json`).
+
 ## Release #12 published (2026-11-25): a real 404 page, phone layout, /prove "not checked" on RPC errors
 
 Sealed into `packages/dashboard/release/12` (manifest `0x5ffa4289…5982`, 28 files: `404.html` is new; resealed after Guard 0.3.4 was published so its links point to `guard-v0.3.4`; the first seal `0x6feb8911…22c5` was never proposed); allowlist and
