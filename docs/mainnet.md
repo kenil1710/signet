@@ -205,7 +205,7 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Release #10 proposed (2026-11-25, tier 00): /prove in ~6 s, no "coming soon", /check fix, Functions back
+## Release #10 published (2026-11-25, tier 00): /prove in ~6 s, no "coming soon", /check fix, Functions back
 
 Built with `SIGNET_REPO_PUBLIC=1` and sealed into `packages/dashboard/release/10` (manifest `0x262eac1f…4605`, 28
 files). Contents: /prove reads through Multicall3 (128 `eval`s per `eth_call`), all checks in parallel at one pinned
@@ -229,6 +229,13 @@ was ~4 min); footer/landing/start without "coming soon" (X link live, Telegram r
 | Tx | From | Call | Gas |
 |---|---|---|---:|
 | [`0x37122c25…81c0`](https://web3.okx.com/explorer/x-layer/evm/tx/0x37122c259b41cd4e6d46076f35a491d628159d62d5164b0111b7cd3ab37f81c0) | CI proposer | `proposeRelease` → #10, tier 00 (block 76,812,533, 04:39:29 UTC) | 168,984 |
+| [`0xa8f68eab…0d33`](https://web3.okx.com/explorer/x-layer/evm/tx/0xa8f68eab33a22c664c076fdb988124ff45c5f7e321569d8546ea120e1e070d33) | CI proposer | `publish(10)`, block 76,816,686 (`policyInputs` = 9, after approver A) | 292,923 |
+| SiteRegistry | CI proposer | `signet/files.json` (7,504 B; allowlist/origins unchanged), read back | 1,857,163 |
+
+`scripts/release-site.sh 10`: Cloudflare deployment `83a6af23` (9 new files, 17 reused), published seconds later; 26/26
+live files byte-identical; `/api/check` and `/api/watchtower` answer JSON again. Both RPCs: `currentRelease()` = 10.
+`/prove` on https://signetguard.xyz in headless Chromium: 7.2 / 6.7 / 7.0 s, all checks passed (release #10, 27 files
+recomputed), no RPC errors. Site CI key ≈ 0.003139 OKB left.
 
 Guard 0.3.3 published as a pre-release the same morning (`guard-v0.3.3`, zip SHA-256 `e843bd2c…de06`, Sigstore
 attestation verified).
