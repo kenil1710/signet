@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-25T11:26:55.922Z",
+  "updatedAt": "2026-11-25T11:31:39.898Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-25T11:26:55.919Z",
+      "checkedAt": "2026-11-25T11:31:39.897Z",
       "release": 12
     }
   ],
@@ -15,9 +15,9 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-25T11:27:03.836Z",
-    "block": "76836979",
-    "summary": "All checks passed (0 pending deployment). Checked in 7.2 s.",
+    "checkedAt": "2026-11-25T11:31:46.512Z",
+    "block": "76837262",
+    "summary": "All checks passed (0 pending deployment). Checked in 6.2 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
@@ -41,7 +41,7 @@
       },
       {
         "claim": "misthos.world: the release files stored on-chain hash to what its gate published",
-        "detail": "no release published yet",
+        "detail": "release #1: filesRoot, allowlistHash and originsHash recomputed here, 423 files listed, observe mode",
         "status": "PASS"
       },
       {
