@@ -205,6 +205,17 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #11 proposed (2026-11-25, tier 00): watchtower box hidden until it has data, Guard links → 0.3.3
+
+Sealed into `packages/dashboard/release/11` (manifest `0xb5cc2196…4ce3`); allowlist and origins equal #10's. Fork
+rehearsal: propose 168,996 gas, approve A 39,958, publish 292,923, files.json written and read back, manifest equal to
+the seal. Proposed after the watchtower's new clock was confirmed: a Cloudflare Worker cron
+(`packages/watchtower/cron`) started rounds at 06:20:52, 06:25:54 and 06:30:51 UTC.
+
+| Tx | From | Call | Gas |
+|---|---|---|---:|
+| [`0x64ed2833…27b4`](https://web3.okx.com/explorer/x-layer/evm/tx/0x64ed283300ba8bc727188c998d7268a1daa0738272c6d6803b3b3117606c27b4) | CI proposer | `proposeRelease` → #11, tier 00 | 168,996 |
+
 ## Release #10 published (2026-11-25, tier 00): /prove in ~6 s, no "coming soon", /check fix, Functions back
 
 Built with `SIGNET_REPO_PUBLIC=1` and sealed into `packages/dashboard/release/10` (manifest `0x262eac1f…4605`, 28
