@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-25T08:32:05.716Z",
+  "updatedAt": "2026-11-25T08:36:43.948Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-25T08:32:05.715Z",
+      "checkedAt": "2026-11-25T08:36:43.947Z",
       "release": 11
     }
   ],
@@ -15,14 +15,14 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-25T08:32:13.287Z",
-    "block": "76826488",
-    "summary": "1 check(s) FAILED. Checked in 7.3 s.",
+    "checkedAt": "2026-11-25T08:36:51.377Z",
+    "block": "76826767",
+    "summary": "All checks passed (0 pending deployment). Checked in 7.2 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
-        "detail": "xlayerrpc.okx.com could not be reached",
-        "status": "FAIL"
+        "detail": "34 NAND gates, netlist sha256 0x1a2e19870a…, all 512 rows equal the published truth table",
+        "status": "PASS"
       },
       {
         "claim": "The Guard decision circuit gives its published truth table on all 512 inputs",
