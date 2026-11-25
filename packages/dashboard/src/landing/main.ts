@@ -177,6 +177,8 @@ const esc = (s: string) => s.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`);
 const shellLines = VERIFY_OUTPUT.map(([kind, text]) =>
   kind === 'cmd' ? `<span class="p">$</span> ${esc(text.replace(/^\$ /, ''))}` : kind === 'ok' ? `<span class="ok">${esc(text)}</span>` : `<span class="dim">${esc(text)}</span>`);
 const shellText = shellLines.join('\n');
+// the whole output is there from the start (the typing below only replays it when read at normal speed)
+$('#shell').innerHTML = shellText;
 
 /* ---------- hero beats ---------- */
 const hero = $('#hero');
@@ -302,14 +304,14 @@ function animated(): void {
       const track = $('.h-track'), dist = () => track.scrollWidth - window.innerWidth;
       const hz = gsap.to(track, { x: () => -dist(), ease: 'none',
         scrollTrigger: { trigger: '.h-pin', start: 'top top', end: () => '+=' + dist(), pin: true, scrub: 0.7, invalidateOnRefresh: true } });
-      gsap.to('#term1 .ln', { opacity: 1, stagger: 0.12, ease: 'none', scrollTrigger: { trigger: '#p1', containerAnimation: hz, start: 'left 85%', end: 'center 45%', scrub: true } });
+      gsap.fromTo('#term1 .ln', { opacity: 0.45 }, { opacity: 1, stagger: 0.12, ease: 'none', scrollTrigger: { trigger: '#p1', containerAnimation: hz, start: 'left 85%', end: 'center 45%', scrub: true } });
       const tlTxt = $('#tlTxt'), clock = { s: 3600 };
       const ptl = gsap.timeline({ scrollTrigger: { trigger: '#p2', containerAnimation: hz, start: 'left 70%', end: 'right 95%', scrub: true,
         onUpdate: (self) => { const p = self.progress; setWho('#wA', p > 0.1); setWho('#wB', p > 0.28); const on = p > 0.85; $('#pubLamp').classList.toggle('on', on); $('#pubVal').textContent = on ? '1' : '0'; } } });
       ptl.to('#tlRing', { strokeDashoffset: 0, ease: 'none', duration: 0.5 }, 0.3)
          .to(clock, { s: 0, ease: 'none', duration: 0.5, onUpdate: () => { const s = Math.round(clock.s); tlTxt.textContent = `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; } }, 0.3)
          .to({}, { duration: 0.2 });
-      gsap.from('#p3 .node, #p3 .agree, #p3 .chk', { opacity: 0, y: 14, stagger: 0.1, ease: 'none', scrollTrigger: { trigger: '#p3', containerAnimation: hz, start: 'left 85%', end: 'left 35%', scrub: true } });
+      gsap.fromTo('#p3 .node, #p3 .agree, #p3 .chk', { opacity: 0.45, y: 14 }, { opacity: 1, y: 0, stagger: 0.1, ease: 'none', scrollTrigger: { trigger: '#p3', containerAnimation: hz, start: 'left 85%', end: 'left 35%', scrub: true } });
       gsap.from('.panel .idx', { xPercent: 30, ease: 'none', scrollTrigger: { trigger: '.h-pin', start: 'top top', end: () => '+=' + dist(), scrub: true } });
     });
 
@@ -323,22 +325,33 @@ function animated(): void {
       finalScenes();
     });
 
+    /* One-shot reveals are an enhancement. Every section's content is in place from the start (nothing waits hidden
+       for a trigger), and a reveal replays only when its element comes into view at reading speed. On a fast scroll
+       or a jump it is skipped, so no section is ever blank or half-faded while you pass it. */
+    const FAST = 1500; // px/s
+    const reveal = (trigger: Element | string, play: () => void) =>
+      ScrollTrigger.create({ trigger, start: 'top bottom', once: true, onEnter: (self) => { if (Math.abs(self.getVelocity()) < FAST) play(); } });
+
     /* headings rise */
-    $$('.sec .h2, .how-head .h2, #attack .h2').forEach((h) => gsap.from(h, { yPercent: 18, opacity: 0, duration: 1.1, ease: 'expo.out', scrollTrigger: { trigger: h, start: 'top 85%' } }));
-    $$('.shead .label').forEach((l) => gsap.from(l, { opacity: 0, duration: 0.8, scrollTrigger: { trigger: l, start: 'top 88%' } }));
+    $$('.sec .h2, .how-head .h2, #attack .h2').forEach((h) => reveal(h, () => gsap.from(h, { yPercent: 18, opacity: 0, duration: 1.1, ease: 'expo.out' })));
+    $$('.shead .label').forEach((l) => reveal(l, () => gsap.from(l, { opacity: 0, duration: 0.8 })));
 
-    /* bench */
-    gsap.from('.bar .fill', { scaleY: 0, duration: 1.5, ease: 'expo.out', stagger: 0.15, scrollTrigger: { trigger: '.bars', start: 'top 75%' } });
-    $$('.bar [data-count]').forEach((el, i) => { const o = { v: 0 }, end = Number(el.dataset.count);
-      gsap.to(o, { v: end, duration: 1.5, ease: 'expo.out', delay: i * 0.15, scrollTrigger: { trigger: '.bars', start: 'top 75%' }, onUpdate: () => { el.textContent = String(Math.round(o.v)); } }); });
+    /* bench: the bars and numbers are final in the HTML; they grow and count up only when read slowly */
+    reveal('.bars', () => {
+      gsap.from('.bar .fill', { scaleY: 0, duration: 1.5, ease: 'expo.out', stagger: 0.15 });
+      $$('.bar [data-count]').forEach((el, i) => { const o = { v: 0 }, end = Number(el.dataset.count);
+        gsap.to(o, { v: end, duration: 1.5, ease: 'expo.out', delay: i * 0.15, onUpdate: () => { el.textContent = String(Math.round(o.v)); } }); });
+    });
 
-    /* proof terminal types once */
-    ScrollTrigger.create({ trigger: '#shell', start: 'top 75%', once: true, onEnter: () => {
-      const pre = $('#shell'); let i = 1; pre.innerHTML = shellLines[0]!;
+    /* proof terminal: types once, at reading speed, at its full height (no jump) */
+    reveal('#shell', () => {
+      const pre = $('#shell'); pre.style.minHeight = `${pre.offsetHeight}px`;
+      let i = 1; pre.innerHTML = shellLines[0]!;
       const step = () => { if (i >= shellLines.length) return; pre.innerHTML += '\n' + shellLines[i++]; setTimeout(step, i === 2 ? 650 : 280); };
-      setTimeout(step, 400); } });
+      setTimeout(step, 400);
+    });
 
-    gsap.from('.plan', { y: 24, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power3.out', scrollTrigger: { trigger: '.plans', start: 'top 80%' } });
+    reveal('.plans', () => gsap.from('.plan', { y: 24, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power3.out' }));
 
     /* FINALE: the seal drops back and stamps (wide screens only: on a phone it covered the buttons above #cta) */
     mm.add('(min-width: 960px)', () => {
@@ -348,7 +361,7 @@ function animated(): void {
         gsap.fromTo('#ring', { scale: 0, opacity: 0.9 }, { scale: 90, opacity: 0, duration: 1.6, ease: 'expo.out' }); }
         if (self.progress < 0.5) stamped = false; } } });
     ft.fromTo(S, { x: 0, y: 0.9, scale: 2.2, opacity: 0, tilt: -0.8, spin: 0, crack: 0 }, { x: 0, y: 0.12, scale: 0.82, opacity: 1, tilt: 0, spin: 0, ease: 'power3.in', immediateRender: false });
-    gsap.from('#cta .h2', { yPercent: 20, opacity: 0, duration: 1.1, ease: 'expo.out', scrollTrigger: { trigger: '#cta', start: 'top 40%' } });
+    reveal('#cta .h2', () => gsap.from('#cta .h2', { yPercent: 20, opacity: 0, duration: 1.1, ease: 'expo.out' }));
     gsap.to(S, { opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: 'footer', start: 'top 70%', end: 'top 20%', scrub: true } });
     });
 

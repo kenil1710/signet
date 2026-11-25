@@ -126,8 +126,8 @@ extension defeats it.
   optional: any approver can still freeze. Naming a new one is tier 11 (3 of 3 + 24 h).
 - **One team.** The three approvers and the recovery address are the same on both gates and held by the Signet team.
 
-Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). The automated suites use a mock wallet;
-one manual test with Rabby passed on 2026-11-25; MetaMask and OKX Wallet are not tested. The gateway runs on staging.
+Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). Wallets tested: Rabby, by hand on X Layer mainnet
+(2026-11-25, no false refusal). Not tested yet: MetaMask, OKX Wallet. The automated suites use a mock wallet. The gateway runs on staging.
 The watchtower checks signetguard.xyz (not misthos.world yet) every 5 minutes, started by a Cloudflare Worker cron
 (GitHub's own schedule, which ran every 4–12 hours, is only a fallback), and publishes its result, including its last
 run of `/prove`. Telegram alerts to the team's chat are set up (a test alert was accepted by Telegram on 2026-11-20,

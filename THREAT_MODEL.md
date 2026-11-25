@@ -97,7 +97,7 @@ Guard's general fail-open, on purpose: a vault address is exactly what a hijacke
 
 ## Honest limits
 
-- **Most users are not protected at signing** (see the first table). Guard is not in the Chrome Web Store yet. The automated suites use a mock wallet; one manual test with Rabby passed on 2026-11-25; MetaMask and OKX Wallet are not tested.
+- **Most users are not protected at signing** (see the first table). Guard is not in the Chrome Web Store yet. Wallets tested: Rabby, by hand on X Layer mainnet (2026-11-25, no false refusal). Not tested yet: MetaMask, OKX Wallet. The automated suites use a mock wallet.
 - **Observe mode** is the default, and a gate can't leave it in its first 7 days: Guard reports and never blocks. A team that never switches to enforce mode gets alerts, not protection.
 - **Fail-open.** When Guard can't read the release (both RPCs down, disagreeing, or no manifest on-chain), it blocks nothing. An attacker who can make the RPCs fail for one user turns Guard off for them. A release verified in the last 24 h is still enforced.
 - **60-second lag.** Guard re-reads a sealed domain from the chain at most once a minute, so a revoke or a new release takes up to 60 s to reach a user who has the site open.

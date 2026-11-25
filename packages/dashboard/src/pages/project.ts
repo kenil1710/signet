@@ -10,7 +10,14 @@ const GUARDIAN_VOTE_TTL = 7 * 24 * 3600; // ReleaseGate.GUARDIAN_VOTE_TTL
 
 export async function projectPage(domain: string): Promise<void> {
   clearInterval(timer);
-  view(`<p class="dim">reading ${esc(domain)} from the chain…</p>`);
+  // a skeleton in the page's own shape while the gate is read (a few RPC calls), instead of an empty page
+  const bar = (w: number, cls = '') => `<span class="sk ${cls}" style="--w:${w}%"></span>`;
+  view(`<div aria-busy="true"><a class="back" href="#/">← all projects</a>
+    <h1>${esc(domain)} ${bar(0, 'chip')}${bar(0, 'chip')}</h1>
+    <p class="loading-note">Reading ${esc(domain)} from the chain: its release, approvers and proposals…</p>
+    <div class="glance">${['State', 'Release', 'Open proposals', 'Timelocks'].map((l) => `<div><span class="label">${l}</span><b>${bar(55, 'big')}</b></div>`).join('')}</div>
+    <table class="kv">${['release', 'gate', 'files', 'approvers', 'CI proposer', 'recovery · guardian', 'timelocks'].map((l, i) => `<tr><td>${l}</td><td>${bar([70, 62, 74, 58, 62, 40, 52][i]!)}</td></tr>`).join('')}</table>
+    <h2>Open proposals</h2><p>${bar(45)}</p></div>`);
   let p: Project | null;
   try {
     p = await project(domain);

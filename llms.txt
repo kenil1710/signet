@@ -15,7 +15,7 @@ Status (2026-11-25): live on X Layer mainnet (chain 196) since 2026-11-18 (https
 - `pnpm verify:claims`: every claim checked on mainnet or in the repo (https://github.com/kenil1710/signet/blob/main/claims.json).
 - Tests: CI runs 173 Foundry tests (the 17 fork tests are skipped there; run them with `cd packages/contracts && XLAYER_RPC_URL=https://xlayerrpc.okx.com forge test`: 190), both circuits on all 512 inputs and every package's unit tests. The staging and attack suites run on a local fork, not in CI.
 - Site (landing, dashboard, /prove against mainnet, no wallet): https://signetguard.xyz/ (Cloudflare Pages).
-- CLI: `signetguard` on npm (0.2.2). Guard: a signed pre-release zip on GitHub (0.3.5), not in the Chrome Web Store yet; its privacy policy: https://signetguard.xyz/privacy. Tested by the automated suites with a mock wallet and once by hand with Rabby; not with MetaMask or OKX Wallet.
+- CLI: `signetguard` on npm (0.2.2). Guard: a signed pre-release zip on GitHub (0.3.5), not in the Chrome Web Store yet; its privacy policy: https://signetguard.xyz/privacy. Wallets tested: Rabby, by hand on X Layer mainnet (2026-11-25, no false refusal); not tested yet: MetaMask, OKX Wallet; the automated suites use a mock wallet.
 - Not live: the gateway (staging only). The watchtower checks signetguard.xyz (not misthos.world yet) every 5 minutes (started by a Cloudflare Worker cron; GitHub's own schedule, which ran every 4–12 hours, is only a fallback) and publishes its status and its last /prove run; Telegram alerts to the team's chat are set up (a test alert was accepted by Telegram on 2026-11-20, watchtower run 44746304914).
 
 ## Built on TapeOut (what is really used)

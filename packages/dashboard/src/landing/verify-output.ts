@@ -7,7 +7,7 @@ export const VERIFY_OUTPUT: [kind: 'cmd' | 'dim' | 'gap' | 'ok' | 'pend', text: 
  ],
  [
   "dim",
-  "Signet claims, checked against X Layer mainnet at block 76226970 on https://xlayerrpc.okx.com and https://xlayer.drpc.org (read-only)"
+  "Signet claims, checked against X Layer mainnet at block 76850321 on https://xlayerrpc.okx.com and https://xlayer.drpc.org (read-only)"
  ],
  [
   "gap",
@@ -27,11 +27,11 @@ export const VERIFY_OUTPUT: [kind: 'cmd' | 'dim' | 'gap' | 'ok' | 'pend', text: 
  ],
  [
   "ok",
-  "PASS    C8 [mainnet] Signet's contracts are on mainnet: SignetRegistry (with its enumerable domain list), SignetFactory, the ReleaseGate implementation and Signet's own site gate"
+  "PASS    C9 [mainnet] The Guard decision circuit is on mainnet and gives the published truth table (docs/guard-truth-table.md) on all 512 inputs"
  ],
  [
   "ok",
-  "PASS    C9 [mainnet] The Guard decision circuit is on mainnet and gives the published truth table (docs/guard-truth-table.md) on all 512 inputs"
+  "PASS    C10 [mainnet] signetguard.xyz's gate is in enforce mode since 2026-11-25 (one approver's enforce(), allowed 7 days after the gate was made), is not frozen, has a published release and has no guardian"
  ],
  [
   "gap",
@@ -39,6 +39,6 @@ export const VERIFY_OUTPUT: [kind: 'cmd' | 'dim' | 'gap' | 'ok' | 'pend', text: 
  ],
  [
   "ok",
-  "ALL CHECKS PASSED (9 on mainnet, 10 from the repo, 0 pending deployment)"
+  "ALL CHECKS PASSED (11 on mainnet, 11 from the repo, 0 pending deployment)"
  ]
 ];
