@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-25T07:52:01.476Z",
+  "updatedAt": "2026-11-25T07:56:55.897Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-25T07:52:01.475Z",
+      "checkedAt": "2026-11-25T07:56:55.896Z",
       "release": 11
     }
   ],
@@ -15,9 +15,9 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-25T07:52:07.242Z",
-    "block": "76824085",
-    "summary": "All checks passed (0 pending deployment). Checked in 5.4 s.",
+    "checkedAt": "2026-11-25T07:56:57.494Z",
+    "block": "76824379",
+    "summary": "1 check(s) FAILED. Checked in 1.4 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
@@ -36,18 +36,8 @@
       },
       {
         "claim": "Signet's registry is deployed and lists its sealed domains",
-        "detail": "2 domain(s) in the registry's list",
-        "status": "PASS"
-      },
-      {
-        "claim": "misthos.world: the release files stored on-chain hash to what its gate published",
-        "detail": "no release published yet",
-        "status": "PASS"
-      },
-      {
-        "claim": "signetguard.xyz: the release files stored on-chain hash to what its gate published",
-        "detail": "release #11: filesRoot, allowlistHash and originsHash recomputed here, 27 files listed, observe mode",
-        "status": "PASS"
+        "detail": "xlayerrpc.okx.com could not be reached",
+        "status": "FAIL"
       }
     ]
   }
