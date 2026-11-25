@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | **none** since 2026-11-24 (signet-ops `0x9275…E291` removed by approvers A and B with `voteRemoveGuardian()`: its keystore password was lost, see "Plan B" below). Before: signet-ops 2026-11-23 → 24 (tier-11 `SetGuardian`, proposal #6); signet-dev until 2026-11-20, then none |
 
-Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#12** (published 2026-11-25); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
+Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#13** (published 2026-11-25); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 
@@ -204,6 +204,19 @@ Sent by the team: `cast send 0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291 --value 
 After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 25; signet-ops 0.043355534124840684 OKB.
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
+
+## Release #14 proposed (2026-11-25, tier 00): landing content at once, full verify:claims output, dashboard skeletons
+
+- Proposed by the CI key at 15:55 UTC: tx [`0x37605d9c…7758`](https://web3.okx.com/explorer/x-layer/tx/0x37605d9c5bd5c44455a795512f512da68cb06cd652594a7a13a73715972d7758) (168,996 gas), manifest `0x915789ea…6b6c`. Tier 00 (allowlist and origins equal #13's): 1 approval + 1 h.
+- Fork rehearsal (mainnet fork with #13 live, enforce mode): before the timelock Guard 0.3.5 showed the red page on #14's bytes (no release could publish); after it, Guard held the page for #14 and turned green 10 s after the publish started, never red.
+
+## Release #13 published (2026-11-25, tier 00): judge review 4 fixes, the first rollout in enforce mode
+
+- Guard 0.3.5 published first as a pre-release (tag `guard-v0.3.5` at `bfc29ca`, 13:35 UTC); #13's Guard links point to it.
+- Proposed by the CI key at 13:36:24 UTC (block ≈ 76,844,748), approved by approver A at 14:51:04 UTC, publishable from 15:51:04 UTC.
+- `scripts/release-site.sh 13` at 15:51 UTC: Cloudflare deployment `fc90516e` (5 new files, 22 reused), then publish tx [`0x69be1afa…61af`](https://web3.okx.com/explorer/x-layer/tx/0x69be1afa066295b0f6113e2bfd5ac45bccd78aa59e688e4be0998824499661af) (block 76,852,874, 292,923 gas; decided by circuit #6), `signet/files.json` written (1,889,709 gas) and read back.
+- Checks: 27/27 live files equal `release/13`; `/api/check` and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 13 and `enforced()` = true on both RPCs. `/api/check` now reports signetguard.xyz and misthos.world as sealed (the `redirect: 'manual'` fix); llms.txt has 0 dead links; /start links Guard 0.3.5. Guard 0.3.5 (mainnet build): popup "Release #13 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again.
+- CI key after #13's propose and publish: 0.002999 OKB.
 
 ## Enforce mode on for signetguard.xyz (2026-11-25, 17:55 IST)
 
