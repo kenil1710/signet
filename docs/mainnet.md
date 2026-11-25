@@ -205,7 +205,7 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Release #11 proposed (2026-11-25, tier 00): watchtower box hidden until it has data, Guard links → 0.3.3
+## Release #11 published (2026-11-25, tier 00): watchtower box hidden until it has data, Guard links → 0.3.3
 
 Sealed into `packages/dashboard/release/11` (manifest `0xb5cc2196…4ce3`); allowlist and origins equal #10's. Fork
 rehearsal: propose 168,996 gas, approve A 39,958, publish 292,923, files.json written and read back, manifest equal to
@@ -215,6 +215,13 @@ the seal. Proposed after the watchtower's new clock was confirmed: a Cloudflare 
 | Tx | From | Call | Gas |
 |---|---|---|---:|
 | [`0x64ed2833…27b4`](https://web3.okx.com/explorer/x-layer/evm/tx/0x64ed283300ba8bc727188c998d7268a1daa0738272c6d6803b3b3117606c27b4) | CI proposer | `proposeRelease` → #11, tier 00 | 168,996 |
+| approver A | — | `approve(11)` (06:33 UTC) | |
+| [`0x8af10930…7d65`](https://web3.okx.com/explorer/x-layer/evm/tx/0x8af10930fc3163c953ee0466ffed51615afbee6faaa8e924861d329e74c97d65) | CI proposer | `publish(11)`, block 76,823,634 | 292,923 |
+| SiteRegistry | CI proposer | `signet/files.json` (7,504 B), read back | 1,859,969 |
+
+`scripts/release-site.sh 11`: Cloudflare deployment `414f1ac9` (7 new files, 19 reused); 26/26 live files identical;
+`/api/*` JSON. Both RPCs: `currentRelease()` = 11. Live /prove (headless Chromium): 7.1 / 7.3 s, all passed; the
+watchtower box shows its last run. Site links → guard-v0.3.3. CI key ≈ 0.003093 OKB left.
 
 ## Release #10 published (2026-11-25, tier 00): /prove in ~6 s, no "coming soon", /check fix, Functions back
 
