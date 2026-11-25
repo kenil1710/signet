@@ -205,7 +205,7 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Release #10 sealed and fork-rehearsed, NOT proposed (2026-11-25): /prove in ~6 s, no "coming soon", /check fix, Functions back
+## Release #10 proposed (2026-11-25, tier 00): /prove in ~6 s, no "coming soon", /check fix, Functions back
 
 Built with `SIGNET_REPO_PUBLIC=1` and sealed into `packages/dashboard/release/10` (manifest `0x262eac1f…4605`, 28
 files). Contents: /prove reads through Multicall3 (128 `eval`s per `eth_call`), all checks in parallel at one pinned
@@ -225,6 +225,13 @@ was ~4 min); footer/landing/start without "coming soon" (X link live, Telegram r
 - **Deploy with `scripts/release-site.sh 10`**, which now deploys from `packages/dashboard`, so the Pages Functions
   (`/api/check`, `/api/watchtower`) ship again: releases #7–#9 were deployed without them (found 2026-11-25). Step 4
   checks both answer JSON.
+
+| Tx | From | Call | Gas |
+|---|---|---|---:|
+| [`0x37122c25…81c0`](https://web3.okx.com/explorer/x-layer/evm/tx/0x37122c259b41cd4e6d46076f35a491d628159d62d5164b0111b7cd3ab37f81c0) | CI proposer | `proposeRelease` → #10, tier 00 (block 76,812,533, 04:39:29 UTC) | 168,984 |
+
+Guard 0.3.3 published as a pre-release the same morning (`guard-v0.3.3`, zip SHA-256 `e843bd2c…de06`, Sigstore
+attestation verified).
 
 ## Release #9 published (2026-11-24, tier 00): /privacy, CLI 0.2.2 on /start, Guard 0.3.2 links, docs synced
 
