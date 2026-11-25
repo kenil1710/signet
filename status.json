@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-25T08:06:39.198Z",
+  "updatedAt": "2026-11-25T08:11:29.682Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-25T08:06:39.197Z",
+      "checkedAt": "2026-11-25T08:11:29.682Z",
       "release": 11
     }
   ],
@@ -15,9 +15,9 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-25T08:06:47.973Z",
-    "block": "76824962",
-    "summary": "1 check(s) FAILED. Checked in 8.5 s.",
+    "checkedAt": "2026-11-25T08:11:37.504Z",
+    "block": "76825253",
+    "summary": "All checks passed (0 pending deployment). Checked in 7.5 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
@@ -26,8 +26,8 @@
       },
       {
         "claim": "The Guard decision circuit gives its published truth table on all 512 inputs",
-        "detail": "xlayerrpc.okx.com could not be reached",
-        "status": "FAIL"
+        "detail": "circuit #7: 22 NAND gates, netlist sha256 0x03c94d0295…, all 512 rows equal the published truth table",
+        "status": "PASS"
       },
       {
         "claim": "A taped-out circuit's behavior can't be upgraded (beacon owner 0x0, pinned implementation, pinned processor code)",
