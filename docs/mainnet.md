@@ -205,7 +205,7 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Release #12 proposed (2026-11-25): a real 404 page, phone layout, /prove "not checked" on RPC errors
+## Release #12 published (2026-11-25): a real 404 page, phone layout, /prove "not checked" on RPC errors
 
 Sealed into `packages/dashboard/release/12` (manifest `0x5ffa4289…5982`, 28 files: `404.html` is new; resealed after Guard 0.3.4 was published so its links point to `guard-v0.3.4`; the first seal `0x6feb8911…22c5` was never proposed); allowlist and
 origins equal #11's, so tier 00. Contents (from the 2026-11-25 audit): unknown URLs answer HTTP 404 with a sealed
@@ -221,6 +221,14 @@ The preview deployment used for those checks was deleted after (an unsealed publ
 | Tx | From | Call | Gas |
 |---|---|---|---:|
 | [`0x11208a32…cee4`](https://web3.okx.com/explorer/x-layer/evm/tx/0x11208a32451f915cce4bbda4868c6995e877cbe01ece1e00f632f4048e9cfee4) | CI proposer | `proposeRelease` → #12, tier 00 | 168,996 |
+| approver A | — | `approve(12)` (08:31 UTC) | |
+| [`0xb2cfd35f…92b2`](https://web3.okx.com/explorer/x-layer/evm/tx/0xb2cfd35ffe9998d4680aab34afc90f1c5cb2be3c2e4a79ed01a5c6399be092b2) | CI proposer | `publish(12)`, block 76,830,678 | 292,923 |
+| SiteRegistry | CI proposer | `signet/files.json` (7,640 B), read back | 1,889,519 |
+
+`scripts/release-site.sh 12`: Cloudflare deployment `9f8902be` (5 new files, 22 reused); 27/27 live files identical;
+`/api/*` JSON; an unknown path answers 404 with the sealed 404.html. Both RPCs: `currentRelease()` = 12. Live /prove
+(headless Chromium): 8.1 / 8.3 s, all passed. Guard 0.3.4 (mainnet build): `/`, `/app`, `/start` OK, and
+`/nonexistent-page-xyz` (HTTP 404) OK, its document checked against the sealed 404.html. CI key ≈ 0.003046 OKB left.
 
 ## Release #11 published (2026-11-25, tier 00): watchtower box hidden until it has data, Guard links → 0.3.3
 
