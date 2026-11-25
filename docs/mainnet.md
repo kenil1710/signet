@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | **none** since 2026-11-24 (signet-ops `0x9275…E291` removed by approvers A and B with `voteRemoveGuardian()`: its keystore password was lost, see "Plan B" below). Before: signet-ops 2026-11-23 → 24 (tier-11 `SetGuardian`, proposal #6); signet-dev until 2026-11-20, then none |
 
-Mode: **observe** (a new gate starts there). Current release: **#8** (published 2026-11-24, after #7 the same day); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
+Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#12** (published 2026-11-25); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 
@@ -204,6 +204,32 @@ Sent by the team: `cast send 0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291 --value 
 After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 25; signet-ops 0.043355534124840684 OKB.
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
+
+## Enforce mode on for signetguard.xyz (2026-11-25, 17:55 IST)
+
+Guard now replaces a page of signetguard.xyz that doesn't match the published seal with its red page and refuses
+signatures the seal doesn't allow. Visitors without Guard see no difference. Plan and rollback:
+`internal/launch/07-enforce-plan.md`.
+
+- **Call:** `enforce()` (`0x58f93ec9`, value 0) on the site gate `0xa3d4…4503`, sent by **approver A** `0xB9ef…2416`
+  with `internal/launch/enforce.js` in Rabby, after the team's yes. Allowed from 2026-11-25 09:52:14 UTC
+  (`deployedAt` + 7 days).
+- **Tx** [`0x00de5449…2dd0`](https://web3.okx.com/explorer/x-layer/tx/0x00de54492ffa1a2a0574d9d3664e407b0586d8d711bcd95910feabf5b9952dd0),
+  block 76,840,474 (12:25:10 UTC), status success, gas 34,702 at 0.0286 gwei = **0.00000099 OKB**, event
+  `Enforced(0xB9ef…2416)`. A has 0.000155 OKB left.
+- **Before (11:52 UTC):** on a mainnet fork, `enforce()` from A passed (34,702 gas) and from a non-approver reverted
+  `NotApprover`; Guard 0.3.4 pointed at the fork showed `/`, `/app`, `/start` and the 404 page green and a tampered
+  `/start` red. On mainnet: not frozen, release #12 current, no pending proposal (`proposalCount` = 12), 27/27 live
+  files equal to `release/12`, watchtower green. The real-wallet test with Rabby passed the same day (a sealed action
+  on /app reached Rabby, no false refusal).
+- **After (12:27–12:32 UTC):** `enforced()` = true on xlayerrpc.okx.com and xlayer.drpc.org; release 12, not frozen.
+  Guard 0.3.4 (mainnet build) popup: "Mode: enforce (Guard blocks)", "Release #12 · this page matches what the team
+  sealed"; `/`, `/app`, `/start` and `/nonexistent-page-xyz` (HTTP 404) green; a tampered `/start` → red page ("This
+  site's seal is broken … Nothing was sent"), then green again untampered. /prove: all checks passed, release #12 row
+  "enforce mode". Watchtower round 45613677889 (12:27 UTC): 0 alerts.
+- **Rollback:** the fast fix is making the site match its seal (Cloudflare Pages rollback to deployment `9f8902be`,
+  release #12). Back to observe on-chain is `proposeAdmin(13, 0x)` (SetObserveMode, tier 11: 3 of 3 + 24 h).
+- misthos.world stays in observe mode; its gate allows `enforce()` from 2026-12-01 08:14 UTC.
 
 ## Release #12 published (2026-11-25): a real 404 page, phone layout, /prove "not checked" on RPC errors
 
