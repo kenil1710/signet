@@ -112,7 +112,7 @@ jobs:
           <pre data-copy>npx -y vercel&#64;39 deploy dist --prod --yes --token "$VERCEL_TOKEN"</pre>
           <p class="warn"><b>Turn off Vercel Web Analytics, Speed Insights and the Vercel Toolbar</b> for Production (Project → Analytics, Speed Insights, and Settings → General → Vercel Toolbar), and remove <code>@vercel/analytics</code> / <code>@vercel/speed-insights</code> from the app. They add scripts to your pages that you didn't seal, so Guard and the watchtower see a mismatch. <code>signet verify https://your-domain</code> reports them.</p>
         </details>
-        <details><summary><b>Next.js with server-rendered pages (Vercel)</b> <span class="soon-tag">CLI 0.2.2, Guard 0.3.3</span></summary>
+        <details><summary><b>Next.js with server-rendered pages (Vercel)</b> <span class="soon-tag">CLI 0.2.2, Guard 0.3.4</span></summary>
           <p>A server-rendered page is built per request, so its HTML can't be sealed. Signet seals the code instead: every file under <code>/_next/static</code> and <code>public/</code>, and the exact inline scripts the pages run. In <code>signet.config.json</code>:</p>
           <pre data-copy>"pages": { "mode": "ssr", "crawl": ["/", "/a-page-that-streams", "/docs/a-page", "/no-such-page", "/docs/no-such-page"] }</pre>
           <p>Seal the exact build that is deployed. Build once, deploy that build as a preview, seal it (the CLI crawls the preview's pages for their inline scripts), then promote the same deployment:</p>
@@ -141,7 +141,7 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
       </section>
       <section class="step" id="guard"><h2>Try Guard (pre-release)</h2>
         <p>Signet Guard isn’t in the Chrome Web Store yet. A <b>pre-release</b> build for X Layer mainnet is on GitHub, built and signed by this project’s release workflow (a Sigstore build attestation you can check with <code>gh attestation verify</code>):</p>
-        <p><a href="https://github.com/kenil1710/signet/releases/tag/guard-v0.3.3" class="btn" data-link="guardPrerelease" target="_blank" rel="noopener" data-applied="1">Signet Guard 0.3.3 (pre-release) on GitHub</a></p>
+        <p><a href="https://github.com/kenil1710/signet/releases/tag/guard-v0.3.4" class="btn" data-link="guardPrerelease" target="_blank" rel="noopener" data-applied="1">Signet Guard 0.3.4 (pre-release) on GitHub</a></p>
         <p class="dim">What Guard reads, stores and never sends: <a href="./privacy">privacy policy</a>.</p>
         <ol>
           <li>Download the <code>.zip</code> and unzip it into a folder you’ll keep.</li>

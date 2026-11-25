@@ -1,10 +1,10 @@
 {
   "version": 1,
   "domain": "signetguard.xyz",
-  "filesRoot": "0xd8d4be8a5ea5ae792154cd1b39dfbfa8ac9fb8302433e4965d6b3eb3af9e5b28",
+  "filesRoot": "0x1d9a14a26463fc575d4b0ad59043f2b9c5beae72bcf4fd23b73a4019a2d9e863",
   "allowlistHash": "0x5a48815ac2c2eab8e1206e0350e6108e96c4029ecffc286aebcc660e2d03efc5",
   "originsHash": "0xfa1880de94b653abff03ffdfe8a8d8f64fc02ff11dd304e64e2ead69fc0285cf",
-  "manifestHash": "0x6feb8911a4f6805f18ffd487927e1b1dbe623f9e6f0b515b3a5ca49d962d22c5",
+  "manifestHash": "0x5ffa42893c44787d43f9ba877801f12105dd53754470a6d655493b17af0f5982",
   "fileCount": 29,
   "totalBytes": 1307977,
   "paths": {
