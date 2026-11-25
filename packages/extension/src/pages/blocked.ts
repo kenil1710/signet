@@ -1,5 +1,5 @@
 // The full red page a tab is sent to when a sealed site, in enforce mode, doesn't match its sealed release.
-import { esc, send, reportWrongBlock, type TabInfo } from './shared.ts';
+import { esc, send, reportWrongBlock, offerCopy, type TabInfo } from './shared.ts';
 
 void (async () => {
   const q = new URLSearchParams(location.hash.slice(1));
@@ -19,14 +19,14 @@ void (async () => {
       ? 'The team that runs this site withdrew the release it had published. Until they publish a new one, nothing here can be trusted.'
       : `The code this page loaded is different from what the team sealed${i ? ` as release #${i.site.release}` : ''}. This is what a hijacked website looks like: the address is right, the code is not.`}</p>
     <div class="bb">
-      <button class="main" id="copy">Open the verified copy</button>
+      <span id="copyslot" class="nocopy">Verified copy: checking…</span>
       <button id="leave">Leave this site</button>
     </div>
     ${wrong.length ? `<details open><summary>What changed</summary><ul class="mono">${wrong.map((f) => `<li>${esc(f.status === 'mismatch' ? 'changed' : 'not sealed')} · ${esc(f.url)}</li>`).join('')}</ul></details>` : ''}
     <div class="sub"><button class="link" id="back">Go back to the site (signing stays blocked)</button><button class="link" id="wrong">Report wrong block</button></div>
     <p class="dim" id="msg" aria-live="polite"></p>
     <p class="note">Your wallet was not asked for anything. If you signed something on this site recently, check your token approvals.</p>`;
-  document.getElementById('copy')!.onclick = () => void send({ type: 'open-copy', domain });
+  void offerCopy(domain, document.getElementById('copyslot')!, 'main');
   document.getElementById('wrong')!.onclick = () => void reportWrongBlock(domain, `page blocked: ${wrong.map((f) => f.url).join(', ')}`, document.getElementById('msg')!);
   // "Leave this site": a new tab page in this tab, away from the broken site (nothing is sent, nothing is unblocked)
   document.getElementById('leave')!.onclick = () => void chrome.tabs.update(tabId, { url: 'chrome://newtab/' }).catch(() => location.replace('about:blank'));

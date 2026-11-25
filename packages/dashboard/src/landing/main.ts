@@ -314,7 +314,9 @@ function animated(): void {
     });
 
     mm.add('(max-width: 959px)', () => {
-      gsap.fromTo(S, { y: S.y, opacity: 1 }, { y: S.y + 0.5, opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: 0.6 } });
+      // phones: the seal fades out within the first 40% of a screen of scrolling, before the hero's buttons pass
+      // under it, and there is no finale stamp (it landed on the plans' buttons at 375 px); see finale below
+      gsap.fromTo(S, { y: S.y, opacity: 1 }, { y: S.y + 0.25, opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: '#hero', start: 'top top', end: () => `+=${Math.round(innerHeight * 0.4)}`, scrub: 0.3 } });
       $$('.step').forEach((s, i) => { s.style.position = 'relative'; s.style.opacity = '1'; if (i < 3) s.style.display = 'none'; });
       $('.rail').style.display = 'none'; $('.steps').style.marginLeft = '0';
       gsap.set('#bOk', { opacity: 0 }); gsap.set('#bBad', { opacity: 1 }); gsap.set('#blocked', { clipPath: 'circle(150% at 70% 30%)' });
@@ -338,7 +340,8 @@ function animated(): void {
 
     gsap.from('.plan', { y: 24, opacity: 0, stagger: 0.1, duration: 0.8, ease: 'power3.out', scrollTrigger: { trigger: '.plans', start: 'top 80%' } });
 
-    /* FINALE: the seal drops back and stamps */
+    /* FINALE: the seal drops back and stamps (wide screens only: on a phone it covered the buttons above #cta) */
+    mm.add('(min-width: 960px)', () => {
     let stamped = false;
     const ft = gsap.timeline({ scrollTrigger: { trigger: '#cta', start: 'top 80%', end: 'top 10%', scrub: 0.8,
       onUpdate: (self) => { if (self.progress > 0.97 && !stamped) { stamped = true; if (S.thud) S.thud();
@@ -347,6 +350,7 @@ function animated(): void {
     ft.fromTo(S, { x: 0, y: 0.9, scale: 2.2, opacity: 0, tilt: -0.8, spin: 0, crack: 0 }, { x: 0, y: 0.12, scale: 0.82, opacity: 1, tilt: 0, spin: 0, ease: 'power3.in', immediateRender: false });
     gsap.from('#cta .h2', { yPercent: 20, opacity: 0, duration: 1.1, ease: 'expo.out', scrollTrigger: { trigger: '#cta', start: 'top 40%' } });
     gsap.to(S, { opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: 'footer', start: 'top 70%', end: 'top 20%', scrub: true } });
+    });
 
     ScrollTrigger.refresh();
   }

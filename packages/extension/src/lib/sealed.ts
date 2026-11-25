@@ -92,6 +92,14 @@ export function sealedPathFor(path: string, isDocument: boolean, has: (p: string
   return has('index.html') ? 'index.html' : null;
 }
 
+/// A document the server answered with HTTP 404: it must be the sealed 404.html (Cloudflare Pages, Netlify and Vercel
+/// serve a top-level 404.html for unknown paths, with status 404). Only when 404.html is sealed and the path itself is
+/// not a sealed file; a sealed path never stands for the 404 page. The status is the one the browser got (Guard reads
+/// it from the cached response), so a 200 page can't pass as 404.html.
+export function notFoundPath(path: string, isDocument: boolean, has: (p: string) => boolean): string | null {
+  return isDocument && !has(path) && has('404.html') ? '404.html' : null;
+}
+
 /// The sealed path a URL of the site stands for: "/" and directories are index.html; the query is ignored.
 export function pathOfUrl(pathname: string): string {
   let p = pathname.replace(/^\/+/, '');

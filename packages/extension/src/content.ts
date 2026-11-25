@@ -8,7 +8,7 @@
 // script must be a sealed hash or a data template (@signet/cli/src/inline.ts). Scripts are recorded from
 // document_start by a MutationObserver (also those that remove themselves), and before every signature Guard takes
 // the pending records synchronously and runs a fresh full check, so a script that runs and signs at once is seen.
-import { pathOfUrl, sealedPathFor } from './lib/sealed.ts';
+import { notFoundPath, pathOfUrl, sealedPathFor } from './lib/sealed.ts';
 import { decideRecheck } from './lib/recheck.ts';
 import { HOLD_MS, POLL_MS } from './lib/hold.ts';
 import { classifyInline, inlineHash, runs } from '@signet/cli/src/inline.ts';
@@ -111,7 +111,10 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     }
     // on the gateway the document is the pinned boot page until its worker takes over, then the sealed file
     if (gw && isDocument && gw['index.html']) valid = [...(valid ?? []), gw['index.html']];
-    if (!valid) return scripty || isDocument ? { url: u.href, status: 'unknown', note: 'not in the sealed release' } : null;
+    // an unknown path answered with HTTP 404: the sealed 404.html (lib/sealed.ts notFoundPath)
+    const nf = notFoundPath(path, isDocument, (p) => !!info!.hashes[p]);
+    const valid404 = nf ? info!.hashes[nf] : undefined;
+    if (!valid && !valid404) return scripty || isDocument ? { url: u.href, status: 'unknown', note: 'not in the sealed release' } : null;
     if (!globalThis.crypto?.subtle) return { url: u.href, status: 'no-crypto', note: 'not a secure context' };
     // On the gateway, site files come from its service worker and never enter the HTTP cache, and a content
     // script's fetch doesn't pass through a page's worker. What Guard can read and pin are the gateway's own
@@ -119,23 +122,41 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     const byWorker = (): FileResult | null =>
       gw && !(path === 'sw.js' || path === '.signet/boot.js') && navigator.serviceWorker?.controller?.scriptURL === `${location.origin}/sw.js`
         ? { url: u.href, status: 'ok-gateway', note: "served and verified by the gateway's pinned worker" } : null;
+    // Hosts send their 404 page with Cache-Control: no-store (Cloudflare Pages does), so the browser keeps no copy to
+    // read. For that page only, check a fresh download: it must be HTTP 404 with the sealed 404.html. (The scripts and
+    // styles it loads are still read from the cache like any file.)
+    const fresh404 = async (): Promise<FileResult | null> => {
+      if (!valid404) return null;
+      try {
+        const f = await fetch(u.href, { cache: 'no-store', credentials: 'same-origin' });
+        if (f.status !== 404) return null;
+        const h = hex(await crypto.subtle.digest('SHA-256', await f.arrayBuffer()));
+        return valid404.includes(h)
+          ? { url: u.href, sha256: h, status: 'ok', note: "the site's 404 page (not cached by the browser): a fresh copy matches the sealed 404.html" }
+          : { url: u.href, sha256: h, status: 'mismatch', note: "the site's 404 page doesn't match the sealed 404.html" };
+      } catch {
+        return null;
+      }
+    };
     try {
       const res = await fetch(u.href, { cache: 'only-if-cached', mode: 'same-origin', credentials: 'same-origin' });
-      if (!res.ok) return byWorker() ?? { url: u.href, status: 'not-cached', note: `cache answered ${res.status}` };
+      const want = res.status === 404 && valid404 ? valid404 : valid;
+      if (!res.ok && want !== valid404) return byWorker() ?? (await fresh404()) ?? { url: u.href, status: 'not-cached', note: `cache answered ${res.status}` };
+      if (!want) return { url: u.href, status: 'unknown', note: 'not in the sealed release' };
       const h = hex(await crypto.subtle.digest('SHA-256', await res.arrayBuffer()));
-      if (valid.includes(h)) return { url: u.href, sha256: h, status: 'ok' };
-      return await recheck(u, h, res.headers.get('date'), valid);
+      if (want.includes(h)) return { url: u.href, sha256: h, status: 'ok' };
+      return await recheck(u, h, res.headers.get('date'), want, want === valid404);
     } catch {
-      return byWorker() ?? { url: u.href, status: 'not-cached', note: 'not in the browser cache (no-store?)' };
+      return byWorker() ?? (await fresh404()) ?? { url: u.href, status: 'not-cached', note: 'not in the browser cache (no-store?)' };
     }
   }
 
   /// The cached copy doesn't match: check the copy the site serves now before deciding (lib/recheck.ts).
-  async function recheck(u: URL, cachedHash: string, cachedDate: string | null, valid: string[]): Promise<FileResult> {
+  async function recheck(u: URL, cachedHash: string, cachedDate: string | null, valid: string[], notFound = false): Promise<FileResult> {
     let fresh: { hash: string; date: number } | null = null;
     try {
       const f = await fetch(u.href, { cache: 'no-store', credentials: 'same-origin' });
-      if (f.ok) fresh = { hash: hex(await crypto.subtle.digest('SHA-256', await f.arrayBuffer())), date: Date.parse(f.headers.get('date') ?? '') };
+      if (notFound ? f.status === 404 : f.ok) fresh = { hash: hex(await crypto.subtle.digest('SHA-256', await f.arrayBuffer())), date: Date.parse(f.headers.get('date') ?? '') };
     } catch { /* the network copy can't be read: decide on the cached copy */ }
     const r = decideRecheck({ cachedHash, cachedDate: Date.parse(cachedDate ?? ''), fresh, sinceLoad: performance.now(), valid, release: info!.release, loadedLocal: performance.timeOrigin, publishedLocal: info!.publishedAt });
     return { url: u.href, ...r };

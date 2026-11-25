@@ -4,7 +4,8 @@
 // list locally; for a host that is not on it, nothing is sent anywhere.
 import { decodeFunctionResult, encodeFunctionData, hexToBytes, sha256, zeroAddress } from 'viem';
 import { gateAbi, registryAbi, siteAbi, MULTICALL3 } from './lib/abi.ts';
-import { agree, either, RpcError, type Call } from './lib/rpc.ts';
+import { agree, callOne, commonHead, either, RpcError, type Call } from './lib/rpc.ts';
+import { fullCopy, type CopyState, type StoredInfo } from './lib/copy.ts';
 import { parseSealed, ALLOWLIST_PATH, ORIGINS_PATH, FILES_PATH } from './lib/sealed.ts';
 import { decide, factsOf, trustedBy, withVerified } from './lib/policy.ts';
 import { checkFactory } from './lib/factory.ts';
@@ -282,7 +283,8 @@ type Msg =
   | { type: 'wrong-block'; domain: string; note: string }
   | { type: 'open-copy'; domain: string }
   | { type: 'copy'; domain: string }
-  | { type: 'copy-file'; domain: string; path: string };
+  | { type: 'copy-file'; domain: string; path: string }
+  | { type: 'copy-state'; domain: string };
 
 async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<unknown> {
   const tabId = sender.tab?.id;
@@ -449,6 +451,24 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       const sealed = site.current ? site.manifests[site.current] : undefined;
       if (site.status !== 'sealed' || !sealed || !site.container) return { ok: false, reason: site.reason || 'No verified release for this domain.' };
       return { ok: true, domain: site.domain, release: site.release, manifest: site.current, container: site.container, prefix: site.prefix, files: sealed.files };
+    }
+    case 'copy-state': {
+      // whether the current release is stored in full (lib/copy.ts), cached per manifest for this browser session
+      const site = await siteFor(msg.domain);
+      const sealed = site.current ? site.manifests[site.current] : undefined;
+      if (site.status !== 'sealed' || !sealed || !site.container) return null;
+      const key = `copy:${site.container}:${site.prefix}:${site.current}`;
+      const known = await get<CopyState>(session, key);
+      if (known) return known;
+      const datas = await callOne(NET.rpcUrl, sealed.files.map((f) => call(NET.siteRegistry, siteAbi, 'fileInfo', [site.container, site.prefix + f.path])), await commonHead(NET));
+      const infos = datas.map((d): StoredInfo => {
+        if (d === 'revert') return null;
+        const [size, , sha] = out<[number, string, Hex]>(siteAbi, 'fileInfo', d);
+        return { size: Number(size), sha256: sha };
+      });
+      const state = fullCopy(sealed.files, infos);
+      await session.set({ [key]: state });
+      return state;
     }
     case 'copy-file': {
       const site = await siteFor(msg.domain);

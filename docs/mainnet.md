@@ -205,6 +205,18 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #12 sealed and fork-rehearsed, NOT proposed (2026-11-25): a real 404 page, phone layout, /prove "not checked" on RPC errors
+
+Sealed into `packages/dashboard/release/12` (manifest `0x6feb8911…22c5`, 28 files: `404.html` is new); allowlist and
+origins equal #11's, so tier 00. Contents (from the 2026-11-25 audit): unknown URLs answer HTTP 404 with a sealed
+`404.html` (they answered 200 with the home page); at 375 px the landing seal no longer covers buttons and /start's
+code blocks keep their indentation; /prove retries a check once on an RPC error and then shows "Not checked", never
+"Failed" (the watchtower's 08:06 UTC run showed one FAIL that the next run didn't). Checked on a Cloudflare preview
+deployment (`001cb8ed.signet-6l4.pages.dev`, not production): routes unchanged, `/a/b/c` → 404 with the sealed bytes.
+Guard 0.3.3 shows the 404 page as unverified (grey); 0.3.4 (built, not tagged) checks it.
+Fork rehearsal: propose 168,996 gas, approve A 39,958, publish 292,923, files.json 1,889,497 (read back), manifest
+equal to the seal. On mainnet at 0.020000001 gwei: CI key ≈ 0.000047 OKB; approver A ≈ 0.0000008 OKB.
+
 ## Release #11 published (2026-11-25, tier 00): watchtower box hidden until it has data, Guard links → 0.3.3
 
 Sealed into `packages/dashboard/release/11` (manifest `0xb5cc2196…4ce3`); allowlist and origins equal #10's. Fork

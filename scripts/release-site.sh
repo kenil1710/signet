@@ -55,4 +55,12 @@ for api in "api/check?domain=example.com" "api/watchtower"; do
   ct="$(curl -s -o /dev/null -w '%{content_type}' -A "$UA" "https://signetguard.xyz/$api")"
   case "$ct" in application/json*) echo "   /$api: JSON" ;; *) bad=$((bad + 1)); echo "   /$api: NOT JSON ($ct): the Pages Functions were not deployed" ;; esac
 done
+# an unknown path: HTTP 404 with the sealed 404.html (releases from #12 have one), not the landing page with 200
+if [ -f "$REL/404.html" ]; then
+  nf="/no-such-page-$RANDOM"
+  code="$(curl -s -o "$STAGE.404" -w '%{http_code}' -A "$UA" "https://signetguard.xyz$nf")"
+  if [ "$code" = 404 ] && [ "$(shasum -a 256 < "$STAGE.404" | cut -c1-64)" = "$(shasum -a 256 < "$REL/404.html" | cut -c1-64)" ]; then echo "   $nf: 404 with the sealed 404.html"
+  else bad=$((bad + 1)); echo "   $nf: HTTP $code, not the sealed 404 page"; fi
+  rm -f "$STAGE.404"
+fi
 [ "$bad" -eq 0 ]

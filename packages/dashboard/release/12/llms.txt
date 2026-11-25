@@ -1,0 +1,48 @@
+# Signet
+
+> Your contracts are audited. Your website isn't. Signet protects what your users actually load: no single hacked key can change a dApp's site (CI only proposes; approvers approve; TapeOut circuit #6 decides, with a timelock nobody can bypass), a watchtower checks what the site serves, it can freeze instantly, and users with Signet Guard can't sign anything the team didn't approve: Guard blocks the signature. Signet builds on TapeKit's on-chain file verification and adds the signing-time allowlist (circuit #7), risk-tiered approvals with timelocks decided by circuit #6, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; live with Pro).
+>
+> Signet lets a dApp team seal each release of its website on X Layer (file hashes, the contracts and spenders the site may ask a wallet to sign for, the outside origins it may use). A TapeOut circuit decides when a release goes live (CI can propose and publish but never approve; humans approve; risky changes wait 24 h). Users who run the Guard browser extension have every page and every signature checked against the sealed release; the signing decision comes from a second TapeOut circuit. Users without Guard are NOT protected at signing; a watchtower alerts the team instead.
+
+Status (2026-11-24): live on X Layer mainnet (chain 196) since 2026-11-18 (docs/mainnet.md):
+- Release-policy circuit #6 and Guard decision circuit #7 on TapeOut processor #101 (0x73153e5fd2Acac604D49d6ca9fea27b750718F22), each verified on all 512 inputs on two RPCs.
+- SignetRegistry 0x98dB5B6B1545D0fb374da40a02045B93398E0589, SignetFactory 0xc5e12ffe9D5bE7085441bD955724A6FAff9f7986, ReleaseGate implementation 0xD14697C1dFEAdA3A117Ff8CD5358c80743453B3D.
+- Signet's site gate 0xa3d4dfb5fB47D2CcF9b4a0a0fcC64Ac3fFef4503 (signetguard.xyz): releases #3, #4 and #5 published 2026-11-20, #6 was the tier-11 guardian change, #7, #8 and #9 published 2026-11-24, #10 on 2026-11-25 (#8's files are also stored in TapeOut's SiteRegistry, circuit #5's container). Observe mode.
+- misthos.world gate 0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59: the team's own app (on Arc, not an outside adopter), sealed in server-rendered mode; release 1 proposed by its CI and approved 2026-11-24, publishable from 2026-11-25. Observe mode.
+- `pnpm verify:claims`: every claim checked on mainnet or in the repo (claims.json).
+- Site (landing, dashboard, /prove against mainnet, no wallet): https://signetguard.xyz (Cloudflare Pages).
+- CLI: `signetguard` on npm (0.2.2). Guard: a signed pre-release zip on GitHub (0.3.3), not in the Chrome Web Store yet; its privacy policy: https://signetguard.xyz/privacy.
+- Not live: enforce mode on any mainnet gate, the gateway (staging only). The watchtower runs for signetguard.xyz every 5 minutes (started by a Cloudflare Worker cron; GitHub's own schedule, which ran every 4–12 hours, is only a fallback) and publishes its status and its last /prove run; Telegram alerts to the team's chat are set up (a test alert was accepted by Telegram on 2026-11-20, watchtower run 44746304914).
+
+## Built on TapeOut (what is really used)
+- Two TapeOut circuits on processor #101: #6 decides when a release may publish (ReleaseGate calls it on every publish and unfreeze; a Solidity copy of the same gates decides only if that call fails or returns a malformed answer, with an on-chain event; the circuit's beacon has no owner, so the rule can't be upgraded); #7 decides Guard's allow/warn/block at signing.
+- The Circuit Container of circuit #5 (0x8E2E14Ac2B8EfAB942d2dAEbe232071460bA94Ed, opened) + TapeOut's SiteRegistry (0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6, the storage behind DeWEB) hold each release's sealed manifest (and, once Pro is live, the files of the verified copy); SignetRegistry writes only files an approved release lists, as the container's 30-day SiteRegistry operator.
+- Files over 48,000 bytes are stored in 24,000-byte pieces, one proved piece per transaction (SignetRegistry.writeChunk on top of SiteRegistry.appendChunk).
+- Reading and checking follow TapeKit / TAP-10: every file's size and SHA-256 checked against the chain, two independent RPCs that must agree; the gateway reuses TapeKit's service-worker design.
+
+## Roadmap (planned, not built)
+- TapeSend alerts from the watchtower to a team's container inbox (about 0.0000039 OKB per alert). Waiting on TapeOut to confirm the DeWEB hub implementation upgraded on 2026-11-18 (docs/ecosystem-integration.md).
+- TapeCode sealing: TapeCode uploads to a staging container, `signet seal --from-container` reads it from the chain, and the approved release is copied to production (design ready, docs/ecosystem-integration.md).
+- Hosting the site itself on DeWEB (about 0.0044 OKB of storage); the Chrome Web Store listing; watchtower in 3 regions.
+
+## Start here
+- [JUDGES.md](JUDGES.md): a 5-minute guide
+- [CLAIMS.md](CLAIMS.md): every claim with its evidence (transaction hash, test or file)
+- [claims.json](claims.json): the same claims with the result of the last `pnpm verify:claims` run
+- [THREAT_MODEL.md](THREAT_MODEL.md): what is stopped, and the honest limits
+
+## Results
+- [docs/benchmark.md](docs/benchmark.md): 12 attacks we wrote, on our own local fork of X Layer, against SRI only (2 blocked), Signet Guard with its signature checks off ("hash-only", 7), Signet (12); 0 false blocks
+- [docs/attack-report.md](docs/attack-report.md): the attack suite in detail, plus the known limits (no extension, compromised extension)
+
+## How it works
+- [docs/signet-spec.md](docs/signet-spec.md): the product, architecture, approval tiers and build plan
+- [docs/policy-truth-table.md](docs/policy-truth-table.md): the release-policy circuit, all 512 rows
+- [docs/guard-truth-table.md](docs/guard-truth-table.md): the Guard decision circuit, all 512 rows
+- [docs/decisions.md](docs/decisions.md): every design decision and why
+- [docs/tapeout-interfaces.md](docs/tapeout-interfaces.md): the TapeOut interfaces used, each with its source
+
+## Try it
+- [docs/TRY-IT-LOCALLY.md](docs/TRY-IT-LOCALLY.md): Guard in your own Chrome against a local fork, with a hacked/clean switch
+- [docs/mainnet.md](docs/mainnet.md): what is on mainnet, every address and transaction
+- [docs/ecosystem-integration.md](docs/ecosystem-integration.md): TapeSend, TapeCode and FabX research

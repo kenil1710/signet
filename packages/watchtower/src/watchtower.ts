@@ -263,6 +263,8 @@ export async function run(c: Config, o: { intervalSec: number; once?: boolean; c
             const st = JSON.parse(readFileSync(c.statusPath, 'utf8')) as Status;
             writeFileSync(c.statusPath, JSON.stringify({ ...st, prove: pr }, null, 2) + '\n');
             log(`[${new Date().toISOString()}] /prove at block ${pr.block}: ${pr.summary}`);
+            // the rows that didn't pass, in the run's log too (status.json keeps only the latest round)
+            for (const row of pr.rows.filter((x) => x.status !== 'PASS' && x.status !== 'PENDING')) log(`  ${row.status}: ${row.claim}: ${row.detail}`);
           }
         }
       } catch (e) {

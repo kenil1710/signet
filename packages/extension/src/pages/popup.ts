@@ -1,4 +1,4 @@
-import { esc, send, reportWrongBlock, headline, type TabInfo } from './shared.ts';
+import { esc, send, reportWrongBlock, headline, offerCopy, type TabInfo } from './shared.ts';
 import type { Net } from '../lib/types.ts';
 
 declare const __NET__: Net;
@@ -47,9 +47,9 @@ void (async () => {
     <p class="pp-mode">Mode: <strong>${i.site.enforced ? 'enforce' : 'observe'}</strong> ${i.site.enforced ? '(Guard blocks)' : '(Guard reports, never blocks)'}${i.site.frozen ? ' · gate frozen' : ''}${i.site.stale ? ' · using the release checked earlier' : ''}</p>
     ${bad.length ? `<h2>Page check</h2><ul class="mono">${bad.map((f) => `<li>${esc(f.status)} · ${esc(f.url)}${f.note ? `<div class="dim">${esc(f.note)}</div>` : ''}</li>`).join('')}</ul>` : ''}
     ${i.events.length ? `<h2>Recent</h2><ul>${i.events.slice(0, 5).map((e) => `<li><strong>${esc(e.title)}</strong> ${e.refused ? '(refused)' : '(reported only)'}<div class="dim">${esc(e.reason)}</div></li>`).join('')}</ul>` : ''}
-    <div class="pp-actions"><button id="copy">Open the verified copy</button><button id="wrong">Report wrong block</button></div>
+    <div class="pp-actions"><span id="copyslot" class="nocopy">Verified copy: checking…</span><button id="wrong">Report wrong block</button></div>
     <p class="dim" id="msg" aria-live="polite"></p>
     <p class="dim mono foot">gate ${esc(i.site.gate ?? '-')}</p></div>`;
-  document.getElementById('copy')!.onclick = () => void send({ type: 'open-copy', domain: i.site.domain });
+  void offerCopy(i.site.domain, document.getElementById('copyslot')!);
   document.getElementById('wrong')!.onclick = () => void reportWrongBlock(i.site.domain, 'reported from the popup', document.getElementById('msg')!);
 })();

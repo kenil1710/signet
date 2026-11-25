@@ -6,7 +6,7 @@ import { NET, read, head, enc, dec, domains, project, releaseLists, releaseOf, d
 import policy from '@signet/circuit/artifacts/policy.json';
 import guard from '@signet/circuit/artifacts/guard.json';
 import { esc, view, $ } from '../ui.ts';
-import { RpcRateLimited } from '@signet/extension/src/lib/rpc.ts';
+import { RpcError, RpcRateLimited } from '@signet/extension/src/lib/rpc.ts';
 
 const cpuAbi = [
   { type: 'function', name: 'circuitInfo', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint32' }, { type: 'uint32' }, { type: 'uint32' }, { type: 'uint32' }] },
@@ -104,12 +104,24 @@ export async function provePage(): Promise<void> {
     rows.push(r);
     render();
     return (async () => {
+      // An RPC that can't be read (unreachable, an HTTP error, a node behind the pinned block, the two nodes
+      // disagreeing) says nothing about the claim: one more try, then "not checked", never "failed". FAIL is kept for
+      // a chain that answered and a claim that is false. (A watchtower run on 2026-11-25 08:06 UTC showed one FAIL that
+      // the next run, 5 min later, didn't: a passing RPC error, most likely.)
+      const run = async (): Promise<string | null> => {
+        try {
+          return await f(r);
+        } catch (e) {
+          if (!(e instanceof RpcError) || e instanceof RpcRateLimited) throw e;
+          await new Promise((ok) => setTimeout(ok, 1500));
+          return await f(r);
+        }
+      };
       try {
-        const d = await f(r);
+        const d = await run();
         Object.assign(r, d === null ? { status: 'PENDING', detail: 'not deployed on this network yet' } : { status: 'PASS', detail: d });
       } catch (e) {
-        // a public RPC that is still rate-limiting after the retries says nothing about the claim: "not checked", never "failed"
-        if (e instanceof RpcRateLimited) Object.assign(r, { status: 'NOTRUN', detail: `${(e as Error).message}: not checked. Reload this page in a minute.` });
+        if (e instanceof RpcError) Object.assign(r, { status: 'NOTRUN', detail: `${(e as Error).message.split('\n')[0]}: not checked. Reload this page in a minute.` });
         else Object.assign(r, { status: e instanceof Stale ? 'STALE' : e instanceof Unconfirmed ? 'UNCONFIRMED' : 'FAIL', detail: (e as Error).message.split('\n')[0] });
       }
       render();
@@ -173,6 +185,6 @@ export async function provePage(): Promise<void> {
   const unconfirmed = rows.filter((r) => r.status === 'UNCONFIRMED').length;
   const notRun = rows.filter((r) => r.status === 'NOTRUN').length;
   $('#sum', v).className = `summary ${fails ? 'bad' : notRun ? 'warn' : 'ok'}`;
-  $('#sum', v).textContent = (fails ? `${fails} check(s) FAILED.` : notRun ? `${notRun} check(s) not run: a public RPC is rate-limiting this browser. Nothing failed; reload in a minute.` : `All checks passed (${rows.filter((r) => r.status === 'PENDING').length} pending deployment${stale ? `; ${stale} project(s) with a release whose files were not uploaded` : ''}${unconfirmed ? `; ${unconfirmed} project(s) not verified by their domain` : ''}).`) + ` Checked in ${secs} s.`;
+  $('#sum', v).textContent = (fails ? `${fails} check(s) FAILED.` : notRun ? `${notRun} check(s) not run: a public RPC didn't answer (or is rate-limiting this browser). Nothing failed; reload in a minute.` : `All checks passed (${rows.filter((r) => r.status === 'PENDING').length} pending deployment${stale ? `; ${stale} project(s) with a release whose files were not uploaded` : ''}${unconfirmed ? `; ${unconfirmed} project(s) not verified by their domain` : ''}).`) + ` Checked in ${secs} s.`;
   v.dataset.proveDone = String(block);
 }

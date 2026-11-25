@@ -113,3 +113,15 @@ test('a big site: signet/files.json over 48,000 bytes is chunked, and the CLI an
   const b = loadSealed(dir);
   assert.doesNotThrow(() => b.chunkProof('signet/files.json', 0), 'the upload can prove each chunk');
 });
+
+// ---- a 404 page (Cloudflare Pages / Netlify / Vercel serve a sealed 404.html with HTTP 404) — notFoundPath
+import { notFoundPath } from '../src/lib/sealed.ts';
+test('an unknown path answered with 404 must be the sealed 404.html; a sealed path or a non-document never is', () => {
+  const h = (p: string) => ['index.html', 'app.html', '404.html', 'assets/a.js'].includes(p);
+  assert.equal(notFoundPath(pathOfUrl('/nonexistent-page-xyz'), true, h), '404.html');
+  assert.equal(notFoundPath(pathOfUrl('/a/b/c'), true, h), '404.html');
+  assert.equal(notFoundPath(pathOfUrl('/app.html'), true, h), null, 'a sealed path is never the 404 page');
+  assert.equal(notFoundPath(pathOfUrl('/'), true, h), null);
+  assert.equal(notFoundPath(pathOfUrl('/x.js'), false, h), null, 'only documents');
+  assert.equal(notFoundPath(pathOfUrl('/nope'), true, (p) => p === 'index.html'), null, 'no 404.html sealed: none');
+});

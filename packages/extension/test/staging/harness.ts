@@ -100,10 +100,11 @@ export async function switchToEnforce(p: Project): Promise<void> {
 // ---------------------------------------------------------------- web server
 
 /// tamper: true = the main bundle is tampered on every request; 'once' = on the next request only, then clean.
-/// root: serve another build (a new release) from now on; html: serve these bytes as index.html instead of the file.
+/// root: serve another build (a new release) from now on; html: serve these bytes as index.html instead of the file;
+/// notFound: these bytes instead of the build's 404.html (served, with status 404, for unknown paths when it has one).
 /// proof: what /.well-known/signet.json answers. undefined = the sealed file (the domain confirms its gate);
 /// 'drop' = 404 (a domain that never confirmed this gate, or a hijack that removes the file); a string = that body.
-export interface Site { port: number; log: string[]; tamper: boolean | 'once'; proof?: 'drop' | string; root?: string; html?: Buffer; close(): void }
+export interface Site { port: number; log: string[]; tamper: boolean | 'once'; proof?: 'drop' | string; root?: string; html?: Buffer; notFound?: Buffer; close(): void }
 
 /// Serves the sealed build for any *.signet.test host and a small unsealed page for every other host.
 export async function serveSite(dist: string): Promise<Site> {
@@ -135,6 +136,13 @@ export async function serveSite(dist: string): Promise<Site> {
     const file = join(site.root ?? dist, rel);
     if (rel.includes('..') || !existsSync(file)) {
       res.statusCode = 404;
+      // like Cloudflare Pages / Netlify / Vercel: a build with a top-level 404.html gets it, with status 404
+      const nf = join(site.root ?? dist, '404.html');
+      if (!rel.includes('..') && existsSync(nf)) {
+        res.setHeader('content-type', types['.html']!);
+        res.setHeader('cache-control', 'no-store'); // as Cloudflare Pages sends its 404 page: the browser keeps no copy
+        return void res.end(site.notFound ?? readFileSync(nf));
+      }
       res.end();
       return;
     }

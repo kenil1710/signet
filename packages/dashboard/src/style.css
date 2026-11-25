@@ -156,7 +156,7 @@ body.embed{background:transparent} body.embed .top{display:none} body.embed #app
 .start .step{border-top:1px solid var(--line);margin-top:36px;padding-top:8px;position:relative}
 .start .step h2{border:0;padding:0;margin:18px 0 12px;font-family:var(--display);font-stretch:125%;font-weight:800;font-size:20px;letter-spacing:-.01em;text-transform:uppercase;color:var(--text)}
 .start ol{padding-left:20px;max-width:72ch} .start li{margin:6px 0}
-.start pre{margin:10px 0 14px}
+.start pre{margin:10px 0 14px;white-space:pre;overflow-wrap:normal}
 .start button.copy{float:right;min-height:30px;padding:0 10px;font-size:12px;margin:-2px 0 6px 10px}
 
 .static-intro{max-width:780px;line-height:1.6}
@@ -185,3 +185,6 @@ body.embed{background:transparent} body.embed .top{display:none} body.embed #app
 .lastrun > summary::-webkit-details-marker { display: none; }
 .lastrun > summary .dim { text-decoration: underline; margin-left: 6px; }
 .lastrun .claims { opacity: .72; margin-top: 6px; }
+.notfound{min-height:62vh;display:flex;flex-direction:column;justify-content:center}
+.nf-links{display:flex;flex-wrap:wrap;gap:12px;margin:22px 0 26px}
+@media (max-width:600px){.start button.copy{float:none;display:block;margin:-4px 0 8px auto}}

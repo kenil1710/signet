@@ -33,3 +33,17 @@ export function headline(i: TabInfo): { title: string; text: string } {
   if (s.status === 'no-release') return { title: 'No sealed release yet', text: s.reason };
   return { title: 'Could not check', text: `${s.reason} Guard does not block when it cannot check.` };
 }
+
+/// "Open the verified copy" only when the current release is stored on-chain in full (background 'copy-state',
+/// lib/copy.ts); otherwise a plain line, never a button that leads to a copy that can't run.
+export async function offerCopy(domain: string, slot: HTMLElement, cls = ''): Promise<void> {
+  const st = await send<{ complete: boolean; stored: number; total: number } | null>({ type: 'copy-state', domain }).catch(() => null);
+  if (st?.complete) {
+    slot.outerHTML = `<button id="copy"${cls ? ` class="${cls}"` : ''}>Open the verified copy</button>`;
+    document.getElementById('copy')!.onclick = () => void send({ type: 'open-copy', domain });
+    return;
+  }
+  slot.className = 'nocopy';
+  slot.textContent = 'Verified copy: available with Pro';
+  slot.title = st ? `This release isn't stored on X Layer in full (${st.stored} of ${st.total} files).` : 'Guard could not read the stored copy.';
+}
