@@ -1,17 +1,54 @@
 {
-  "updatedAt": "2026-11-24T23:58:25.086Z",
+  "updatedAt": "2026-11-25T05:54:39.428Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-24T23:58:25.086Z",
-      "release": 9
+      "checkedAt": "2026-11-25T05:54:39.423Z",
+      "release": 10
     }
   ],
   "operator": {
     "until": "2026-12-19T08:05:42.000Z",
-    "daysLeft": 24.3,
+    "daysLeft": 24.1,
     "renewedThisRound": false
+  },
+  "prove": {
+    "checkedAt": "2026-11-25T05:54:46.476Z",
+    "block": "76817043",
+    "summary": "All checks passed (0 pending deployment). Checked in 5.9 s.",
+    "rows": [
+      {
+        "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
+        "detail": "34 NAND gates, netlist sha256 0x1a2e19870a…, all 512 rows equal the published truth table",
+        "status": "PASS"
+      },
+      {
+        "claim": "The Guard decision circuit gives its published truth table on all 512 inputs",
+        "detail": "circuit #7: 22 NAND gates, netlist sha256 0x03c94d0295…, all 512 rows equal the published truth table",
+        "status": "PASS"
+      },
+      {
+        "claim": "A taped-out circuit's behavior can't be upgraded (beacon owner 0x0, pinned implementation, pinned processor code)",
+        "detail": "owner 0x0, implementation 0x977f2178…, processor code hash 0x57aa306fd0…",
+        "status": "PASS"
+      },
+      {
+        "claim": "Signet's registry is deployed and lists its sealed domains",
+        "detail": "2 domain(s) in the registry's list",
+        "status": "PASS"
+      },
+      {
+        "claim": "misthos.world: the release files stored on-chain hash to what its gate published",
+        "detail": "no release published yet",
+        "status": "PASS"
+      },
+      {
+        "claim": "signetguard.xyz: the release files stored on-chain hash to what its gate published",
+        "detail": "release #10: filesRoot, allowlistHash and originsHash recomputed here, 27 files listed, observe mode",
+        "status": "PASS"
+      }
+    ]
   }
 }
