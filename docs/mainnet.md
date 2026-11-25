@@ -216,6 +216,11 @@ deployment (`001cb8ed.signet-6l4.pages.dev`, not production): routes unchanged, 
 Guard 0.3.3 shows the 404 page as unverified (grey); 0.3.4 checks it (published as a pre-release, `guard-v0.3.4`, zip SHA-256 `f58f19f2…0b0e`, Sigstore attestation verified).
 Fork rehearsal (of the reseal): propose 168,996 gas, approve A 39,958, publish 292,923, files.json 1,889,519 (read back), manifest
 equal to the seal. On mainnet at 0.020000001 gwei: CI key ≈ 0.000047 OKB; approver A ≈ 0.0000008 OKB.
+The preview deployment used for those checks was deleted after (an unsealed public copy).
+
+| Tx | From | Call | Gas |
+|---|---|---|---:|
+| [`0x11208a32…cee4`](https://web3.okx.com/explorer/x-layer/evm/tx/0x11208a32451f915cce4bbda4868c6995e877cbe01ece1e00f632f4048e9cfee4) | CI proposer | `proposeRelease` → #12, tier 00 | 168,996 |
 
 ## Release #11 published (2026-11-25, tier 00): watchtower box hidden until it has data, Guard links → 0.3.3
 
