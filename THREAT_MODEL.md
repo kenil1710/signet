@@ -12,7 +12,7 @@ Two limits are stated, not counted as attacks Guard defends against:
 
 | User | Protected at signing? | What they get |
 |---|---|---|
-| **Runs the Guard extension** (Chrome) | **Yes** | Page check against the sealed release, signing-time allowlist decided by the Guard circuit, warning page, verified copy |
+| **Runs the Guard extension** (Chrome) | **Yes** | Page check against the sealed release, signing-time allowlist decided by the Guard circuit, warning page. The verified copy is built but not live yet (it comes with Pro) |
 | **Uses a wallet that does the same check** | Would be | No wallet does this yet. A wallet SDK is a plan, not built |
 | **Anyone else** (no extension, mobile, WalletConnect to a phone) | **No** | Indirect only: the watchtower alerts the team within about 10 minutes (a round every 5 minutes; a bad load is confirmed by a second one), and the team can freeze, revoke and warn |
 

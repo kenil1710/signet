@@ -31,7 +31,7 @@
     <li><b>Seal:</b> CI hashes every file of a release and lists the contracts it may call; that becomes a proposal on X Layer. The CI key can only propose.</li>
     <li><b>Approve:</b> the team's approvers approve in their own wallets. TapeOut circuit #6 decides when it publishes: code only 1 approval + 1 h; a new origin 2 + 1 h; a new contract or spender 2 + 24 h; admin changes 3 of 3 + 24 h.</li>
     <li><b>Guard:</b> a browser extension (a signed pre-release on GitHub; not in the Chrome Web Store yet) checks the page against the sealed release, read from two X Layer nodes, and checks every signature request against the sealed allowlist (circuit #7).</li>
-    <li><b>Builds on TapeKit:</b> TapeKit already verifies DeWEB files on-chain. Signet adds the signing-time allowlist, risk-tiered approvals with timelocks, CI that can only propose, a domain proof, and a verified copy read from X Layer.</li>
+    <li><b>Builds on TapeKit:</b> TapeKit already verifies DeWEB files on-chain. Signet adds the signing-time allowlist, risk-tiered approvals with timelocks, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; live with Pro).</li>
   </ul>
   <p>Benchmark (12 attacks we wrote, on our own local fork of X Layer): 12 of 12 blocked, 0 false blocks in 16 clean sessions. SRI alone: 2/12; Signet Guard with its signature checks off ("hash-only"): 7/12.</p>
   <p><a href="https://signetguard.xyz/app#/prove">Proof page</a> (re-checks the circuits on X Layer in your browser) ·
@@ -250,7 +250,7 @@
             <svg width="60" height="60" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4a28 28 0 1 0 0 56" fill="none" stroke="#FFF6F3" stroke-width="3"/><path d="M36 4.3A28 28 0 0 1 36 59.7" fill="none" stroke="#FFF6F3" stroke-width="3" opacity=".5"/><path d="M33 2l-4 14 6 6-6 10 5 8-4 22" fill="none" stroke="#FFF6F3" stroke-width="2.5" stroke-linejoin="round"/></svg>
             <h4>Stop. This site's seal is broken.</h4>
             <p>Signet stopped this page from asking your wallet to sign. Nothing was sent.</p>
-            <div class="bb"><span>Open the verified copy</span> <span>Leave this site</span></div>
+            <div class="bb"><span class="nocopy">Verified copy: available with Pro</span> <span>Leave this site</span></div>
           </div>
         </div>
       </div>

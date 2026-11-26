@@ -187,8 +187,8 @@ const BEATS = [
     lede: "Signet brings DeWEB's trust guarantee to every website: no migration, your own domain, plus approval rules for every release." },
   { files: '6 / 7 · app-2aa5a3e0.js changed', stat: 'Seal broken',
     lede: "<b>February 2025.</b> One tampered JavaScript file on Safe{Wallet}'s site, about $1.5B taken from Bybit. The smart contracts were never touched." },
-  { files: '6 / 7 · verified copy available', stat: 'Signature refused · $0 sent',
-    lede: "<b>Signet Guard sees the broken seal before your wallet does.</b> The signature request stops, and you're offered the verified copy." },
+  { files: '6 / 7 · signature refused', stat: 'Signature refused · $0 sent',
+    lede: "<b>Signet Guard sees the broken seal before your wallet does.</b> The signature request stops before your wallet opens." },
 ];
 let beat = -1;
 function setBeat(i: number): void {

@@ -196,6 +196,7 @@ header.solid{background:rgba(10,9,8,.78);backdrop-filter:blur(12px);-webkit-back
 .blocked .bb span{height:42px;padding:0 18px;border-radius:999px;display:inline-flex;align-items:center;font-size:14px;font-weight:600}
 .blocked .bb span:first-child{background:#FFF6F3;color:#5E180F}
 .blocked .bb span:last-child{border:1.5px solid rgba(255,246,243,.7)}
+.blocked .bb span.nocopy{background:none;color:inherit;opacity:.8;font-weight:500;padding:0 6px}
 @media (max-width:960px){
   .atk-pin{height:auto;min-height:0;padding:80px 0}
   .atk{grid-template-columns:1fr;gap:28px}
