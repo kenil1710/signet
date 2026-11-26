@@ -205,6 +205,11 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #15 proposed (2026-11-26, tier 00): the verified copy is no longer presented as live
+
+- Proposed by the CI key at 09:06:36 UTC: tx [`0x341e2d22…0c4e`](https://web3.okx.com/explorer/x-layer/tx/0x341e2d2226aa021d57ecbe3939559fd5e5ee0d8f97b667129eb36f493bd10c4e) (block 76,914,960, 168,996 gas), manifest `0x5e542cae…bce6`. Tier 00 (allowlist and origins equal #14's): 1 approval + 1 h.
+- Changes: hero beat 3 ("6 / 7 · signature refused"; "The signature request stops before your wallet opens."), the mock red page ("Verified copy: available with Pro", as in Guard), the TapeKit bullet and THREAT_MODEL.md's user table.
+
 ## Release #14 published (2026-11-26, tier 00): landing content at once, full verify:claims output, dashboard skeletons
 
 - Approved by approver A at 05:20:14 UTC (10:50 IST), publishable from 06:20:14 UTC.
