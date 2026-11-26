@@ -205,6 +205,11 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #16 proposed (2026-11-26, tier 00): who holds Signet's keys, said plainly
+
+- Proposed by the CI key at 10:32:13 UTC: tx [`0x85b7ebbd…34a9`](https://web3.okx.com/explorer/x-layer/tx/0x85b7ebbd1f4b2a1d1f7c0a68a74221c342aaf1b2ebb0a572e2b3e142250c34a9) (block 76920097, 168,996 gas), manifest `0xdd814e6c…e894`. Tier 00 (allowlist and origins equal #15's): 1 approval + 1 h.
+- Changes: the docs and the site say that approvers A, B and C on both gates are 3 wallets on 3 devices held by one founder (as is the recovery address), "no single key" and never "no single person"; misthos.world is the founder's own app, the first real site sealed, not an outside customer. Fork-rehearsed with #15 live in enforce mode: red before the timelock, hold during the rollout, green 15 s after the publish.
+
 ## Release #15 published (2026-11-26, tier 00)
 
 - Approved by approver A at 09:07:40 UTC (14:37 IST), publishable from 10:07:40 UTC.
