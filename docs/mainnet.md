@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | **none** since 2026-11-24 (signet-ops `0x9275…E291` removed by approvers A and B with `voteRemoveGuardian()`: its keystore password was lost, see "Plan B" below). Before: signet-ops 2026-11-23 → 24 (tier-11 `SetGuardian`, proposal #6); signet-dev until 2026-11-20, then none |
 
-Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#15** (published 2026-11-26); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
+Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#16** (published 2026-11-26); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 
@@ -205,9 +205,16 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #16 published (2026-11-26, tier 00)
+
+- Approved by approver A at 10:51:17 UTC (16:21 IST), publishable from 11:51:17 UTC.
+- `scripts/release-site.sh 16` at 11:51 UTC: Cloudflare deployment `6cb3633c` (7 new files, 20 reused), then publish tx [`0xf353f3c1…e708`](https://web3.okx.com/explorer/x-layer/tx/0xf353f3c1ff8333b1853bf82ec69dad6000c515defea592ed74c247f525e2e708) (block 76,924,876 at 11:51:52 UTC, 292,923 gas; decided by circuit #6), `signet/files.json` written (1,889,686 gas) and read back.
+- Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
+- CI key after #16's publish: 0.002858 OKB.
+
 ## Release #16 proposed (2026-11-26, tier 00): who holds Signet's keys, said plainly
 
-- Proposed by the CI key at 10:32:13 UTC: tx [`0x85b7ebbd…34a9`](https://web3.okx.com/explorer/x-layer/tx/0x85b7ebbd1f4b2a1d1f7c0a68a74221c342aaf1b2ebb0a572e2b3e142250c34a9) (block 76920097, 168,996 gas), manifest `0xdd814e6c…e894`. Tier 00 (allowlist and origins equal #15's): 1 approval + 1 h.
+- Proposed by the CI key at 10:32:13 UTC: tx [`0x85b7ebbd…34a9`](https://web3.okx.com/explorer/x-layer/tx/0x85b7ebbd1f4b2a1d1f7c0a68a74221c342aaf1b2ebb0a572e2b3e142250c34a9) (block 76,920,097, 168,996 gas), manifest `0xdd814e6c…e894`. Tier 00 (allowlist and origins equal #15's): 1 approval + 1 h.
 - Changes: the docs and the site say that approvers A, B and C on both gates are 3 wallets on 3 devices held by one founder (as is the recovery address), "no single key" and never "no single person"; misthos.world is the founder's own app, the first real site sealed, not an outside customer. Fork-rehearsed with #15 live in enforce mode: red before the timelock, hold during the rollout, green 15 s after the publish.
 
 ## Release #15 published (2026-11-26, tier 00)
