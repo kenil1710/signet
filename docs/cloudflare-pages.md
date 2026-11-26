@@ -58,8 +58,11 @@ Cloudflare. So the domain moves its **nameservers** to Cloudflare: still free, a
 2. Enter `signetguard.xyz` → **Continue** → **Activate domain**. Cloudflare creates the DNS record (a `CNAME`
    `signetguard.xyz` → `signet-6l4.pages.dev`, proxied) and issues the HTTPS certificate. Status goes from
    *Initializing* to **Active**, usually within a few minutes once the zone is active.
-3. Optional: repeat with `www.signetguard.xyz`. Then add a redirect from `www` to the apex (**Rules → Redirect
-   Rules**, "Redirect from WWW to root" template).
+3. `www.signetguard.xyz`: **done 2026-11-26** as a redirect only (not a second custom domain): **Rules → Redirect
+   Rules**, "Redirect from WWW to root" template, 301, path and query kept. Its DNS record is proxied, so the rule
+   answers before any origin. Without the rule `www` returned HTTP 522 (proxied, but nothing served it). Checked:
+   `https://www.signetguard.xyz/start?x=1` → 301 `https://signetguard.xyz/start?x=1`; `http://www…/app` → 301 to the
+   https apex. Only the apex is sealed (its `/.well-known/signet.json`); `www` serves no page of its own.
 4. Recommended: **SSL/TLS → Edge Certificates → Always Use HTTPS: On**.
 
 ### D. Check
