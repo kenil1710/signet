@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-26T15:27:05.619Z",
+  "updatedAt": "2026-11-26T15:31:56.902Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-26T15:27:05.619Z",
+      "checkedAt": "2026-11-26T15:31:56.901Z",
       "release": 16
     }
   ],
@@ -15,9 +15,9 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-26T15:27:13.967Z",
-    "block": "76937789",
-    "summary": "All checks passed (0 pending deployment). Checked in 8.0 s.",
+    "checkedAt": "2026-11-26T15:32:04.938Z",
+    "block": "76938080",
+    "summary": "1 check(s) FAILED. Checked in 7.8 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
@@ -31,8 +31,8 @@
       },
       {
         "claim": "A taped-out circuit's behavior can't be upgraded (beacon owner 0x0, pinned implementation, pinned processor code)",
-        "detail": "owner 0x0, implementation 0x977f2178…, processor code hash 0x57aa306fd0…",
-        "status": "PASS"
+        "detail": "Failed to fetch",
+        "status": "FAIL"
       },
       {
         "claim": "Signet's registry is deployed and lists its sealed domains",
