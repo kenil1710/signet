@@ -18,7 +18,7 @@
       <div class="kicker">Setup · X Layer mainnet · about 15 minutes of your time</div>
       <h1>Protect your site</h1>
       <p class="lead">After these five steps, no single key can publish a release of your website: your CI only <b>proposes</b> each release, your approvers <b>approve</b> it in their own wallets, and TapeOut circuit #6 decides when it may go live. Users who run Guard are checked against exactly what you sealed.</p>
-      <p class="dim">You need: Node.js 18+, a static site built by GitHub Actions (output folder such as <code>dist/</code>), a wallet on X Layer with ~0.001 OKB, and three approver addresses.</p>
+      <p class="dim">You need: Node.js 18+, a static site built by GitHub Actions (output folder such as <code>dist/</code>), a wallet on X Layer with ~0.001 OKB, and three approver addresses, ideally held by three different people, each on their own device. One person with three wallets removes the single key, not the single person.</p>
 
       <section class="step quick" id="quick"><h2>Fastest: one command</h2>
         <p>In your project folder. It asks for your domain, the gate address (it tells you how to create it in the dashboard), your host and your build command, then writes the proposer key, <code>signet.config.json</code>, the domain proof, your host's header file and <code>.github/workflows/signet.yml</code>. It sends no transaction.</p>

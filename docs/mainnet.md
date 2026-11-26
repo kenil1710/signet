@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | **none** since 2026-11-24 (signet-ops `0x9275…E291` removed by approvers A and B with `voteRemoveGuardian()`: its keystore password was lost, see "Plan B" below). Before: signet-ops 2026-11-23 → 24 (tier-11 `SetGuardian`, proposal #6); signet-dev until 2026-11-20, then none |
 
-Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#14** (published 2026-11-26); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
+Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#15** (published 2026-11-26); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 
@@ -204,6 +204,13 @@ Sent by the team: `cast send 0x9275eDEC1c4940B85a1e11Cce3EAd662ba00E291 --value 
 After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 25; signet-ops 0.043355534124840684 OKB.
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
+
+## Release #15 published (2026-11-26, tier 00)
+
+- Approved by approver A at 09:07:40 UTC (14:37 IST), publishable from 10:07:40 UTC.
+- `scripts/release-site.sh 15` at 10:08 UTC: Cloudflare deployment `5586a520` (4 new files, 23 reused), then publish tx [`0x37ac51bc…e6cd`](https://web3.okx.com/explorer/x-layer/tx/0x37ac51bc4a2ac7e5b120fb06300f8653f5d84e86f4d6df6dc2fb7bda3a26e6cd) (block 76,918,662 at 10:08:18 UTC, 292,923 gas; decided by circuit #6), `signet/files.json` written (1,889,698 gas) and read back.
+- Checks: 27/27 live files equal `release/15`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 15 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #15 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live hero and mock red page carry the new wording.
+- CI key after #15's publish: 0.002905 OKB.
 
 ## Release #15 proposed (2026-11-26, tier 00): the verified copy is no longer presented as live
 

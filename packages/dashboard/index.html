@@ -33,6 +33,7 @@
     <li><b>Guard:</b> a browser extension (a signed pre-release on GitHub; not in the Chrome Web Store yet) checks the page against the sealed release, read from two X Layer nodes, and checks every signature request against the sealed allowlist (circuit #7).</li>
     <li><b>Builds on TapeKit:</b> TapeKit already verifies DeWEB files on-chain. Signet adds the signing-time allowlist, risk-tiered approvals with timelocks, CI that can only propose, a domain proof, and a verified copy read from X Layer (built; live with Pro).</li>
   </ul>
+  <p>Signet is built by one founder. Its own gates have three approver wallets on three devices, all held by that founder: no single key can publish, but the design is meant for three different people. misthos.world, the first real site sealed, is the founder's own app, not an outside customer.</p>
   <p>Benchmark (12 attacks we wrote, on our own local fork of X Layer): 12 of 12 blocked, 0 false blocks in 16 clean sessions. SRI alone: 2/12; Signet Guard with its signature checks off ("hash-only"): 7/12.</p>
   <p><a href="https://signetguard.xyz/app#/prove">Proof page</a> (re-checks the circuits on X Layer in your browser) ·
   <a href="https://signetguard.xyz/start">Setup guide for teams</a> ·
@@ -476,6 +477,8 @@
           <div class="fl"><small>Release policy</small> <b>Circuit #6 · 34 NAND · 9 inputs · 2 outputs</b></div>
           <div class="fl"><small>Upgrade keys</small> <b>None on the circuit. Its beacon owner is 0x0.</b></div>
           <div class="fl"><small>Fallback</small> <b>A Solidity copy of the same gates, used only if the circuit call fails (emits an event)</b></div>
+          <div class="fl"><small>Who holds Signet's own keys</small> <b>One founder: approvers A, B and C are 3 wallets on 3 devices. No single key can publish; a real team should use 3 people.</b></div>
+          <div class="fl"><small>Sealed sites</small> <b>signetguard.xyz and misthos.world, both the founder's own; no outside customer yet</b></div>
           <div class="fl"><small>In your browser</small> <b><a href="#proof" data-link="prove">Open the proof page</a></b></div>
         </div>
       </div>

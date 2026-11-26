@@ -1,8 +1,8 @@
 {
   "project": "Signet",
-  "checkedAt": "2026-11-25T13:29:06.291Z",
+  "checkedAt": "2026-11-26T09:15:06.456Z",
   "chain": "X Layer mainnet (196)",
-  "block": "76844147",
+  "block": "76915326",
   "rpcs": [
     "https://xlayerrpc.okx.com",
     "https://xlayer.drpc.org"
@@ -135,12 +135,12 @@
       "kind": "mainnet",
       "claim": "signetguard.xyz's gate is in enforce mode since 2026-11-25 (one approver's enforce(), allowed 7 days after the gate was made), is not frozen, has a published release and has no guardian",
       "status": "PASS",
-      "detail": "enforced, not frozen, current release #12, guardian 0x0; enforce() in tx 0x00de5449… (block 76840474) by 0xb9ef367a86de5150a5390c4148073901587d2416"
+      "detail": "enforced, not frozen, current release #14, guardian 0x0; enforce() in tx 0x00de5449… (block 76840474) by 0xb9ef367a86de5150a5390c4148073901587d2416"
     },
     {
       "id": "C11",
       "kind": "mainnet",
-      "claim": "misthos.world's gate (the team's own app, not an outside adopter) has published release #1 and is in observe mode (its team can switch to enforce from 2026-12-01 08:14 UTC); it has no guardian",
+      "claim": "misthos.world's gate (the founder's own app on Arc, the first real site sealed with Signet; not an outside customer) has published release #1 and is in observe mode (its owner can switch to enforce from 2026-12-01 08:14 UTC); it has no guardian",
       "status": "PASS",
       "detail": "current release #1, observe mode (enforce allowed from 2026-12-01T08:14:44.000Z), guardian 0x0"
     },

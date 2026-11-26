@@ -39,7 +39,7 @@ export async function newPage(): Promise<void> {
     <p class="lead">Two transactions from your wallet (≈ 0.000013 OKB of gas at 0.02 gwei). After that, no single key can publish your site: the CI key only proposes, your approvers approve, and TapeOut circuit #6 decides when it goes live. Full guide: <a href="../start">/start</a>.</p>
     <div class="formgrid">
       ${field('f-domain', 'Domain', 'app.example.org', 'Exactly the host your users open. First come, first served: claim it before someone else does.')}
-      ${field('f-a', 'Approver A', '0x…')}${field('f-b', 'Approver B', '0x…')}${field('f-c', 'Approver C', '0x…', 'Three different people or devices. Any 2 approve normal releases; admin changes need all 3.')}
+      ${field('f-a', 'Approver A', '0x…')}${field('f-b', 'Approver B', '0x…')}${field('f-c', 'Approver C', '0x…', 'Ideally three different people, each on their own device. A code-only release needs 1 approval; a new origin, contract or spender needs 2; admin changes need all 3.')}
       ${field('f-proposer', 'CI proposer', '0x…', 'From <code>signet keygen</code>. It can propose and publish, never approve.')}
       ${field('f-recovery', 'Recovery', '0x…', 'A key kept offline; it can replace lost approvers (3 of 3 + 24 h).')}
       ${field('f-guardian', 'Guardian (optional)', '0x… or empty', 'Can only freeze, e.g. your watchtower. Leave empty for none.')}

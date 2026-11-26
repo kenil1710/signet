@@ -219,7 +219,7 @@ const CLAIMS: Claim[] = [
     },
   },
   {
-    id: 'C11', kind: 'mainnet', text: "misthos.world's gate (the team's own app, not an outside adopter) has published release #1 and is in observe mode (its team can switch to enforce from 2026-12-01 08:14 UTC); it has no guardian",
+    id: 'C11', kind: 'mainnet', text: "misthos.world's gate (the founder's own app on Arc, the first real site sealed with Signet; not an outside customer) has published release #1 and is in observe mode (its owner can switch to enforce from 2026-12-01 08:14 UTC); it has no guardian",
     check: async (b) => {
       const gate = '0xDfFf2307d45df1995502d8b300aE9AfbB01c4a59' as Address;
       const [enforced, current, guardian, deployedAt] = await Promise.all([call<boolean>(b, gate, gateAbi, 'enforced'), call<bigint>(b, gate, gateAbi, 'currentRelease'), call<Address>(b, gate, gateAbi, 'guardian'), call<number>(b, gate, gateAbi, 'deployedAt')]);

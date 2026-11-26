@@ -116,15 +116,15 @@ extension defeats it.
 **Where it stands on mainnet** ([`docs/mainnet.md`](docs/mainnet.md); C8–C11 in `CLAIMS.md`):
 - **signetguard.xyz** (Signet's own site) is in **enforce** mode since 2026-11-25 12:25 UTC (`enforce()` by approver A,
   tx `0x00de5449…2dd0`): Guard users get the red page and refused signatures if it stops matching its seal. Releases
-  #3–#12 went through its gate (#6 was the tier-11 guardian change); #8's files are stored in full in DeWEB's
+  #3 onward went through its gate (#6 was the tier-11 guardian change); #8's files are stored in full in DeWEB's
   SiteRegistry. Each release is deployed and published seconds apart by `scripts/release-site.sh`; Guard 0.3.4+
   holds the page for up to 60 s while a release can publish, so a rollout doesn't turn it red.
-- **misthos.world** (the team's own app on Arc, not an outside adopter) published release #1 on 2026-11-25 (tier 10:
+- **misthos.world** (the founder's own app on Arc, the first real site sealed with Signet; not an outside customer) published release #1 on 2026-11-25 (tier 10:
   2 approvals + 24 h) and is in **observe** mode; enforce is possible from 2026-12-01 08:14 UTC.
 - **No guardian on either gate.** The guardian (signet-ops, a freeze-only key) lost its keystore password, so
   approvers A and B removed it from both gates on 2026-11-24 (`voteRemoveGuardian()`, 2 of 3). A guardian is
   optional: any approver can still freeze. Naming a new one is tier 11 (3 of 3 + 24 h).
-- **One team.** The three approvers and the recovery address are the same on both gates and held by the Signet team.
+- **One person holds the keys.** Approvers A, B and C on both gates are three separate wallets on three separate devices, held by one person (Signet is built by a solo founder), as is the recovery address. No single key can publish a release, but one person holds every key. The design is meant for three different people, and a real team should use three.
 
 Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). Wallets tested: Rabby, by hand on X Layer mainnet
 (2026-11-25, no false refusal). Not tested yet: MetaMask, OKX Wallet. The automated suites use a mock wallet. The gateway runs on staging.
