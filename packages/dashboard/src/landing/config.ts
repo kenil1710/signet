@@ -13,7 +13,7 @@ export function linksFor(repoPublic: boolean) {
     /** The team's X account: also the contact for setup help (a DM). */
     x: 'https://x.com/vekariya_kenil',
     /** Signet Guard's signed pre-release zip on GitHub (load unpacked), until the store listing exists. */
-    guardPrerelease: repoPublic ? `${REPO}/releases/tag/guard-v0.3.5` : 'TODO: the Guard pre-release is on GitHub once the repository is public',
+    guardPrerelease: repoPublic ? `${REPO}/releases/tag/guard-v0.3.6` : 'TODO: the Guard pre-release is on GitHub once the repository is public',
     /** Signet Guard on the Chrome Web Store (not submitted yet). */
     chromeWebStore: 'TODO: Chrome Web Store listing URL',
     /** The wallet-free proof page of this same app. */

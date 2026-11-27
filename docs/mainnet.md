@@ -205,11 +205,27 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## OKX Wallet refusal by hand (2026-11-28): Guard 0.3.6 build `9727af7`, enforce mode
+
+- **Setup:** a separate Chrome 158 profile, a new empty OKX Wallet 4.26.0, account `0x9598…6ceb` connected, X Layer,
+  Guard 0.3.6 loaded unpacked (`chrome://extensions`: "0.3.6 (build 9727af7 2026-11-27 20:01Z)"),
+  signetguard.xyz/app (release #16, enforce mode).
+- **Wallet-free channel check:** a fake `eth_sign` frame posted by the page came back "4001 Signet Guard refused this
+  signature: Unverified signature" (Guard's listener was live on the page).
+- **Unsealed** `eth_sendTransaction` to `0xBAD0…0C0F` through `window.okxwallet` and through `window.ethereum`: both
+  rejected with Guard's 4001 (not a contract this site sealed); **OKX never opened**; red page "Signature refused",
+  "Verified copy: available with Pro".
+- **Sealed** call to the gate (`enforced()`, 0 OKB): OKX opened; rejected by hand.
+- The two earlier OKX failures the same day: with Guard 0.3.5/0.3.6 before the channel check, Guard can't wrap OKX's
+  provider; the second ran a Guard build loaded before the check existed (`docs/decisions.md`).
+- **Both wallets now tested by hand with refusals:** Rabby (Guard 0.3.5, see below) and OKX Wallet (Guard 0.3.6).
+
 ## Release #17 sealed (2026-11-28, tier 00), not proposed: wallets tested, said plainly
 
 - `release/17` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`. Differs from
-  #16 only in `docs/CLAIMS.md`, `docs/THREAT_MODEL.md`, `llms.txt` and `start.html` (Rabby: first refusal
-  2026-11-28; OKX Wallet: not protected yet). Allowlist and origins equal #16's: tier 00 (1 approval + 1 h).
+  #16 in the wallet wording (`docs/CLAIMS.md`, `docs/THREAT_MODEL.md`, `llms.txt`, `start.html`: Guard tested by hand
+  with Rabby and OKX Wallet, refusals work) and the Guard download links (0.3.5 to 0.3.6). Resealed after the OKX
+  hand test passed. Allowlist and origins equal #16's: tier 00 (1 approval + 1 h).
 - `pnpm verify:claims`: all passed (11 on mainnet, 11 from the repo).
 - Not proposed: proposing is a mainnet transaction from the CI key and waits for the founder's yes.
 
@@ -226,7 +242,7 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
   sealed call sent afterwards didn't open Rabby either. Not reproduced headless with the same Rabby build (rejects with
   4001 in ~1 s, also with OKX installed alongside); Guard 0.3.6 answers the page before drawing the notice. To check
   again by hand.
-- **OKX Wallet 4.26.0, same day, Guard 0.3.6 test build:** not intercepted. Unsealed requests through
+- **OKX Wallet 4.26.0, same day, first Guard 0.3.6 test build (before the channel check):** not intercepted. Unsealed requests through
   `window.okxwallet` and `window.ethereum` opened OKX; Guard was never asked. Root cause and fix: `docs/decisions.md`
   (2026-11-28).
 

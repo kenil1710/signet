@@ -29,4 +29,4 @@ Staging needs two RPC URLs (`SIGNET_RPC_URL`, `SIGNET_RPC_URL2`); the tests put 
 
 **Token transfers** follow the project's sealed `transfers` setting: `user` (default), `allowlist` or `any`.
 
-**Limits (v1).** See `docs/decisions.md`, "Guard extension" and "Four changes after the overnight run". The main ones: no public gateway is deployed yet; only the top frame is checked; a wallet that freezes its provider and makes `window.ethereum` non-configurable can only be wrapped through EIP-6963; not tested with a real wallet.
+**Limits (v1).** See `docs/decisions.md`, "Guard extension" and "Four changes after the overnight run". The main ones: no public gateway is deployed yet; only the top frame is checked; a wallet that freezes its provider and makes `window.ethereum` non-configurable can only be wrapped through EIP-6963; tested by hand with Rabby and OKX Wallet on X Layer mainnet (2026-11-28, refusals work), not with MetaMask.
