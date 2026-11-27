@@ -205,6 +205,14 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Guard 0.3.6 published (2026-11-28, pre-release)
+
+- Tag `guard-v0.3.6` on commit `5071a22`; workflow run 46062406493 (success):
+  https://github.com/kenil1710/signet/releases/tag/guard-v0.3.6 (`signet-guard-0.3.6.zip` + `.sha256`).
+- Checked after download: SHA-256 matches; `gh attestation verify signet-guard-0.3.6.zip -R kenil1710/signet` exits 0;
+  the zip's manifest says "0.3.6 (build 5071a22 2026-11-27 20:16Z)".
+- Release #17 (sealed, not proposed) links to this release.
+
 ## OKX Wallet refusal by hand (2026-11-28): Guard 0.3.6 build `9727af7`, enforce mode
 
 - **Setup:** a separate Chrome 158 profile, a new empty OKX Wallet 4.26.0, account `0x9598…6ceb` connected, X Layer,
