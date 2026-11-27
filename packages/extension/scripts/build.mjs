@@ -5,6 +5,17 @@ import { build } from 'vite';
 import { rmSync, mkdirSync, copyFileSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadNetwork } from '@signet/contracts/network';
+import { execFileSync } from 'node:child_process';
+
+/// git commit (+ "-dirty" if the tree has changes) and the UTC build time, e.g. "f1d68f4-dirty 2026-11-28 08:12Z"
+function build_id() {
+  let git = 'nogit';
+  try {
+    git = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+    if (execFileSync('git', ['status', '--porcelain', '--', '.'], { cwd: root, encoding: 'utf8' }).trim()) git += '-dirty';
+  } catch { /* not a git checkout */ }
+  return `${git} ${new Date().toISOString().slice(0, 16).replace('T', ' ')}Z`;
+}
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const out = process.env.GUARD_OUT || `${root}dist`;
@@ -58,6 +69,9 @@ const manifest = {
   manifest_version: 3,
   name: 'Signet Guard',
   version: JSON.parse(readFileSync(`${root}package.json`, 'utf8')).version,
+  // shown in chrome://extensions: which build is loaded (an unpacked extension keeps running the files it loaded
+  // until it is reloaded, and every 0.3.6 build has the same version)
+  version_name: `${JSON.parse(readFileSync(`${root}package.json`, 'utf8')).version} (build ${build_id()})`,
   description: "Checks a sealed dApp's website against the release its team published on X Layer, and refuses signatures the team never sealed.",
   minimum_chrome_version: '120',
   background: { service_worker: 'background.js', type: 'module' },
