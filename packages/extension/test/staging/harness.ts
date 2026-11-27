@@ -213,10 +213,13 @@ export interface WalletCall { provider: string; method: string; params: string }
 export interface Session { ctx: BrowserContext; sw: Worker; wallet: WalletCall[]; extId: string; close(): Promise<void> }
 
 /// A mock wallet on every page of the context: window.ethereum and one EIP-6963 provider. Every call is recorded.
-export async function installMockWallet(ctx: BrowserContext, late = false): Promise<WalletCall[]> {
+/// `vendors`: also the wallet globals other wallets use (window.okxwallet and .ethereum, bitkeep.ethereum,
+/// coinbaseWalletExtension, phantom.ethereum, trustwallet, rabby) and one Guard has no name for (someNewWallet).
+export const VENDOR_PATHS = ['window.okxwallet', 'window.okxwallet.ethereum', 'window.bitkeep.ethereum', 'window.coinbaseWalletExtension', 'window.phantom.ethereum', 'window.trustwallet', 'window.rabby', 'window.someNewWallet'];
+export async function installMockWallet(ctx: BrowserContext, late = false, vendors = false): Promise<WalletCall[]> {
   const wallet: WalletCall[] = [];
   await ctx.exposeBinding('__walletCall', (_src, provider: string, method: string, params: string) => void wallet.push({ provider, method, params }));
-  await ctx.addInitScript(({ account, late }) => {
+  await ctx.addInitScript(({ account, late, vendors }) => {
     const make = (name: string) => ({
       isMockWallet: true,
       async request({ method, params }: { method: string; params?: unknown }) {
@@ -237,16 +240,25 @@ export async function installMockWallet(ctx: BrowserContext, late = false): Prom
       const announce = () => window.dispatchEvent(new CustomEvent('eip6963:announceProvider', { detail: Object.freeze({ info: { uuid: '7d1c3a52-0000-4000-8000-000000000001', name: 'Mock Wallet', icon: 'data:,', rdns: 'test.signet.mock' }, provider: announced }) }));
       window.addEventListener('eip6963:requestProvider', announce);
       announce();
+      if (!vendors) return;
+      const w = window as unknown as Record<string, unknown>;
+      w.okxwallet = Object.assign(make('window.okxwallet'), { ethereum: make('window.okxwallet.ethereum') });
+      w.bitkeep = { ethereum: make('window.bitkeep.ethereum') };
+      w.coinbaseWalletExtension = make('window.coinbaseWalletExtension');
+      w.phantom = { ethereum: make('window.phantom.ethereum'), solana: {} };
+      w.trustwallet = make('window.trustwallet');
+      w.rabby = make('window.rabby');
+      w.someNewWallet = Object.assign(make('window.someNewWallet'), { on() {} });
     };
     if (late) setTimeout(install, 0);
     else install();
-  }, { account: USER, late });
+  }, { account: USER, late, vendors });
   return wallet;
 }
 
 /// A fresh browser profile with Guard loaded and a mock wallet on every page (window.ethereum and one
 /// EIP-6963 provider). `late`: the wallet installs itself after the page's first script, as slow wallets do.
-export async function openBrowser(ext: string, o: { origin: string; late?: boolean }): Promise<Session> {
+export async function openBrowser(ext: string, o: { origin: string; late?: boolean; vendors?: boolean }): Promise<Session> {
   const profile = tmp('guard-profile-');
   const ctx = await chromium.launchPersistentContext(profile, {
     channel: 'chromium', headless: true, viewport: { width: 1100, height: 760 },
@@ -257,7 +269,7 @@ export async function openBrowser(ext: string, o: { origin: string; late?: boole
       `--unsafely-treat-insecure-origin-as-secure=${o.origin}`,
     ],
   });
-  const wallet = await installMockWallet(ctx, !!o.late);
+  const wallet = await installMockWallet(ctx, !!o.late, !!o.vendors);
   // up to 90 s: on a fully loaded machine Chromium can take more than the default 30 s to start the worker
   const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker', { timeout: 90000 }));
   const extId = new URL(sw.url()).host;

@@ -10,7 +10,7 @@ import type { Page } from 'playwright';
 import { encodeLabel } from '../../src/lib/label.ts';
 import {
   anvil, net, sealDemoDapp, switchToEnforce, serveSite, rpcProxy, buildExtension, startGateway, openBrowser, until, synced, tabIdOf, badge, events, siteState, signed,
-  DEMO_DIR, DRAINER, DRAIN_DATA, ROUTER, type Project, type Site, type Proxy, type Session,
+  DEMO_DIR, DRAINER, DRAIN_DATA, ROUTER, VENDOR_PATHS, type Project, type Site, type Proxy, type Session,
 } from './harness.ts';
 
 const domain = `guard-${Date.now().toString(36)}.signet.test`;
@@ -23,8 +23,8 @@ let gateway: Awaited<ReturnType<typeof startGateway>>;
 let origin: string;
 const open: Session[] = [];
 
-async function browser(o: { late?: boolean } = {}): Promise<Session> {
-  const s = await openBrowser(ext, { origin, late: o.late });
+async function browser(o: { late?: boolean; vendors?: boolean } = {}): Promise<Session> {
+  const s = await openBrowser(ext, { origin, late: o.late, vendors: o.vendors });
   open.push(s);
   await synced(s, domain);
   return s;
@@ -256,6 +256,41 @@ test('enforce mode (Guard 0.3.5): eth_sign and every signature Guard cannot read
     assert.ok(refused.length >= 3);
     // circuit #7 answered WARN (row with decoded = 0); Guard 0.3.5 refuses on top of it, and says so
     assert.ok(refused.every((e) => e.details.some((d) => /^decided by the Guard circuit, row 0x[0-9a-f]{3}/.test(d)) && e.details.some((d) => /refused in enforce mode: Guard can't read this request/.test(d))), JSON.stringify(refused.map((e) => e.details.slice(-2))));
+    await s.close();
+  }
+});
+
+test('enforce mode (Guard 0.3.6): a direct request through any wallet global (window.okxwallet, okxwallet.ethereum, bitkeep, coinbase, phantom, trust, rabby, an unnamed one) is refused when unsealed and passes when sealed', async () => {
+  for (const late of [false, true]) {
+    const s = await browser({ late, vendors: true });
+    const { page, tab } = await visit(s);
+    await light(s, tab, 'OK');
+    await page.waitForTimeout(300); // the re-checks find the global Guard has no name for
+    const tries = await page.evaluate(async ({ paths, drainer, router }) => {
+      const word = (a: string) => a.toLowerCase().slice(2).padStart(64, '0');
+      const token = '0x1E4a5963aBFD975d8c9021ce480b42188849D41d';
+      const tx = (spender: string) => ({ method: 'eth_sendTransaction', params: [{ from: '0x1111111111111111111111111111111111111111', to: token, data: `0x095ea7b3${word(spender)}${'f'.repeat(64)}` }] });
+      const out: string[] = [];
+      for (const path of paths) {
+        const p = path.split('.').slice(1).reduce<unknown>((o, k) => (o as Record<string, unknown>)[k], window) as { request(a: unknown): Promise<unknown> };
+        for (const [what, spender] of [['unsealed', drainer], ['sealed', router]] as const) {
+          out.push(`${path} ${what}: ${await p.request(tx(spender)).then(() => 'SENT', (e: { code?: number; message: string }) => `${e.code} ${e.message}`)}`);
+        }
+      }
+      return out;
+    }, { paths: VENDOR_PATHS, drainer: DRAINER, router: ROUTER });
+    await dismiss(page);
+    for (const path of VENDOR_PATHS) {
+      assert.match(tries.find((t) => t.startsWith(`${path} unsealed:`))!, /: 4001 Signet Guard refused this signature: Spender not in the sealed allowlist/, `${path} (wallet ${late ? 'late' : 'early'})`);
+      assert.equal(tries.find((t) => t.startsWith(`${path} sealed:`)), `${path} sealed: SENT`, `wallet ${late ? 'late' : 'early'}`);
+    }
+    // the wallet saw exactly one approve per provider, each for the sealed spender, never the drainer
+    const sent = signed(s);
+    assert.deepEqual(sent.map((c) => c.provider).sort(), [...VENDOR_PATHS].sort());
+    assert.ok(sent.every((c) => c.params.includes(ROUTER.toLowerCase().slice(2)) && !c.params.includes(DRAINER.toLowerCase().slice(2))), JSON.stringify(sent));
+    const refused = (await events(s)).filter((e) => e.refused);
+    assert.ok(refused.length >= VENDOR_PATHS.length);
+    assert.ok(refused.every((e) => e.details.some((d) => /^decided by the Guard circuit, row 0x[0-9a-f]{3}/.test(d))), JSON.stringify(refused.map((e) => e.details.at(-1))));
     await s.close();
   }
 });
