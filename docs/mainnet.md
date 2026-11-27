@@ -205,6 +205,14 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #17 sealed (2026-11-28, tier 00), not proposed: wallets tested, said plainly
+
+- `release/17` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`. Differs from
+  #16 only in `docs/CLAIMS.md`, `docs/THREAT_MODEL.md`, `llms.txt` and `start.html` (Rabby: first refusal
+  2026-11-28; OKX Wallet: not protected yet). Allowlist and origins equal #16's: tier 00 (1 approval + 1 h).
+- `pnpm verify:claims`: all passed (11 on mainnet, 11 from the repo).
+- Not proposed: proposing is a mainnet transaction from the CI key and waits for the founder's yes.
+
 ## First refusal with a real wallet (2026-11-28): Rabby, enforce mode
 
 - **Setup:** signetguard.xyz/app (release #16, enforce mode since 2026-11-25), Guard 0.3.5 (the GitHub pre-release),
