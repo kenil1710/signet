@@ -1,4 +1,5 @@
 import type { GuardEvent, PageReport, SiteState } from '../lib/types.ts';
+import { copyOffer } from '../lib/copy.ts';
 
 export interface TabInfo { tab: { domain: string; url: string; report: PageReport | null }; site: Omit<SiteState, 'manifests'>; light: 'green' | 'red' | 'grey'; events: GuardEvent[]; files: number; contracts?: number; decider?: { by: string; why: string | null; at: number } | null }
 export const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -35,15 +36,15 @@ export function headline(i: TabInfo): { title: string; text: string } {
 }
 
 /// "Open the verified copy" only when the current release is stored on-chain in full (background 'copy-state',
-/// lib/copy.ts); otherwise a plain line, never a button that leads to a copy that can't run.
+/// lib/copy.ts) and a gateway runs it (copyOffer); otherwise a plain line, never a button to a copy the wallet cannot use.
 export async function offerCopy(domain: string, slot: HTMLElement, cls = ''): Promise<void> {
-  const st = await send<{ complete: boolean; stored: number; total: number } | null>({ type: 'copy-state', domain }).catch(() => null);
-  if (st?.complete) {
-    slot.outerHTML = `<button id="copy"${cls ? ` class="${cls}"` : ''}>Open the verified copy</button>`;
+  const offer = copyOffer(await send<Parameters<typeof copyOffer>[0]>({ type: 'copy-state', domain }).catch(() => null));
+  if (offer.button) {
+    slot.outerHTML = `<button id="copy"${cls ? ` class="${cls}"` : ''} title="${esc(offer.title)}">${esc(offer.text)}</button>`;
     document.getElementById('copy')!.onclick = () => void send({ type: 'open-copy', domain });
     return;
   }
   slot.className = 'nocopy';
-  slot.textContent = 'Verified copy: available with Pro';
-  slot.title = st ? `This release isn't stored on X Layer in full (${st.stored} of ${st.total} files).` : 'Guard could not read the stored copy.';
+  slot.textContent = offer.text;
+  slot.title = offer.title;
 }

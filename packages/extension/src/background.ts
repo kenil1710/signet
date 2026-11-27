@@ -462,7 +462,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       if (site.status !== 'sealed' || !sealed || !site.container) return null;
       const key = `copy:${site.container}:${site.prefix}:${site.current}`;
       const known = await get<CopyState>(session, key);
-      if (known) return known;
+      if (known) return { ...known, gateway: !!NET.gateway };
       const datas = await callOne(NET.rpcUrl, sealed.files.map((f) => call(NET.siteRegistry, siteAbi, 'fileInfo', [site.container, site.prefix + f.path])), await commonHead(NET));
       const infos = datas.map((d): StoredInfo => {
         if (d === 'revert') return null;
@@ -471,7 +471,7 @@ async function handle(msg: Msg, sender: chrome.runtime.MessageSender): Promise<u
       });
       const state = fullCopy(sealed.files, infos);
       await session.set({ [key]: state });
-      return state;
+      return { ...state, gateway: !!NET.gateway };
     }
     case 'copy-file': {
       const site = await siteFor(msg.domain);

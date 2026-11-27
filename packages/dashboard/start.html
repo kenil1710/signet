@@ -145,7 +145,7 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
           <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
           <li>Click <b>Load unpacked</b> and choose the unzipped folder (the one with <code>manifest.json</code>).</li>
         </ol>
-        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Wallets tested: <b>Rabby</b>, by hand on X Layer mainnet (2026-11-25: a sealed action on signetguard.xyz reached Rabby, nothing was refused by mistake). Not tested yet: MetaMask, OKX Wallet. The automated tests use a mock wallet that records every request. In enforce mode it refuses <code>eth_sign</code> and any signature it can't read.</p>
+        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Tested by hand on X Layer mainnet: <b>Rabby</b> works (2026-11-25: a sealed action reached Rabby, nothing was refused by mistake; 2026-11-28: an unsealed transaction was refused and Rabby never opened). <b>OKX Wallet is not protected yet</b>: Guard can’t wrap OKX’s providers, so a request reaches OKX unchecked; a fix is being built. Not tested yet: MetaMask. The automated tests use a mock wallet that records every request. In enforce mode it refuses <code>eth_sign</code> and any signature it can't read.</p>
       </section>
       <section class="step" id="faq"><h2>Questions</h2>
         <dl class="faq">

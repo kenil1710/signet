@@ -205,6 +205,23 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## First refusal with a real wallet (2026-11-28): Rabby, enforce mode
+
+- **Setup:** signetguard.xyz/app (release #16, enforce mode since 2026-11-25), Guard 0.3.5 (the GitHub pre-release),
+  Rabby connected with approver A's address `0xB9ef…2416`, chain X Layer. By hand, in the founder's normal profile.
+- **Unsealed request:** `eth_sendTransaction` to `0x…dEaD` (0 OKB, no data), sent from the console through
+  `window.rabby`. Guard showed its refusal page ("Signature refused · Contract not in the sealed allowlist · Nothing
+  was sent to your wallet") and **Rabby never opened**. The first time a refusal by Guard has been seen with a real
+  wallet; before this, every refusal was with the mock wallet (the 2026-11-25 Rabby test only checked that a sealed
+  action went through).
+- **Not clean yet:** the console printed nothing for the refused request (its promise should reject with 4001), and a
+  sealed call sent afterwards didn't open Rabby either. Not reproduced headless with the same Rabby build (rejects with
+  4001 in ~1 s, also with OKX installed alongside); Guard 0.3.6 answers the page before drawing the notice. To check
+  again by hand.
+- **OKX Wallet 4.26.0, same day, Guard 0.3.6 test build:** not intercepted. Unsealed requests through
+  `window.okxwallet` and `window.ethereum` opened OKX; Guard was never asked. Root cause and fix: `docs/decisions.md`
+  (2026-11-28).
+
 ## Release #16 published (2026-11-26, tier 00)
 
 - Approved by approver A at 10:51:17 UTC (16:21 IST), publishable from 11:51:17 UTC.

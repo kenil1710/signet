@@ -82,7 +82,8 @@ at the end).
 - **WEBCAT enforces CSP** from the signed manifest, and **needs no blockchain, gas or wallet** for anyone. It uses
   established public infrastructure (Sigstore, Sigsum).
 - **Both are audited by more eyes** and have real deployments. Signet's attack results are from a fork (staging),
-  and Guard has been tested by hand with one real wallet (Rabby, on X Layer mainnet), not yet with MetaMask or OKX Wallet.
+  and Guard has been tested by hand with one real wallet that works (Rabby, on X Layer mainnet); it does not protect OKX Wallet
+  yet (2026-11-28) and is not tested with MetaMask.
 - **WEBCAT's preload list** avoids even sealed-domain lookups at browse time. Guard reads the chain for sealed
   domains (none for unsealed ones).
 

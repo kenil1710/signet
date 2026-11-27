@@ -126,8 +126,9 @@ extension defeats it.
   optional: any approver can still freeze. Naming a new one is tier 11 (3 of 3 + 24 h).
 - **One person holds the keys.** Approvers A, B and C on both gates are three separate wallets on three separate devices, held by one person (Signet is built by a solo founder), as is the recovery address. No single key can publish a release, but one person holds every key. The design is meant for three different people, and a real team should use three.
 
-Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). Wallets tested: Rabby, by hand on X Layer mainnet
-(2026-11-25, no false refusal). Not tested yet: MetaMask, OKX Wallet. The automated suites use a mock wallet. The gateway runs on staging.
+Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). Tested by hand on X Layer mainnet: Rabby works
+(no false refusal on 2026-11-25; an unsealed transaction refused before Rabby opened on 2026-11-28). **OKX Wallet is not protected yet**
+(Guard can't wrap OKX 4.26.0's providers; a fix is being built). Not tested yet: MetaMask. The automated suites use a mock wallet. The gateway runs on staging.
 The watchtower checks signetguard.xyz (not misthos.world yet) every 5 minutes, started by a Cloudflare Worker cron
 (GitHub's own schedule, which ran every 4–12 hours, is only a fallback), and publishes its result, including its last
 run of `/prove`. Telegram alerts to the team's chat are set up (a test alert was accepted by Telegram on 2026-11-20,

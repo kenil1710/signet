@@ -10,6 +10,7 @@
 // the pending records synchronously and runs a fresh full check, so a script that runs and signs at once is seen.
 import { notFoundPath, pathOfUrl, sealedPathFor } from './lib/sealed.ts';
 import { decideRecheck } from './lib/recheck.ts';
+import { copyOffer } from './lib/copy.ts';
 import { HOLD_MS, POLL_MS } from './lib/hold.ts';
 import { classifyInline, inlineHash, runs } from '@signet/cli/src/inline.ts';
 import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts';
@@ -361,8 +362,13 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
       const known = redirecting || (info.enforce && (info.site === 'revoked' || last?.status === 'tampered'));
       return void down({ type: 'decision', id, refused: known, message: known ? "This page doesn't match its sealed release. Don't sign." : '' });
     }
-    if (d.refused && !redirecting) showRefusal(d);
+    // the page's promise is answered first: a refused request always rejects with 4001, whatever the notice does
     down({ type: 'decision', id, refused: d.refused, message: `${d.title}. ${d.reason}` });
+    if (d.refused && !redirecting) {
+      try {
+        showRefusal(d);
+      } catch { /* the notice is a courtesy; the refusal already happened */ }
+    }
   }
 
   // ---- the full-page notice for a refused signature
@@ -390,13 +396,29 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
           <ul>${d.details.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
           <p class="small">Nothing was sent to your wallet. The team that runs this site sealed a list of contracts it may ask you to sign for; this request is outside that list.</p>
           <button class="main" id="close">Back to the site</button>
-          <button id="copy">Open verified copy</button>
+          <span id="copyslot" class="small">Verified copy: checking…</span>
           <button id="wrong">Report wrong block</button>
           <p class="small" id="msg" aria-live="polite"></p>
         </div>
       </div>`;
     root.getElementById('close')!.addEventListener('click', () => host.remove());
-    root.getElementById('copy')!.addEventListener('click', () => void ask({ type: 'open-copy', domain: info!.domain }));
+    // the same rule as the popup and the warning page (lib/copy.ts): a button only for a copy the wallet can use
+    void ask<Parameters<typeof copyOffer>[0]>({ type: 'copy-state', domain: info!.domain }).then((st) => {
+      const slot = root.getElementById('copyslot');
+      if (!slot) return;
+      const offer = copyOffer(st);
+      if (!offer.button) {
+        slot.textContent = offer.text;
+        slot.title = offer.title;
+        return;
+      }
+      const b = document.createElement('button');
+      b.id = 'copy';
+      b.textContent = offer.text;
+      b.title = offer.title;
+      b.addEventListener('click', () => void ask({ type: 'open-copy', domain: info!.domain }));
+      slot.replaceWith(b);
+    });
     root.getElementById('wrong')!.addEventListener('click', async () => {
       const text = await ask<string>({ type: 'wrong-block', domain: info!.domain, note: `${d.title}: ${d.details.join('; ')}` });
       try {
