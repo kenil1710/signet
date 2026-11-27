@@ -36,11 +36,30 @@
       } else if (m.type === 'decision' && m.id !== undefined) {
         asks.get(m.id)?.({ refused: !!m.refused, message: m.message ?? '' });
         asks.delete(m.id);
+      } else if (m.type === 'wallet-info' && m.id !== undefined) {
+        void walletInfo((m as { wallet?: string | null }).wallet ?? null).then((v) => up({ type: 'wallet-info', id: m.id, ...v }));
       }
     });
     up({ type: 'ack' });
   });
   dispatch(new CE('signet-guard:hello'));
+
+  /// For a request Guard caught on a wallet's own channel (content.ts, lib/wire.ts): that wallet's chain and accounts,
+  /// read with non-signing calls on its provider. The channel name says which wallet ("okexwallet" -> window.okxwallet).
+  const CHANNEL: Record<string, string[]> = { okexwallet: ['okxwallet'], rabby: ['rabby'], bitkeep: ['bitkeep', 'ethereum'], metamask: ['ethereum'] };
+  async function walletInfo(wallet: string | null): Promise<{ chainId: string | null; accounts: string[] }> {
+    let p: unknown;
+    try {
+      const path = (wallet && CHANNEL[wallet]) || ['ethereum'];
+      p = path.reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], window);
+      if (!p || typeof (p as { request?: unknown }).request !== 'function') p = (window as unknown as { ethereum?: unknown }).ethereum;
+    } catch { /* ignore */ }
+    const rq = p && typeof (p as { request?: unknown }).request === 'function' ? (a: Args) => (p as { request: Request }).request(a) : null;
+    if (!rq) return { chainId: null, accounts: [] };
+    const chainId = await rq({ method: 'eth_chainId' }).catch(() => null);
+    const accounts = await rq({ method: 'eth_accounts' }).catch(() => []);
+    return { chainId: typeof chainId === 'string' ? chainId : null, accounts: Array.isArray(accounts) ? accounts.filter((x) => typeof x === 'string') : [] };
+  }
 
   /// Is this a sealed domain? Unknown for longer than 3 s (no content script) counts as no: fail-open.
   const isSealed = (): Promise<boolean> =>

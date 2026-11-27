@@ -258,12 +258,15 @@ export async function installMockWallet(ctx: BrowserContext, late = false, vendo
 
 /// A fresh browser profile with Guard loaded and a mock wallet on every page (window.ethereum and one
 /// EIP-6963 provider). `late`: the wallet installs itself after the page's first script, as slow wallets do.
-export async function openBrowser(ext: string, o: { origin: string; late?: boolean; vendors?: boolean }): Promise<Session> {
+/// A test wallet extension built like OKX Wallet 4.26.0 (non-configurable globals, a provider that ignores
+/// assignments, requests over window.postMessage): Guard can't wrap it and must check its channel instead.
+export const OKX_LIKE_WALLET = fileURLToPath(new URL('./okx-like-wallet', import.meta.url));
+export async function openBrowser(ext: string, o: { origin: string; late?: boolean; vendors?: boolean; extensions?: string[] }): Promise<Session> {
   const profile = tmp('guard-profile-');
   const ctx = await chromium.launchPersistentContext(profile, {
     channel: 'chromium', headless: true, viewport: { width: 1100, height: 760 },
     args: [
-      `--disable-extensions-except=${ext}`, `--load-extension=${ext}`,
+      `--disable-extensions-except=${[ext, ...(o.extensions ?? [])].join(',')}`, `--load-extension=${[ext, ...(o.extensions ?? [])].join(',')}`,
       '--host-resolver-rules=MAP *.signet.test 127.0.0.1, MAP *.example.test 127.0.0.1',
       // the staging site is plain http on a made-up host; real sites are https (crypto.subtle needs a secure context)
       `--unsafely-treat-insecure-origin-as-secure=${o.origin}`,

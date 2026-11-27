@@ -36,7 +36,8 @@ is synced or uploaded. Removing the extension removes all of it.
 ## Your wallet's requests
 
 On a sealed site, Guard wraps the page's wallet providers (`window.ethereum`, wallet globals such as `window.okxwallet`, and
-EIP-6963 providers) so it can check each signature request
+EIP-6963 providers), and reads the requests a wallet's page script passes to its own content script on the page, so it
+can check each signature request
 against the sealed release before your wallet shows it. In observe mode (the default) it only reports; when the site's
 team turned on enforce mode, it refuses requests to contracts and spenders the team didn't seal. It doesn't record the
 requests anywhere.

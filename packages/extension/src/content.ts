@@ -11,6 +11,7 @@
 import { notFoundPath, pathOfUrl, sealedPathFor } from './lib/sealed.ts';
 import { decideRecheck } from './lib/recheck.ts';
 import { copyOffer } from './lib/copy.ts';
+import { requestKey, signRequestIn, type WireRequest } from './lib/wire.ts';
 import { HOLD_MS, POLL_MS } from './lib/hold.ts';
 import { classifyInline, inlineHash, runs } from '@signet/cli/src/inline.ts';
 import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts';
@@ -69,9 +70,10 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
   const down = (m: unknown) => document.dispatchEvent(new CustomEvent(`sg:${secret}:down`, { detail: JSON.stringify(m) }));
   const offer = () => document.dispatchEvent(new CustomEvent('signet-guard:init', { detail: secret }));
   document.addEventListener(`sg:${secret}:up`, (e) => {
-    const m = JSON.parse((e as CustomEvent).detail as string) as { type: string; id: number; req: unknown };
+    const m = JSON.parse((e as CustomEvent).detail as string) as { type: string; id: number; req: unknown; chainId?: string | null; accounts?: string[] };
     if (m.type === 'ack') linked = true;
     else if (m.type === 'sign') void onSign(m.id, m.req);
+    else if (m.type === 'wallet-info') walletAsks.get(m.id)?.({ chainId: m.chainId ?? null, accounts: Array.isArray(m.accounts) ? m.accounts : [] });
   });
   document.addEventListener('signet-guard:hello', () => {
     if (!linked) offer();
@@ -86,7 +88,73 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
     }
   };
 
+  // ---- Guard 0.3.6: the wallet's own channel (lib/wire.ts). A wallet's page script hands each request to its
+  // content script with window.postMessage. This capture listener runs before the wallet's listener (measured with
+  // OKX 4.26.0 in both load orders), holds a signing request until Guard decides, and posts the frame again if it is
+  // allowed. It covers wallets whose provider object can't be wrapped (OKX). On a domain that isn't sealed it does
+  // nothing once that is known; until then (the first few milliseconds) a signing frame waits for that answer.
+  const decided = new Map<string, number>(); // requests the page-world wrapper got "allowed" for: key -> time
+  const passOnce = new Map<string, number>(); // frames Guard posts again after an allow
+  let passUnkeyed = 0; // the same, for a frame that isn't JSON (only ever allowed in observe mode)
+  const walletAsks = new Map<number, (v: { chainId: string | null; accounts: string[] }) => void>();
+  let nextWalletAsk = 1;
+  const targetOrigin = location.origin === 'null' ? '*' : location.origin;
+  const frameKey = (data: unknown): string | null => {
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return null;
+    }
+  };
+  /// The chain and accounts of the wallet behind a frame, read by the page-world script (a non-signing call)
+  const walletInfo = (wallet: string | null) => new Promise<{ chainId: string | null; accounts: string[] }>((res) => {
+    const id = nextWalletAsk++;
+    walletAsks.set(id, (v) => { walletAsks.delete(id); res(v); });
+    setTimeout(() => { if (walletAsks.delete(id)) res({ chainId: null, accounts: [] }); }, 3000);
+    down({ type: 'wallet-info', id, wallet });
+  });
+  const repost = (data: unknown, key: string | null) => {
+    if (key) passOnce.set(key, (passOnce.get(key) ?? 0) + 1);
+    else passUnkeyed++;
+    window.postMessage(data, targetOrigin);
+  };
+  window.addEventListener('message', (e) => {
+    if (e.source !== window) return; // wallets only take frames a page posts to itself
+    if (infoKnown && !info) return; // not a sealed domain: Guard stays out of the way
+    const req = signRequestIn(e.data);
+    if (!req) return;
+    const key = frameKey(e.data);
+    if (key ? (passOnce.get(key) ?? 0) > 0 : passUnkeyed > 0) {
+      if (key) passOnce.set(key, passOnce.get(key)! - 1);
+      else passUnkeyed--;
+      return; // Guard's own repost of an allowed frame
+    }
+    const rk = requestKey(req.method, req.params);
+    const at = rk ? decided.get(rk) : undefined;
+    if (rk && at !== undefined && Date.now() - at < 60_000) {
+      decided.delete(rk);
+      return; // the page-world wrapper already got this exact request allowed
+    }
+    e.stopImmediatePropagation();
+    void onWire(e.data, key, req);
+  }, true);
+
+  async function onWire(data: unknown, key: string | null, req: WireRequest): Promise<void> {
+    await infoReady;
+    if (!info) return repost(data, key);
+    const w = await walletInfo(req.wallet);
+    const readable = requestKey(req.method, req.params) !== null;
+    const r = await decideSign({ method: req.method, params: readable ? req.params : [], chainId: w.chainId, accounts: w.accounts });
+    if (!r.refused) return repost(data, key);
+    // refused: the wallet never sees it; the page gets a 4001 when the wallet's reply format is known
+    if (req.reply) window.postMessage(req.reply(4001, `Signet Guard refused this signature: ${r.message}`), targetOrigin);
+    r.show();
+  }
+
   let info: PageInfo | null = null;
+  let infoKnown = false; // the first answer to "is this a sealed domain?" arrived
+  let infoReadyDone: () => void = () => {};
+  const infoReady = new Promise<void>((r) => (infoReadyDone = r));
   let last: PageReport | null = null;
   let redirecting = false;
   let rechecked = false;
@@ -350,9 +418,12 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
   }
 
   // ---- signing requests
-  async function onSign(id: number, req: unknown): Promise<void> {
+  /// Guard's decision on one signing request (from the page-world wrapper or the wallet's channel). `show` draws the
+  /// refusal notice; callers answer the page first, then call it.
+  async function decideSign(req: unknown): Promise<{ refused: boolean; message: string; show: () => void }> {
+    const none = () => {};
     scanNow(); // synchronously, before anything else: a script that inserted itself and signed at once is now recorded
-    if (!info) return void down({ type: 'decision', id, refused: false });
+    if (!info) return { refused: false, message: '', show: none };
     await Promise.race([first, new Promise((r) => setTimeout(r, 5000))]);
     await Promise.race([checkFresh(), new Promise((r) => setTimeout(r, 8000))]); // the page as it is at signing time
     const d = await ask<Decision>({ type: 'sign', req });
@@ -360,15 +431,28 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
       // No answer: the extension is gone, or Guard itself is taking the tab to the warning page and the answer was
       // lost with the page. Fail-open only if nothing here is known to be wrong.
       const known = redirecting || (info.enforce && (info.site === 'revoked' || last?.status === 'tampered'));
-      return void down({ type: 'decision', id, refused: known, message: known ? "This page doesn't match its sealed release. Don't sign." : '' });
+      return { refused: known, message: known ? "This page doesn't match its sealed release. Don't sign." : '', show: none };
     }
-    // the page's promise is answered first: a refused request always rejects with 4001, whatever the notice does
-    down({ type: 'decision', id, refused: d.refused, message: `${d.title}. ${d.reason}` });
-    if (d.refused && !redirecting) {
+    const show = () => {
+      if (!d.refused || redirecting) return;
       try {
         showRefusal(d);
       } catch { /* the notice is a courtesy; the refusal already happened */ }
+    };
+    return { refused: d.refused, message: `${d.title}. ${d.reason}`, show };
+  }
+
+  async function onSign(id: number, req: unknown): Promise<void> {
+    const r = await decideSign(req);
+    if (!r.refused) {
+      // allowed: when the same request now travels on the wallet's channel, it isn't asked about again
+      const q = req as { method?: string; params?: unknown };
+      const rk = typeof q?.method === 'string' ? requestKey(q.method, q.params) : null;
+      if (rk) decided.set(rk, Date.now());
     }
+    // the page's promise is answered first: a refused request always rejects with 4001, whatever the notice does
+    down({ type: 'decision', id, refused: r.refused, message: r.message });
+    r.show();
   }
 
   // ---- the full-page notice for a refused signature
@@ -434,6 +518,8 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
   // ---- start
   void (async () => {
     info = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href });
+    infoKnown = true;
+    infoReadyDone();
     // tell the page's wallet wrapper at once: on a sealed domain every signature waits for Guard's decision, which
     // waits for the first check below (so for the domain proof too). Never a fail-open window while the proof loads.
     down({ type: 'state', sealed: !!info });
