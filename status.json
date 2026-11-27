@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-27T11:31:42.818Z",
+  "updatedAt": "2026-11-27T11:36:28.388Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-27T11:31:42.817Z",
+      "checkedAt": "2026-11-27T11:36:28.388Z",
       "release": 16
     }
   ],
@@ -15,8 +15,8 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-27T11:31:50.639Z",
-    "block": "77010066",
+    "checkedAt": "2026-11-27T11:36:36.023Z",
+    "block": "77010351",
     "summary": "All checks passed (0 pending deployment). Checked in 7.4 s.",
     "rows": [
       {
