@@ -261,6 +261,12 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
 - CI key after #16's publish: 0.002858 OKB.
 
+## Release #17 proposed (2026-11-28, tier 00): Guard tested by hand with Rabby and OKX Wallet, Guard 0.3.6 links
+
+- Proposed by the CI key at 04:56:10 UTC: tx [`0x111c1abb…fdd0`](https://web3.okx.com/explorer/x-layer/tx/0x111c1abb8e376c85ba09a6132f0afdb45ad1e8c4e73a9c23cab39934331fdfd0) (block 77,072,734, 168,984 gas), manifest `0x7557ac04…87a1`. Tier 00 (allowlist and origins equal #16's): 1 approval + 1 h.
+- Changes: CLAIMS, THREAT_MODEL, llms.txt and /start say "Guard tested by hand with Rabby and OKX Wallet (refusals work); OKX needs Guard 0.3.6; not tested: MetaMask"; the Guard links point to guard-v0.3.6.
+- CI key after the proposal: 0.002854 OKB.
+
 ## Release #16 proposed (2026-11-26, tier 00): who holds Signet's keys, said plainly
 
 - Proposed by the CI key at 10:32:13 UTC: tx [`0x85b7ebbd…34a9`](https://web3.okx.com/explorer/x-layer/tx/0x85b7ebbd1f4b2a1d1f7c0a68a74221c342aaf1b2ebb0a572e2b3e142250c34a9) (block 76,920,097, 168,996 gas), manifest `0xdd814e6c…e894`. Tier 00 (allowlist and origins equal #15's): 1 approval + 1 h.
