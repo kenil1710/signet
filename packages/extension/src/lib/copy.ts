@@ -18,14 +18,14 @@ export function fullCopy(files: SealedFile[], infos: StoredInfo[]): CopyState {
 
 /// What Guard offers as the verified copy, the same everywhere (popup, warning page, refusal notice). A button only
 /// when the copy is usable: a gateway is configured (the copy runs on its own origin, where the wallet works) and
-/// every file of the current release is stored on-chain with its sealed size and hash. Otherwise a plain line that
-/// says what the site says: the verified copy comes with Pro. (The read-only preview inside the extension is not
-/// offered as the verified copy.)
+/// every file of the current release is stored on-chain with its sealed size and hash. Otherwise a plain line:
+/// "coming soon" (0.3.8; no gateway is deployed yet). (The read-only preview inside the extension is not offered as
+/// the verified copy.)
 export function copyOffer(st: (CopyState & { gateway?: boolean }) | null): { button: boolean; text: string; title: string } {
   if (st?.complete && st.gateway) return { button: true, text: 'Open the verified copy', title: 'A copy of the sealed release, read from X Layer, every file hash-checked.' };
   const title = !st ? 'Guard could not read the stored copy.'
-    : !st.gateway ? "The verified copy runs on Signet's gateway, which comes with Pro."
+    : !st.gateway ? "The verified copy runs on Signet's gateway, which isn't deployed yet."
     : `This release isn't stored on X Layer in full (${st.stored} of ${st.total} files).`;
-  return { button: false, text: 'Verified copy: available with Pro', title };
+  return { button: false, text: 'Verified copy: coming soon', title };
 }
 

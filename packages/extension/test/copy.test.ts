@@ -22,15 +22,15 @@ test('hash compared case-insensitively; an empty release is never complete', () 
   assert.equal(fullCopy([], []).complete, false);
 });
 
-// One rule for the popup, the warning page and the refusal notice: the site says the verified copy comes with Pro,
+// One rule for the popup, the warning page and the refusal notice: no gateway is deployed yet, so the copy is "coming soon",
 // so Guard shows a button only for a copy the wallet can use (a gateway, and every file stored).
-test('copyOffer: a button only with a gateway and a complete copy; otherwise "Verified copy: available with Pro"', () => {
+test('copyOffer: a button only with a gateway and a complete copy; otherwise "Verified copy: coming soon"', () => {
   assert.deepEqual(copyOffer({ complete: true, stored: 3, total: 3, gateway: true }), { button: true, text: 'Open the verified copy', title: 'A copy of the sealed release, read from X Layer, every file hash-checked.' });
   const noGateway = copyOffer({ complete: true, stored: 3, total: 3, gateway: false });
-  assert.deepEqual([noGateway.button, noGateway.text], [false, 'Verified copy: available with Pro']);
-  assert.match(noGateway.title, /gateway, which comes with Pro/);
+  assert.deepEqual([noGateway.button, noGateway.text], [false, 'Verified copy: coming soon']);
+  assert.match(noGateway.title, /gateway, which isn't deployed yet/);
   const partial = copyOffer({ complete: false, stored: 1, total: 3, gateway: true });
-  assert.deepEqual([partial.button, partial.text, partial.title], [false, 'Verified copy: available with Pro', "This release isn't stored on X Layer in full (1 of 3 files)."]);
-  assert.deepEqual([copyOffer(null).button, copyOffer(null).text], [false, 'Verified copy: available with Pro']);
+  assert.deepEqual([partial.button, partial.text, partial.title], [false, 'Verified copy: coming soon', "This release isn't stored on X Layer in full (1 of 3 files)."]);
+  assert.deepEqual([copyOffer(null).button, copyOffer(null).text], [false, 'Verified copy: coming soon']);
   assert.equal(copyOffer({ complete: true, stored: 3, total: 3 }).button, false, 'an older answer without the gateway flag: no button');
 });

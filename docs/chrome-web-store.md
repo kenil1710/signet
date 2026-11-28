@@ -1,22 +1,19 @@
-# Chrome Web Store submission: Signet Guard 0.3.7
+# Chrome Web Store submission: Signet Guard 0.3.8
 
 Everything the Developer Dashboard asks for. Nothing here has been submitted; the team submits it (Chrome Web Store
-developer account, one-time USD 5 registration fee, paid by card to Google: **no OKB**). Updated 2026-11-28 for 0.3.7.
+developer account, one-time USD 5 registration fee, paid by card to Google: **no OKB**). Updated 2026-11-28 for 0.3.8.
 
 ## Package
 
-Upload the zip attached to the GitHub pre-release `guard-v0.3.7`
-(https://github.com/kenil1710/signet/releases/tag/guard-v0.3.7), not a local build: `signet-guard-0.3.7.zip`, built
-by the `guard-release` workflow (mainnet build, files sorted, fixed timestamps), with a Sigstore attestation
-(`gh attestation verify signet-guard-0.3.7.zip -R kenil1710/signet`) and its SHA-256 in `signet-guard-0.3.7.zip.sha256`.
-Its `version_name` is "0.3.7 (build 5f28338 2026-11-28 09:02Z)", the build tested by hand. Store icon: the seal
-(`packages/extension/src/pages/assets/seal-still.webp`) as a 128×128 PNG, 96 px art centered.
+Upload the zip attached to the GitHub pre-release `guard-v0.3.8` (made by the `guard-release` workflow when the tag is
+pushed; not released yet), not a local build: `signet-guard-0.3.8.zip` (mainnet build, files sorted, fixed timestamps),
+with a Sigstore attestation (`gh attestation verify signet-guard-0.3.8.zip -R kenil1710/signet`) and its SHA-256 in
+`signet-guard-0.3.8.zip.sha256`. 0.3.8 adds the icons the store needs (16/32/48/128, from the seal image) and says
+"Verified copy: coming soon". Store icon: the manifest's 128 px icon (96 px art centered).
 
-Manifest facts the review will see: Manifest V3, version 0.3.7, permissions `storage`, `alarms`; 6 host permissions
+Manifest facts the review will see: Manifest V3, version 0.3.8, permissions `storage`, `alarms`; 6 host permissions
 (two X Layer RPC nodes, four Arc RPC nodes); two content scripts on `http://*/*` and `https://*/*` at
-`document_start` in all frames (one isolated, one in the page world); no remote code; no `icons` key in the manifest
-(Chrome shows a letter in the toolbar; the store icon is uploaded separately; adding manifest icons is a later
-release, not done in the code freeze).
+`document_start` in all frames (one isolated, one in the page world); icons 16/32/48/128; no remote code.
 
 ## Store listing
 
@@ -62,7 +59,7 @@ Checks dApp websites against the release their team sealed on X Layer, and refus
 1. `1-sealed.png`: a sealed site, green; the popup shows the sealed release.
 2. `2-signature-refused.png`: enforce mode refuses a signature to an unsealed contract.
 3. `3-page-mismatch.png`: a tampered script: the page doesn't match its sealed release.
-4. `4-verified-copy.png`: the verified copy offered on a hijacked site.
+4. `4-verified-copy.png`: the verified copy offered on a hijacked site. Leave it out until a gateway is deployed (Guard 0.3.8 says "coming soon").
 
 They come from the staging test suite (real Guard pages on a staging test domain, Guard 0.3.x). Optional: retake 1–3
 at 1280×800 during the video demo on swap.localhost (same pages, newer build). No promo tile is required.
@@ -94,7 +91,7 @@ transmitted). Certify all three statements (not sold; not used for unrelated pur
 
 ## Before you click Submit
 
-- Upload `signet-guard-0.3.7.zip` from the GitHub release (not a local build) and check the dashboard shows version 0.3.7.
+- Upload `signet-guard-0.3.8.zip` from the GitHub release (not a local build) and check the dashboard shows version 0.3.8 and the seal icon.
 - Review can take several days; extensions with content scripts on all sites often get a longer review.
 - After approval: put the store link in the site (`chromeWebStore` in `packages/dashboard/src/landing/config.ts`, now a
   "coming soon" link) in a later site release, and say "in the Chrome Web Store" only after that.

@@ -1,7 +1,7 @@
 // Guard 0.3.4 on staging: (1) a sealed 404.html, served with HTTP 404 for unknown paths (as Cloudflare Pages does),
 // is checked like any page: the sealed bytes are OK, other bytes are not; (2) the popup offers "Open the verified copy"
 // only when the current release is stored on-chain in full and a gateway runs the copy (Guard 0.3.6, lib/copy.ts
-// copyOffer), and says "Verified copy: available with Pro" otherwise, as the site does.
+// copyOffer), and says "Verified copy: coming soon" otherwise, as the site does.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, readFileSync, writeFileSync } from 'node:fs';
@@ -76,15 +76,15 @@ after(async () => {
   rpcB?.close();
 });
 
-test('a release stored in full (publish --full): "Open the verified copy" only when a gateway runs it; without one, "available with Pro"', async () => {
+test('a release stored in full (publish --full): "Open the verified copy" only when a gateway runs it; without one, "coming soon"', async () => {
   await release({ full: true });
-  // no gateway (the mainnet build today): the site says the verified copy comes with Pro, and so does Guard
+  // no gateway (the mainnet build today): no gateway is deployed, so Guard says the verified copy is coming soon
   const s = await browser();
   const { tab } = await visit(s, '/');
   await until('green', async () => (await badge(s, tab)) === 'OK', 20000);
   const c = await popupCopy(s, tab);
   assert.ok(!c.button, c.text);
-  assert.match(c.text, /Verified copy: available with Pro/);
+  assert.match(c.text, /Verified copy: coming soon/);
   await s.close();
   // with a gateway: the button
   const gw = await startGateway(rpcA.url, rpcB.url);
@@ -120,13 +120,13 @@ test('an unknown path: HTTP 404 with the sealed 404.html is green; other bytes a
   await s.close();
 });
 
-test('a release not stored in full: no button, the popup says "Verified copy: available with Pro"', async () => {
+test('a release not stored in full: no button, the popup says "Verified copy: coming soon"', async () => {
   await release({ full: false });
   const s = await browser();
   const { tab } = await visit(s, '/');
   await until('green', async () => (await badge(s, tab)) === 'OK', 20000);
   const c = await popupCopy(s, tab);
   assert.equal(c.button, false, c.text);
-  assert.match(c.text, /Verified copy: available with Pro/);
+  assert.match(c.text, /Verified copy: coming soon/);
   await s.close();
 });

@@ -63,6 +63,10 @@ for (const f of ['popup.html', 'blocked.html', 'copy.html', 'sandbox.html', 'pag
 // fonts and the seal image, bundled (the pages make no network request)
 mkdirSync(`${out}/assets`, { recursive: true });
 for (const f of ['archivo-subset.woff2', 'ibm-plex-mono-latin-400-normal.woff2', 'ibm-plex-mono-latin-500-normal.woff2', 'seal-still.webp']) copyFileSync(`${root}src/pages/assets/${f}`, `${out}/assets/${f}`);
+// 0.3.8: the extension's icons (toolbar, chrome://extensions, the Chrome Web Store), from the seal image
+const ICONS = { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png', 48: 'icons/icon-48.png', 128: 'icons/icon-128.png' };
+mkdirSync(`${out}/icons`, { recursive: true });
+for (const f of Object.values(ICONS)) copyFileSync(`${root}src/pages/assets/${f}`, `${out}/${f}`);
 
 const rpcHosts = [...new Set([net.rpcUrl, net.rpcUrl2, ...Object.values(net.chains).flatMap((c) => [c.rpcUrl, c.rpcUrl2])].filter(Boolean).map((u) => `${new URL(u).origin}/*`))];
 const manifest = {
@@ -75,7 +79,8 @@ const manifest = {
   description: "Checks a sealed dApp's website against the release its team published on X Layer, and refuses signatures the team never sealed.",
   minimum_chrome_version: '120',
   background: { service_worker: 'background.js', type: 'module' },
-  action: { default_title: 'Signet Guard', default_popup: 'popup.html' },
+  icons: ICONS,
+  action: { default_title: 'Signet Guard', default_popup: 'popup.html', default_icon: { 16: ICONS[16], 32: ICONS[32] } },
   permissions: ['storage', 'alarms'],
   host_permissions: rpcHosts, // only the RPCs (X Layer, and per chain for factory rules); pages are reached through content scripts
   content_scripts: [
