@@ -28,7 +28,7 @@ sent (project rule: every mainnet transaction is shown with its cost first). Mac
 | Recovery | `0x69400a5f15F6b2D84AAB70989B32266010E6cD93` |
 | Guardian (freeze only) | **none** since 2026-11-24 (signet-ops `0x9275…E291` removed by approvers A and B with `voteRemoveGuardian()`: its keystore password was lost, see "Plan B" below). Before: signet-ops 2026-11-23 → 24 (tier-11 `SetGuardian`, proposal #6); signet-dev until 2026-11-20, then none |
 
-Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#16** (published 2026-11-26); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). See the "Release #…" sections below.
+Mode: **enforce** since 2026-11-25 12:25:10 UTC (approver A, see "Enforce mode on" below); observe before (a new gate starts there). Current release: **#18** (published 2026-11-28, tx `0x2711e42f…ba0f`); #3, #4 and #5 were published 2026-11-20; #6 was the tier-11 guardian change (2026-11-23). Release numbers are the gate's proposal ids, shared with admin proposals: #1 and #2 expired unpublished and #6 was an admin change, so #18 is the 15th published site release. See the "Release #…" sections below.
 
 ## Transactions (all from signet-dev, in order)
 
@@ -205,61 +205,18 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Guard 0.3.6 published (2026-11-28, pre-release)
+## Release #19 sealed (2026-11-28, tier 00), not proposed: judge review 5 fixes, wallets line on the home page
 
-- Tag `guard-v0.3.6` on commit `5071a22`; workflow run 46062406493 (success):
-  https://github.com/kenil1710/signet/releases/tag/guard-v0.3.6 (`signet-guard-0.3.6.zip` + `.sha256`).
-- Checked after download: SHA-256 matches; `gh attestation verify signet-guard-0.3.6.zip -R kenil1710/signet` exits 0;
-  the zip's manifest says "0.3.6 (build 5071a22 2026-11-27 20:16Z)".
-- Release #17 (sealed, not proposed) links to this release.
-
-## OKX Wallet refusal by hand (2026-11-28): Guard 0.3.6 build `9727af7`, enforce mode
-
-- **Setup:** a separate Chrome 158 profile, a new empty OKX Wallet 4.26.0, account `0x9598…6ceb` connected, X Layer,
-  Guard 0.3.6 loaded unpacked (`chrome://extensions`: "0.3.6 (build 9727af7 2026-11-27 20:01Z)"),
-  signetguard.xyz/app (release #16, enforce mode).
-- **Wallet-free channel check:** a fake `eth_sign` frame posted by the page came back "4001 Signet Guard refused this
-  signature: Unverified signature" (Guard's listener was live on the page).
-- **Unsealed** `eth_sendTransaction` to `0xBAD0…0C0F` through `window.okxwallet` and through `window.ethereum`: both
-  rejected with Guard's 4001 (not a contract this site sealed); **OKX never opened**; red page "Signature refused",
-  "Verified copy: available with Pro".
-- **Sealed** call to the gate (`enforced()`, 0 OKB): OKX opened; rejected by hand.
-- The two earlier OKX failures the same day: with Guard 0.3.5/0.3.6 before the channel check, Guard can't wrap OKX's
-  provider; the second ran a Guard build loaded before the check existed (`docs/decisions.md`).
-- **Both wallets now tested by hand with refusals:** Rabby (Guard 0.3.5, then 0.3.6 with the 4001 reply) and OKX Wallet (Guard 0.3.6).
-
-## Release #17 sealed (2026-11-28, tier 00), not proposed: wallets tested, said plainly
-
-- `release/17` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`. Differs from
-  #16 in the wallet wording (`docs/CLAIMS.md`, `docs/THREAT_MODEL.md`, `llms.txt`, `start.html`: Guard tested by hand
-  with Rabby and OKX Wallet, refusals work) and the Guard download links (0.3.5 to 0.3.6). Resealed after the OKX
-  hand test passed. Allowlist and origins equal #16's: tier 00 (1 approval + 1 h).
-- `pnpm verify:claims`: all passed (11 on mainnet, 11 from the repo).
-- Not proposed: proposing is a mainnet transaction from the CI key and waits for the founder's yes.
-
-## First refusal with a real wallet (2026-11-28): Rabby, enforce mode
-
-- **Setup:** signetguard.xyz/app (release #16, enforce mode since 2026-11-25), Guard 0.3.5 (the GitHub pre-release),
-  Rabby connected with approver A's address `0xB9ef…2416`, chain X Layer. By hand, in the founder's normal profile.
-- **Unsealed request:** `eth_sendTransaction` to `0x…dEaD` (0 OKB, no data), sent from the console through
-  `window.rabby`. Guard showed its refusal page ("Signature refused · Contract not in the sealed allowlist · Nothing
-  was sent to your wallet") and **Rabby never opened**. The first time a refusal by Guard has been seen with a real
-  wallet; before this, every refusal was with the mock wallet (the 2026-11-25 Rabby test only checked that a sealed
-  action went through).
-- **Not clean yet:** the console printed nothing for the refused request (its promise should reject with 4001), and a
-  sealed call sent afterwards didn't open Rabby either. Not reproduced headless with the same Rabby build (rejects with
-  4001 in ~1 s, also with OKX installed alongside); Guard 0.3.6 answers the page before drawing the notice. Checked
-  again by hand with Guard 0.3.6: fixed (rejects with 4001, see "Rabby with Guard 0.3.6" above).
-- **OKX Wallet 4.26.0, same day, first Guard 0.3.6 test build (before the channel check):** not intercepted. Unsealed requests through
-  `window.okxwallet` and `window.ethereum` opened OKX; Guard was never asked. Root cause and fix: `docs/decisions.md`
-  (2026-11-28).
-
-## Release #16 published (2026-11-26, tier 00)
-
-- Approved by approver A at 10:51:17 UTC (16:21 IST), publishable from 11:51:17 UTC.
-- `scripts/release-site.sh 16` at 11:51 UTC: Cloudflare deployment `6cb3633c` (7 new files, 20 reused), then publish tx [`0xf353f3c1…e708`](https://web3.okx.com/explorer/x-layer/tx/0xf353f3c1ff8333b1853bf82ec69dad6000c515defea592ed74c247f525e2e708) (block 76,924,876 at 11:51:52 UTC, 292,923 gas; decided by circuit #6), `signet/files.json` written (1,889,686 gas) and read back.
-- Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
-- CI key after #16's publish: 0.002858 OKB.
+- `release/19` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`: manifest
+  `0xb3ed364f…5f1f` (filesRoot `0xaae4ec2f…f887`; the gate's `manifestHashOf` gives the same). Allowlist and origins
+  equal #18's: tier 00 (1 approval + 1 h). `pnpm verify:claims`: all passed (11 + 11).
+- Changes from #18: the home page (hero sentence conditional on enforce mode; "Tested by hand on X Layer mainnet with
+  Rabby, OKX Wallet and MetaMask" linking to /start#wallets; an "Example" label on How it works step 03; watchtower
+  and verified-copy scope; the recovery-address exception), /start (watchtower scope, domain squatting, enforce after
+  7 days), /privacy (local log, Arc vault check sends the wallet address to two Arc RPC nodes, phone layout),
+  CLAIMS/THREAT_MODEL (recovery exception, threat 18, what `verify:claims` checks, rebuild check), benchmark (re-run
+  2026-11-28, known misses), llms.txt.
+- Not proposed: waits for the founder's yes. Estimate: `proposeRelease` 171,492 gas at 0.02 gwei ≈ 0.0000034 OKB.
 
 ## Release #18 published (2026-11-28, tier 00): MetaMask tested by hand, Guard 0.3.7 links
 
@@ -274,7 +231,7 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - No link in the site, README, docs or llms.txt uses `/releases/latest` (all name the exact tag), so guard-v0.3.7 stays a pre-release.
 - CI key after the proposal: 0.002807 OKB.
 
-## Guard 0.3.7 published; release #18 sealed (2026-11-28, tier 00), not proposed
+## Guard 0.3.7 published; release #18 sealed (2026-11-28, tier 00), not proposed at the time (proposed and published later, above)
 
 - **Guard 0.3.7** pre-release: https://github.com/kenil1710/signet/releases/tag/guard-v0.3.7 (tag on `5f28338`, the
   commit hand-tested; workflow run 46128518336). Downloaded: `signet-guard-0.3.7.zip` matches its `.sha256`,
@@ -326,6 +283,62 @@ wallet request was rejected by hand; nothing was signed or sent.
 - Proposed by the CI key at 04:56:10 UTC: tx [`0x111c1abb…fdd0`](https://web3.okx.com/explorer/x-layer/tx/0x111c1abb8e376c85ba09a6132f0afdb45ad1e8c4e73a9c23cab39934331fdfd0) (block 77,072,734, 168,984 gas), manifest `0x7557ac04…87a1`. Tier 00 (allowlist and origins equal #16's): 1 approval + 1 h.
 - Changes: CLAIMS, THREAT_MODEL, llms.txt and /start say "Guard tested by hand with Rabby and OKX Wallet (refusals work); OKX needs Guard 0.3.6; not tested: MetaMask"; the Guard links point to guard-v0.3.6.
 - CI key after the proposal: 0.002854 OKB.
+
+## Release #17 sealed (2026-11-28, tier 00), not proposed at the time (proposed and published later, above): wallets tested, said plainly
+
+- `release/17` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`. Differs from
+  #16 in the wallet wording (`docs/CLAIMS.md`, `docs/THREAT_MODEL.md`, `llms.txt`, `start.html`: Guard tested by hand
+  with Rabby and OKX Wallet, refusals work) and the Guard download links (0.3.5 to 0.3.6). Resealed after the OKX
+  hand test passed. Allowlist and origins equal #16's: tier 00 (1 approval + 1 h).
+- `pnpm verify:claims`: all passed (11 on mainnet, 11 from the repo).
+- Not proposed: proposing is a mainnet transaction from the CI key and waits for the founder's yes.
+
+## Guard 0.3.6 published (2026-11-27 20:16 UTC, 2026-11-28 IST; pre-release)
+
+- Tag `guard-v0.3.6` on commit `5071a22`; workflow run 46062406493 (success):
+  https://github.com/kenil1710/signet/releases/tag/guard-v0.3.6 (`signet-guard-0.3.6.zip` + `.sha256`).
+- Checked after download: SHA-256 matches; `gh attestation verify signet-guard-0.3.6.zip -R kenil1710/signet` exits 0;
+  the zip's manifest says "0.3.6 (build 5071a22 2026-11-27 20:16Z)".
+- Release #17 (sealed, not proposed) links to this release.
+
+## OKX Wallet refusal by hand (2026-11-28): Guard 0.3.6 build `9727af7`, enforce mode
+
+- **Setup:** a separate Chrome 158 profile, a new empty OKX Wallet 4.26.0, account `0x9598…6ceb` connected, X Layer,
+  Guard 0.3.6 loaded unpacked (`chrome://extensions`: "0.3.6 (build 9727af7 2026-11-27 20:01Z)"),
+  signetguard.xyz/app (release #16, enforce mode).
+- **Wallet-free channel check:** a fake `eth_sign` frame posted by the page came back "4001 Signet Guard refused this
+  signature: Unverified signature" (Guard's listener was live on the page).
+- **Unsealed** `eth_sendTransaction` to `0xBAD0…0C0F` through `window.okxwallet` and through `window.ethereum`: both
+  rejected with Guard's 4001 (not a contract this site sealed); **OKX never opened**; red page "Signature refused",
+  "Verified copy: available with Pro".
+- **Sealed** call to the gate (`enforced()`, 0 OKB): OKX opened; rejected by hand.
+- The two earlier OKX failures the same day: with Guard 0.3.5/0.3.6 before the channel check, Guard can't wrap OKX's
+  provider; the second ran a Guard build loaded before the check existed (`docs/decisions.md`).
+- **Both wallets now tested by hand with refusals:** Rabby (Guard 0.3.5, then 0.3.6 with the 4001 reply) and OKX Wallet (Guard 0.3.6).
+
+## First refusal with a real wallet (2026-11-28): Rabby, enforce mode
+
+- **Setup:** signetguard.xyz/app (release #16, enforce mode since 2026-11-25), Guard 0.3.5 (the GitHub pre-release),
+  Rabby connected with approver A's address `0xB9ef…2416`, chain X Layer. By hand, in the founder's normal profile.
+- **Unsealed request:** `eth_sendTransaction` to `0x…dEaD` (0 OKB, no data), sent from the console through
+  `window.rabby`. Guard showed its refusal page ("Signature refused · Contract not in the sealed allowlist · Nothing
+  was sent to your wallet") and **Rabby never opened**. The first time a refusal by Guard has been seen with a real
+  wallet; before this, every refusal was with the mock wallet (the 2026-11-25 Rabby test only checked that a sealed
+  action went through).
+- **Not clean yet:** the console printed nothing for the refused request (its promise should reject with 4001), and a
+  sealed call sent afterwards didn't open Rabby either. Not reproduced headless with the same Rabby build (rejects with
+  4001 in ~1 s, also with OKX installed alongside); Guard 0.3.6 answers the page before drawing the notice. Checked
+  again by hand with Guard 0.3.6: fixed (rejects with 4001, see "Rabby with Guard 0.3.6" above).
+- **OKX Wallet 4.26.0, same day, first Guard 0.3.6 test build (before the channel check):** not intercepted. Unsealed requests through
+  `window.okxwallet` and `window.ethereum` opened OKX; Guard was never asked. Root cause and fix: `docs/decisions.md`
+  (2026-11-28).
+
+## Release #16 published (2026-11-26, tier 00)
+
+- Approved by approver A at 10:51:17 UTC (16:21 IST), publishable from 11:51:17 UTC.
+- `scripts/release-site.sh 16` at 11:51 UTC: Cloudflare deployment `6cb3633c` (7 new files, 20 reused), then publish tx [`0xf353f3c1…e708`](https://web3.okx.com/explorer/x-layer/tx/0xf353f3c1ff8333b1853bf82ec69dad6000c515defea592ed74c247f525e2e708) (block 76,924,876 at 11:51:52 UTC, 292,923 gas; decided by circuit #6), `signet/files.json` written (1,889,686 gas) and read back.
+- Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
+- CI key after #16's publish: 0.002858 OKB.
 
 ## Release #16 proposed (2026-11-26, tier 00): who holds Signet's keys, said plainly
 

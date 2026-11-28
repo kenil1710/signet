@@ -49,7 +49,7 @@ signet domain public</pre>
         <p>(Vercel: the same header in <code>vercel.json</code>.) Deploy your site once with the file, then check:</p>
         <pre data-copy>signet domain --check</pre>
         <p><b>Behind Cloudflare?</b> Turn off <b>Email Obfuscation</b>, <b>Rocket Loader</b> and <b>Web Analytics’ automatic setup</b> (it adds a <code>static.cloudflareinsights.com</code> script to your HTML, only for browsers) for your site, and anything else that rewrites HTML or scripts on the way out. They change the bytes your visitors get after you sealed them, so Guard shows the site as not matching its release. (Email Obfuscation rewrites any text that looks like an email address, even <code>name&#64;1.2.3</code>, and adds a script.) Check the live bytes against your build with <code>signet verify https://your-domain --build dist</code>.</p>
-        <p class="dim">Only someone who controls the domain can publish this file. Guard, the dashboard, the badge and the watchtower ignore a gate until its domain serves this file naming it, so nobody can seal a domain they don't control.</p>
+        <p class="dim">Only someone who controls the domain can publish this file. Guard, the dashboard, the badge and the watchtower ignore a gate until its domain serves this file naming it, so nobody can seal a domain they don't control. Someone else can still bind your domain on-chain first: they can't use it (no proof), but you can't bind it either until a later registry version. Bind early.</p>
       </section>
 
       <section class="step" id="ci"><h2>4 · Add the GitHub workflow</h2>
@@ -84,7 +84,7 @@ jobs:
       - name: Deploy (only reached after the release is published)
         run: echo "your deploy command here"</pre>
         <p><code>signet wait --publish</code> also writes the release's 3 manifest files on-chain (allowlist, origins, file list; ≈ 0.00003 OKB), which is what Guard checks your site against. A re-run skips files that are already stored.</p>
-        <p class="dim">Deploy only after <code>signet wait</code> succeeds: that keeps your own pipeline from shipping an unapproved build. A stolen hosting or DNS credential can still put other files live; the watchtower alerts you within minutes, and Guard users are refused once your gate is in enforce mode. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
+        <p class="dim">Deploy only after <code>signet wait</code> succeeds: that keeps your own pipeline from shipping an unapproved build. A stolen hosting or DNS credential can still put other files live; the watchtower (running for signetguard.xyz; for your site with Pro, planned) alerts within minutes, and Guard users are refused once your gate is in enforce mode. A first release is tier 10 (2 approvals + 24 h), longer than a 6-hour GitHub job: when the job times out, re-run it after the 24 h; <code>propose --reuse</code> finds the same proposal.</p>
       </section>
 
       <section class="step" id="hosts"><h2>Your host</h2>
@@ -134,7 +134,7 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
       <section class="step" id="approve"><h2>5 · Approve your first release, add the badge</h2>
         <p>Push to <code>main</code>. The workflow proposes release #1. Two approvers open <a href="./app#/">the dashboard</a>, open your domain, read Diff Guard, and click <b>Approve</b> in their own wallets. After the timelock the workflow publishes and deploys.</p>
         <p>Then open <code>{{ORIGIN}}/app#/badge/&lt;your domain&gt;</code> and copy the "Sealed by Signet" badge into your site footer. It links to a live page that reads the chain.</p>
-        <p class="dim">Your gate starts in observe mode (Guard reports, never blocks). Switch to enforce in the dashboard when your releases flow cleanly.</p>
+        <p class="dim">Your gate starts in observe mode (Guard reports, never blocks). Switch to enforce in the dashboard when your releases flow cleanly, after the gate's first 7 days (the contract refuses earlier).</p>
       </section>
       <section class="step" id="guard"><h2>Try Guard (pre-release)</h2>
         <p>Signet Guard isn’t in the Chrome Web Store yet. A <b>pre-release</b> build for X Layer mainnet is on GitHub, built and signed by this project’s release workflow (a Sigstore build attestation you can check with <code>gh attestation verify</code>):</p>
@@ -145,7 +145,7 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
           <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
           <li>Click <b>Load unpacked</b> and choose the unzipped folder (the one with <code>manifest.json</code>).</li>
         </ol>
-        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Guard is tested by hand with <b>Rabby</b>, <b>OKX Wallet</b> and <b>MetaMask</b> on X Layer mainnet, in enforce mode (2026-11-28, Guard 0.3.7; refusals work: an unsealed transaction was refused before the wallet opened, and a sealed one reached it). OKX Wallet needs Guard 0.3.6 or later. Tested headless only: <b>Coinbase Wallet</b>, <b>Bitget Wallet</b> and <b>Phantom</b> (copies of the real extensions). Not protected yet: <b>Trust Wallet</b> through <code>window.ethereum</code> (its EIP-6963 provider is checked). The automated tests use mock wallets that record every request. In enforce mode it refuses <code>eth_sign</code> and any signature it can't read.</p>
+        <p class="dim" id="wallets" style="scroll-margin-top:96px">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Guard is tested by hand with <b>Rabby</b>, <b>OKX Wallet</b> and <b>MetaMask</b> on X Layer mainnet, in enforce mode (2026-11-28, Guard 0.3.7; refusals work: an unsealed transaction was refused before the wallet opened, and a sealed one reached it). OKX Wallet needs Guard 0.3.6 or later. Tested headless only: <b>Coinbase Wallet</b>, <b>Bitget Wallet</b> and <b>Phantom</b> (copies of the real extensions). Not protected yet: <b>Trust Wallet</b> through <code>window.ethereum</code> (its EIP-6963 provider is checked). The automated tests use mock wallets that record every request. In enforce mode it refuses <code>eth_sign</code> and any signature it can't read.</p>
       </section>
       <section class="step" id="faq"><h2>Questions</h2>
         <dl class="faq">
@@ -153,7 +153,7 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
           <dt>What does it cost?</dt><dd>Gas on X Layer: about 0.000013 OKB to create the gate, and about 0.0001 OKB per release (propose, publish, the 3 manifest files). The Free plan is free; Pro (planned) adds a faster watchtower and the verified copy.</dd>
           <dt>An approver loses their key?</dt><dd>The other two can still approve releases (no release needs all three, except admin changes). To replace approvers, your <b>recovery address</b> (kept offline) proposes a new set; it takes effect after 7 days unless two current approvers cancel it, and it works even while the gate is frozen.</dd>
           <dt>Does it slow my site down?</dt><dd>No. Your site is served as before; nothing is added to your pages. Guard checks in the user's browser, and only on sealed domains.</dd>
-          <dt>What if my users don't install Guard?</dt><dd>Your team still gets the release approvals and timelock, watchtower alerts, instant freeze, and the public proof and badge. Guard is the extra layer that also blocks the signature for users who run it.</dd>
+          <dt>What if my users don't install Guard?</dt><dd>Your team still gets the release approvals and timelock, instant freeze, and the public proof and badge. Guard is the extra layer that also blocks the signature for users who run it.</dd>
           <dt>Is my first release slow?</dt><dd>Yes: every first release is tier 10 (2 approvals + 24 h). After that, a code-only release needs 1 approval + 1 h.</dd>
         </dl>
       </section>

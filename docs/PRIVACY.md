@@ -28,7 +28,7 @@ is synced or uploaded. Removing the extension removes all of it.
 
 ## What Guard never does
 
-- It never sends your browsing history, page contents, wallet addresses, balances or keys to us or to anyone.
+- It never sends your browsing history, page contents, wallet addresses, balances or keys to us. The one exception to "to anyone": on a sealed site whose contracts are on Arc and whose team sealed a factory rule, your wallet address goes to the two Arc RPC nodes inside the read-only call that checks a vault was created for you (the table above).
 - It never reads or changes your wallet's keys. It sees a signature request only to decide whether to let it through.
 - It never sells, shares or transfers data: it has none to share.
 - It uses no remote code: everything it runs is in the extension package.

@@ -1,8 +1,8 @@
 {
   "project": "Signet",
-  "checkedAt": "2026-11-26T09:15:06.456Z",
+  "checkedAt": "2026-11-28T11:11:08.790Z",
   "chain": "X Layer mainnet (196)",
-  "block": "76915326",
+  "block": "77095100",
   "rpcs": [
     "https://xlayerrpc.okx.com",
     "https://xlayer.drpc.org"
@@ -128,14 +128,14 @@
       "kind": "repo",
       "claim": "A real-size bundle (300 KB) can be stored on-chain as the verified copy, one proved 24 KB piece per transaction, each under 16.7M gas",
       "status": "PASS",
-      "detail": "13 transactions, 70,054,261 gas in total, at most 5,635,682 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
+      "detail": "13 transactions, 70,054,185 gas in total, at most 5,635,658 per transaction (reproduce: packages/gateway/test/staging/chunked.test.ts)"
     },
     {
       "id": "C10",
       "kind": "mainnet",
       "claim": "signetguard.xyz's gate is in enforce mode since 2026-11-25 (one approver's enforce(), allowed 7 days after the gate was made), is not frozen, has a published release and has no guardian",
       "status": "PASS",
-      "detail": "enforced, not frozen, current release #14, guardian 0x0; enforce() in tx 0x00de5449… (block 76840474) by 0xb9ef367a86de5150a5390c4148073901587d2416"
+      "detail": "enforced, not frozen, current release #18, guardian 0x0; enforce() in tx 0x00de5449… (block 76840474) by 0xb9ef367a86de5150a5390c4148073901587d2416"
     },
     {
       "id": "C11",

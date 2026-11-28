@@ -1,7 +1,7 @@
 # Signet in 5 minutes
 
-**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single key can publish a release of your site, a hacked host or DNS is detected within minutes and blocked for users with Signet Guard, and those users can't sign anything your team didn't approve.
-**What teams get:** release approvals with on-chain timelocks (CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts, a freeze any one approver can pull at once, a verified copy read from X Layer (built; live with Pro), and a public proof and badge. **For users:** Guard **blocks the signature** to any contract or spender the team didn't approve (circuit #7), and in enforce mode refuses `eth_sign` and any signature it can't read (Guard 0.3.5). Signet **builds on TapeKit's** on-chain file verification.
+**Your contracts are audited. Your website isn't.** Signet protects what your users actually load: no single key can publish a release of your site, a hacked host or DNS is blocked for users with Signet Guard (and caught within minutes where the watchtower runs), and on a site in enforce mode Guard refuses signatures to contracts and spenders your team didn't seal.
+**What teams get:** release approvals with on-chain timelocks (CI only proposes, approvers approve in their own wallets, TapeOut circuit #6 decides), watchtower alerts (running for signetguard.xyz; for other sites with Pro, planned), a freeze any one approver can pull at once, a verified copy read from X Layer (built and tested on a local fork; not deployed yet), and a public proof and badge. **For users:** in enforce mode, Guard **blocks the signature** to any contract or spender the team didn't seal (decided with circuit #7), and in enforce mode refuses `eth_sign` and any signature it can't read (Guard 0.3.5). Signet **builds on TapeKit's** on-chain file verification.
 
 **What it is.** A dApp team seals each release of its website on X Layer: the hash of every file, the contracts and
 spenders the site may ask a wallet to sign for, and the outside origins it may talk to. A TapeOut circuit decides
@@ -27,7 +27,7 @@ Frozen: nothing publishes. The 1 h / 24 h waits are defaults.
 can freeze or revoke the current release at once; two can unfreeze, un-revoke, remove the guardian, or remove a file
 from a revoked release. Changes are slow: approvers, the CI key, the recovery address, the guardian, timelocks, the
 domain binding, the circuit copy and switching back to observe mode take **3 of 3 + 24 h** (tier 11). Switching to
-enforce (stricter) takes one approver, after the gate's first 7 days.
+enforce (stricter) takes one approver, after the gate's first 7 days. One exception: the recovery address alone can replace all three approvers after a public 7-day wait, unless two approvers cancel (it is on-chain for anyone to see; nothing alerts on it yet).
 
 ## Minute 1–3: check the claims against mainnet yourself
 
@@ -52,7 +52,7 @@ cast call 0x73153e5fd2Acac604D49d6ca9fea27b750718F22 "eval(uint256,bytes)(bytes)
 ```
 
 No terminal? Open **[/prove](https://signetguard.xyz/app#/prove)**: the same circuit checks, run by your
-browser against mainnet, with no wallet (about 6 seconds since release #10; a few minutes before).
+browser against mainnet, with no wallet (about 6–15 seconds, depending on the public RPCs).
 
 ## What runs on TapeOut (X Layer mainnet)
 
@@ -116,7 +116,7 @@ extension defeats it.
 **Where it stands on mainnet** ([`docs/mainnet.md`](docs/mainnet.md); C8–C11 in `CLAIMS.md`):
 - **signetguard.xyz** (Signet's own site) is in **enforce** mode since 2026-11-25 12:25 UTC (`enforce()` by approver A,
   tx `0x00de5449…2dd0`): Guard users get the red page and refused signatures if it stops matching its seal. Releases
-  #3 onward went through its gate (#6 was the tier-11 guardian change); #8's files are stored in full in DeWEB's
+  #3 onward went through its gate (release numbers are the gate's proposal ids: #1 and #2 expired, #6 was the tier-11 guardian change, so #18 is the 15th published site release); #8's files are stored in full in DeWEB's
   SiteRegistry. Each release is deployed and published seconds apart by `scripts/release-site.sh`; Guard 0.3.4+
   holds the page for up to 60 s while a release can publish, so a rollout doesn't turn it red.
 - **misthos.world** (the founder's own app on Arc, the first real site sealed with Signet; not an outside customer) published release #1 on 2026-11-25 (tier 10:
@@ -126,7 +126,7 @@ extension defeats it.
   optional: any approver can still freeze. Naming a new one is tier 11 (3 of 3 + 24 h).
 - **One person holds the keys.** Approvers A, B and C on both gates are three separate wallets on three separate devices, held by one person (Signet is built by a solo founder), as is the recovery address. No single key can publish a release, but one person holds every key. The design is meant for three different people, and a real team should use three.
 
-Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). Guard is tested by hand with Rabby, OKX Wallet and MetaMask on X Layer mainnet
+Guard isn't in the Chrome Web Store (a pre-release zip with a Sigstore build attestation is on GitHub). Guard is tested by hand with Rabby, OKX Wallet and MetaMask on X Layer mainnet
 (enforce mode, 2026-11-28, Guard 0.3.7; refusals work: an unsealed transaction refused before the wallet opened, a sealed one reached it; OKX needs Guard 0.3.6 or later).
 Tested headless only: Coinbase Wallet, Bitget Wallet and Phantom (copies of the real extensions; refused before the wallet, sealed reached it).
 Not protected yet: Trust Wallet through `window.ethereum` (private channel; its EIP-6963 provider is checked). The automated suites use mock wallets. The gateway runs on staging.

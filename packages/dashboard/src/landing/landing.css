@@ -106,6 +106,9 @@ header.solid{background:rgba(10,9,8,.78);backdrop-filter:blur(12px);-webkit-back
 .lede{max-width:470px;font-size:16px;color:#C9C0BA;min-height:76px}
 .lede b{color:var(--text);font-weight:600}
 .cta-row{display:flex;gap:10px;flex-wrap:wrap}
+.tested{margin:12px 0 0;font-size:13px;color:var(--muted);max-width:360px}
+.tested a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.tested a:hover{color:var(--text)}
 .h-prog{position:absolute;left:0;right:0;bottom:0;height:2px;background:transparent}
 .h-prog i{display:block;height:100%;background:var(--wax);transform-origin:left;transform:scaleX(0)}
 @media (max-width:960px){

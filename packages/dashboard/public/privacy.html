@@ -10,7 +10,7 @@
 body{background:var(--ink);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;margin:0}
 main{max-width:860px;margin:0 auto;padding:32px 16px 64px}
 h1{font-size:30px;line-height:1.2}h2{font-size:20px;margin-top:32px}
-a{color:var(--wax)}code{font:14px ui-monospace,Menlo,monospace;background:#171412;padding:1px 4px;border-radius:3px}
+a{color:var(--wax);overflow-wrap:anywhere}code{font:14px ui-monospace,Menlo,monospace;overflow-wrap:anywhere;background:#171412;padding:1px 4px;border-radius:3px}
 table{border-collapse:collapse;width:100%;font-size:14px;display:block;overflow-x:auto}th,td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
 p,li{color:#e4ddd7}.back{color:var(--muted);font-size:14px}
 </style>
@@ -26,7 +26,7 @@ p,li{color:#e4ddd7}.back{color:var(--muted);font-size:14px}
 <h2>What Guard stores</h2>
 <p>In the extension's own storage, on your device: the sealed-domain list, the sealed releases and domain proofs of the sealed sites you visit (to answer quickly), its settings, the current state of each tab (cleared when the browser closes), and a log of its last 200 warnings and refusals on sealed sites (time, domain, page URL, what was flagged), which you can read in the popup. Nothing is synced or uploaded. Removing the extension removes all of it.</p>
 <h2>What Guard never does</h2>
-<ul><li>It never sends your browsing history, page contents, wallet addresses, balances or keys to us or to anyone.</li><li>It never reads or changes your wallet's keys. It sees a signature request only to decide whether to let it through.</li><li>It never sells, shares or transfers data: it has none to share.</li><li>It uses no remote code: everything it runs is in the extension package.</li></ul>
+<ul><li>It never sends your browsing history, page contents, wallet addresses, balances or keys to us. The one exception to "to anyone": on a sealed site whose contracts are on Arc and whose team sealed a factory rule, your wallet address goes to the two Arc RPC nodes inside the read-only call that checks a vault was created for you (the table above).</li><li>It never reads or changes your wallet's keys. It sees a signature request only to decide whether to let it through.</li><li>It never sells, shares or transfers data: it has none to share.</li><li>It uses no remote code: everything it runs is in the extension package.</li></ul>
 <h2>Your wallet's requests</h2>
 <p>On a sealed site, Guard wraps the page's wallet providers (<code>window.ethereum</code>, wallet globals such as <code>window.okxwallet</code>, and EIP-6963 providers), and reads the requests a wallet's page script passes to its own content script on the page, so it can check each signature request against the sealed release before your wallet shows it. In observe mode (the default) it only reports; when the site's team turned on enforce mode, it refuses requests to contracts and spenders the team didn't seal. It doesn't send the requests anywhere; the ones it warns about or refuses go into the local log described above (on your device only).</p>
 <h2>Changes and contact</h2>
