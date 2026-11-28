@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-11-28T13:01:48.635Z",
+  "updatedAt": "2026-11-28T13:06:32.129Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-28T13:01:48.635Z",
+      "checkedAt": "2026-11-28T13:06:32.129Z",
       "release": 19
     }
   ],
@@ -15,9 +15,9 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-28T13:01:56.133Z",
-    "block": "77101872",
-    "summary": "All checks passed (0 pending deployment). Checked in 7.2 s.",
+    "checkedAt": "2026-11-28T13:06:40.024Z",
+    "block": "77102154",
+    "summary": "All checks passed (0 pending deployment). Checked in 7.7 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
