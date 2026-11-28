@@ -261,6 +261,20 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
 - CI key after #16's publish: 0.002858 OKB.
 
+## Guard 0.3.7 published; release #18 sealed (2026-11-28, tier 00), not proposed
+
+- **Guard 0.3.7** pre-release: https://github.com/kenil1710/signet/releases/tag/guard-v0.3.7 (tag on `5f28338`, the
+  commit hand-tested; workflow run 46128518336). Downloaded: `signet-guard-0.3.7.zip` matches its `.sha256`,
+  `gh attestation verify` exit 0, `version_name` "0.3.7 (build 5f28338 2026-11-28 09:02Z)", content scripts in all frames.
+- **Release #18** = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`: manifest
+  `0x7ebbd1af…20ca` (filesRoot `0xdc88d0bd…37f4`; `manifestHashOf` on the gate gives the same). Differs from #17 in
+  `docs/CLAIMS.md`, `docs/THREAT_MODEL.md`, `llms.txt`, `start.html` (wallets: Rabby, OKX Wallet and MetaMask tested
+  by hand; Coinbase, Bitget, Phantom headless; Trust Wallet not protected yet; same-origin iframes) and the Guard links
+  (`index.html` ×4, `start.html` ×1: guard-v0.3.6 → guard-v0.3.7). Allowlist and origins hashes equal the active
+  release's: tier 00 (1 approval + 1 h). `pnpm verify:claims`: all passed (11 + 11).
+- Not proposed: waits for the founder's yes. Estimate: `proposeRelease` 171,504 gas at 0.02 gwei ≈ 0.0000034 OKB (CI key
+  holds 0.002811 OKB).
+
 ## Guard 0.3.7 hand tests (2026-11-28): Rabby, OKX Wallet and MetaMask, top frame and same-origin iframe
 
 Guard 0.3.7 (build `5f28338`, mainnet build), signetguard.xyz/app (release #17, enforce mode) unless noted. Every
