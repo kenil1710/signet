@@ -126,9 +126,9 @@ extension defeats it.
   optional: any approver can still freeze. Naming a new one is tier 11 (3 of 3 + 24 h).
 - **One person holds the keys.** Approvers A, B and C on both gates are three separate wallets on three separate devices, held by one person (Signet is built by a solo founder), as is the recovery address. No single key can publish a release, but one person holds every key. The design is meant for three different people, and a real team should use three.
 
-Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). Guard is tested by hand with Rabby and OKX Wallet on X Layer mainnet
-(enforce mode, 2026-11-28; refusals work: an unsealed transaction refused before the wallet opened, a sealed one reached it; OKX needs Guard 0.3.6).
-Also tested headless with copies of the real MetaMask, Coinbase Wallet, Bitget Wallet and Phantom extensions (refused before the wallet, sealed reached it).
+Guard isn't in the Chrome Web Store (a signed pre-release zip is on GitHub). Guard is tested by hand with Rabby, OKX Wallet and MetaMask on X Layer mainnet
+(enforce mode, 2026-11-28, Guard 0.3.7; refusals work: an unsealed transaction refused before the wallet opened, a sealed one reached it; OKX needs Guard 0.3.6 or later).
+Tested headless only: Coinbase Wallet, Bitget Wallet and Phantom (copies of the real extensions; refused before the wallet, sealed reached it).
 Not protected yet: Trust Wallet through `window.ethereum` (private channel; its EIP-6963 provider is checked). The automated suites use mock wallets. The gateway runs on staging.
 The watchtower checks signetguard.xyz (not misthos.world yet) every 5 minutes, started by a Cloudflare Worker cron
 (GitHub's own schedule, which ran every 4–12 hours, is only a fallback), and publishes its result, including its last

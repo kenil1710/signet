@@ -138,14 +138,14 @@ npx -y vercel&#64;39 promote "$URL" --token "$VERCEL_TOKEN"</pre>
       </section>
       <section class="step" id="guard"><h2>Try Guard (pre-release)</h2>
         <p>Signet Guard isn’t in the Chrome Web Store yet. A <b>pre-release</b> build for X Layer mainnet is on GitHub, built and signed by this project’s release workflow (a Sigstore build attestation you can check with <code>gh attestation verify</code>):</p>
-        <p><a class="btn" href="#guard" data-link="guardPrerelease">Signet Guard 0.3.6 (pre-release) on GitHub</a></p>
+        <p><a class="btn" href="#guard" data-link="guardPrerelease">Signet Guard 0.3.7 (pre-release) on GitHub</a></p>
         <p class="dim">What Guard reads, stores and never sends: <a href="./privacy">privacy policy</a>.</p>
         <ol>
           <li>Download the <code>.zip</code> and unzip it into a folder you’ll keep.</li>
           <li>Open <code>chrome://extensions</code> and turn on <b>Developer mode</b>.</li>
           <li>Click <b>Load unpacked</b> and choose the unzipped folder (the one with <code>manifest.json</code>).</li>
         </ol>
-        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Guard is tested by hand with <b>Rabby</b> and <b>OKX Wallet</b> on X Layer mainnet, in enforce mode (2026-11-28; refusals work: an unsealed transaction was refused before the wallet opened, and a sealed one reached it). OKX Wallet needs Guard 0.3.6. Also tested headless with copies of the real <b>MetaMask</b>, <b>Coinbase Wallet</b>, <b>Bitget Wallet</b> and <b>Phantom</b> extensions. Not protected yet: <b>Trust Wallet</b> through <code>window.ethereum</code> (its EIP-6963 provider is checked). The automated tests use mock wallets that record every request. In enforce mode it refuses <code>eth_sign</code> and any signature it can't read.</p>
+        <p class="dim">It starts in observe mode on every site (it reports, never blocks) unless that site’s team turned enforcement on, and it makes no network call for sites that aren’t sealed. Guard is tested by hand with <b>Rabby</b>, <b>OKX Wallet</b> and <b>MetaMask</b> on X Layer mainnet, in enforce mode (2026-11-28, Guard 0.3.7; refusals work: an unsealed transaction was refused before the wallet opened, and a sealed one reached it). OKX Wallet needs Guard 0.3.6 or later. Tested headless only: <b>Coinbase Wallet</b>, <b>Bitget Wallet</b> and <b>Phantom</b> (copies of the real extensions). Not protected yet: <b>Trust Wallet</b> through <code>window.ethereum</code> (its EIP-6963 provider is checked). The automated tests use mock wallets that record every request. In enforce mode it refuses <code>eth_sign</code> and any signature it can't read.</p>
       </section>
       <section class="step" id="faq"><h2>Questions</h2>
         <dl class="faq">

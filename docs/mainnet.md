@@ -261,6 +261,22 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
 - CI key after #16's publish: 0.002858 OKB.
 
+## Guard 0.3.7 hand tests (2026-11-28): Rabby, OKX Wallet and MetaMask, top frame and same-origin iframe
+
+Guard 0.3.7 (build `5f28338`, mainnet build), signetguard.xyz/app (release #17, enforce mode) unless noted. Every
+wallet request was rejected by hand; nothing was signed or sent.
+
+| Wallet | Profile | Unsealed (to `0x…dEaD`) | Sealed (to the gate `0xa3d4…4503`) |
+|---|---|---|---|
+| Rabby | normal | top frame: 4001 "Signet Guard refused" + red page, Rabby shut. Same-origin iframe, through `w.rabby` and `w.ethereum`: 4001 + red notice inside the iframe, Rabby never opened | Rabby opened; rejected |
+| OKX Wallet 4.x | test | top frame: 4001 + red page. Iframe, through `w.okxwallet` and `w.ethereum`: two 4001 "Signet Guard refused" + red notice, no OKX window (one earlier run showed OKX's reworded "User denied request signature": same outcome, nothing reached OKX) | OKX opened; rejected |
+| MetaMask 13.x | test (fresh empty wallet, OKX turned off) | 4001 "Signet Guard refused" + red page; MetaMask never saw it | MetaMask opened; rejected ("MetaMask Tx Signature: User denied") |
+
+- **misthos.world popup** (observe mode): "35 / 35 loaded checked · 26 files + 8 inline + 1 server-rendered page",
+  in green (0.3.6 showed "26 / 35" in red).
+- **The first MetaMask test by hand.** Coinbase Wallet, Bitget Wallet and Phantom stay "tested headless" (copies of the
+  real extensions on staging, `docs/decisions.md`); Trust Wallet stays "not protected yet" through `window.ethereum`.
+
 ## Rabby with Guard 0.3.6 (2026-11-28): the refused request rejects with 4001
 
 - **Setup:** signetguard.xyz/app (release #17, enforce mode), Guard 0.3.6 (build 5071a22, the GitHub pre-release),
