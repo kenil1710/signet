@@ -101,6 +101,8 @@ test('home lists the sealed domain; the project page shows release, roles, mode 
   await page.locator(`a[href="#/p/${domain}"]`).waitFor();
   await page.click(`a[href="#/p/${domain}"]`);
   await page.locator('h1').filter({ hasText: domain }).waitFor();
+  // the page shows skeleton rows while it reads the chain (since release #14): wait for the values
+  await page.waitForFunction(() => /manifest 0x[0-9a-f]{64}/i.test(document.getElementById('app')?.innerText ?? ''), null, { timeout: 30000 });
   const t = await text();
   assert.match(t, /release\s+#1 · manifest 0x[0-9a-f]{64}/i); // labels are uppercase in CSS
   assert.match(t, new RegExp(p.gate));
@@ -225,8 +227,10 @@ test('freeze (one approver), unfreeze (two), revoke', async () => {
 test('vote to remove the guardian: approvers only; the second vote removes it', async () => {
   // a reload resets the mock wallet to approver 1 (init script), so switch accounts on another page first
   const openAs = async (who: string) => { await go('/'); await as(who); await go(`/p/${domain}`); };
+  // the row is a skeleton until the chain answers (since release #14): wait for its value
+  const guardianRow = () => page.waitForFunction(() => [...document.querySelectorAll('tr')].some((r) => /recovery · guardian/.test(r.cells[0]?.textContent ?? '') && /0x[0-9a-fA-F]{4}|none/.test(r.cells[1]?.textContent ?? '')), null, { timeout: 30000 });
   await openAs(A.users[0]!);
-  await page.locator('td', { hasText: 'recovery · guardian' }).waitFor();
+  await guardianRow();
   assert.equal(await page.locator('#rmguardian').count(), 0, 'not shown to a non-approver');
   await openAs(A.approvers[0]!);
   await page.locator('#rmguardian').waitFor();
@@ -239,7 +243,7 @@ test('vote to remove the guardian: approvers only; the second vote removes it', 
   assert.match(await clickAndWait('#rmguardian', /guardian removed|refused/), /guardian removed/);
   await openAs(A.approvers[1]!);
   const row = page.locator('tr', { has: page.locator('td', { hasText: 'recovery · guardian' }) });
-  await row.waitFor();
+  await guardianRow();
   assert.match((await row.locator('td').nth(1).textContent())!, /· none$/);
   assert.equal(await page.locator('#rmguardian').count(), 0, 'no button once there is no guardian');
 });

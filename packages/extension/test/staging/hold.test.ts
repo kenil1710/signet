@@ -110,6 +110,27 @@ test('deployed seconds before the publish: grey while release #N can publish, a 
   await s.close();
 });
 
+test('a reload during the hold: a signature right after the reload is still refused, nothing reaches the wallet, green once published', async () => {
+  const r = readyRelease();
+  await passTimelock();
+  site.root = r.dir;
+  const s = await browser();
+  const { page, tab } = await visit(s);
+  await until('the hold', async () => (await report(s, tab))?.hold ?? null, 20000);
+  // the user reloads while Guard waits, and signs at once
+  await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+  await page.click('#approve').catch(() => {});
+  await until('the signature after the reload to be refused', async () => (await events(s)).some((e) => e.kind === 'sign' && e.refused), 20000);
+  assert.deepEqual(signed(s), [], 'nothing reached the wallet');
+  assert.doesNotMatch(page.url(), /blocked\.html/, 'still held, not red, right after the reload');
+  await until('held again after the reload', async () => (await report(s, tab))?.hold ?? null, 20000);
+  signet(project.dir, ['publish', r.id, r.dir], 'user2');
+  await until('green after the publish', async () => (await badge(s, tab)) === 'OK', HOLD_MS + 10000);
+  assert.deepEqual(signed(s), []);
+  site.root = undefined;
+  await s.close();
+});
+
 test('a release that can publish but is never published: red after the hold', async () => {
   const r = readyRelease();
   await passTimelock();

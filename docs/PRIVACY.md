@@ -1,6 +1,6 @@
 # Signet Guard privacy policy
 
-_Effective 2026-11-24. Applies to the Signet Guard browser extension (version 0.3.1 and later)._
+_Effective 2026-11-24, updated 2026-11-28 (wallet requests: what is kept locally). Applies to the Signet Guard browser extension (version 0.3.1 and later)._
 
 **Short version: Guard collects nothing about you and sends nothing to us.** It has no account, no analytics, no
 telemetry and no server of ours to talk to. Everything it decides, it decides inside your browser.
@@ -39,8 +39,8 @@ On a sealed site, Guard wraps the page's wallet providers (`window.ethereum`, wa
 EIP-6963 providers), and reads the requests a wallet's page script passes to its own content script on the page, so it
 can check each signature request
 against the sealed release before your wallet shows it. In observe mode (the default) it only reports; when the site's
-team turned on enforce mode, it refuses requests to contracts and spenders the team didn't seal. It doesn't record the
-requests anywhere.
+team turned on enforce mode, it refuses requests to contracts and spenders the team didn't seal. It doesn't send the
+requests anywhere; the ones it warns about or refuses go into the local log described above (on your device only).
 
 ## Changes and contact
 
