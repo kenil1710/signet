@@ -205,6 +205,25 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #20 sealed (2026-11-28, tier 00), not proposed: Guard 0.3.8 links, OKX fixed in 0.3.8
+
+- `release/20` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`: manifest
+  `0x1be635a3…f006` (filesRoot `0xb6fb13a9…a59c`; the gate's `manifestHashOf` gives the same). Allowlist and origins
+  equal #19's: tier 00 (1 approval + 1 h). `pnpm verify:claims`: all passed (11 + 11).
+- Changes from #19: the Guard links (`index.html` ×4, `start.html` ×1) guard-v0.3.7 → guard-v0.3.8; CLAIMS,
+  THREAT_MODEL, llms.txt and /start: OKX not guaranteed in 0.3.6–0.3.7 (listener order), held in the page in 0.3.8
+  (hand-tested with Guard injected after OKX), the raw-message and borrowed-`postMessage` limits, `personal_sign`
+  allowed by design, hand tests with 0.3.7 and 0.3.8; the landing mock says "Verified copy: coming soon".
+- Not proposed: waits for the founder's yes. Estimate: `proposeRelease` 171,504 gas at 0.02 gwei ≈ 0.0000034 OKB.
+
+## Guard 0.3.8 published (2026-11-28, pre-release)
+
+- https://github.com/kenil1710/signet/releases/tag/guard-v0.3.8: tag on `4e211a7` (the build hand-tested), workflow run
+  46153162424. Downloaded: `signet-guard-0.3.8.zip` SHA-256 `e4423e7e1516d713109de4b87f8b66af6d078d8d50e2a70b4bc15cd497fea180`
+  matches its `.sha256`; `gh attestation verify` exit 0; `version_name` "0.3.8 (build 4e211a7 2026-11-28 14:09Z)";
+  icons 16/32/48/128; "Verified copy: coming soon" in the popup, warning page and refusal notice, "Pro" nowhere; a
+  rebuild from the repository equals every file but `manifest.json`'s `version_name`.
+
 ## Guard 0.3.8 hand tests (2026-11-28): OKX with Guard injected after OKX, MetaMask, Rabby, icons
 
 Guard 0.3.8 (build `4e211a7`, mainnet build), signetguard.xyz/app (release #19, enforce mode). Every wallet request

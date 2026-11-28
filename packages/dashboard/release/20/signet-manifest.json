@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "domain": "signetguard.xyz",
+  "filesRoot": "0xb6fb13a9ce6505401717199f207d5eacfabdf3955d7a51522c6e9434e45ba59c",
+  "allowlistHash": "0x5a48815ac2c2eab8e1206e0350e6108e96c4029ecffc286aebcc660e2d03efc5",
+  "originsHash": "0xfa1880de94b653abff03ffdfe8a8d8f64fc02ff11dd304e64e2ead69fc0285cf",
+  "manifestHash": "0x1be635a3cab26a31dccd04cd4c8b43c4fc436bbcd54a77fe9e12dc0cbd5df006",
+  "fileCount": 29,
+  "totalBytes": 1332983,
+  "paths": {
+    "allowlist": "signet/allowlist.json",
+    "origins": "signet/origins.json",
+    "files": "signet/files.json"
+  }
+}

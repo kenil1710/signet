@@ -5,8 +5,8 @@ developer account, one-time USD 5 registration fee, paid by card to Google: **no
 
 ## Package
 
-Upload the zip attached to the GitHub pre-release `guard-v0.3.8` (made by the `guard-release` workflow when the tag is
-pushed; not released yet), not a local build: `signet-guard-0.3.8.zip` (mainnet build, files sorted, fixed timestamps),
+Upload the zip attached to the GitHub pre-release `guard-v0.3.8`
+(https://github.com/kenil1710/signet/releases/tag/guard-v0.3.8; SHA-256 `e4423e7e1516d713109de4b87f8b66af6d078d8d50e2a70b4bc15cd497fea180`), not a local build: `signet-guard-0.3.8.zip` (mainnet build, files sorted, fixed timestamps),
 with a Sigstore attestation (`gh attestation verify signet-guard-0.3.8.zip -R kenil1710/signet`) and its SHA-256 in
 `signet-guard-0.3.8.zip.sha256`. 0.3.8 adds the icons the store needs (16/32/48/128, from the seal image) and says
 "Verified copy: coming soon". Store icon: the manifest's 128 px icon (96 px art centered).
