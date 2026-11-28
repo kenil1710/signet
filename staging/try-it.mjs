@@ -86,6 +86,9 @@ function setup() {
     cast('rpc', 'anvil_mine', '0x1');
     sh('cast', ['send', JSON.parse(readFileSync(cfgFile, 'utf8')).gate, 'enforce()', '--from', local.accounts.approvers[0], '--unlocked', '--rpc-url', RPC]);
   }
+  // the domain proof: Guard acts on a sealed domain only once the site names its gate in /.well-known/signet.json
+  // (docs/domain-ownership.md); without it the demo site stays grey ("not verified") and nothing is refused
+  signet(['domain', DIST]);
   console.log('6/6 building the gateway and the Guard extension');
   build();
   writeFileSync(MODE, 'clean\n');

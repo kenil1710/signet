@@ -1,4 +1,4 @@
-// Guard content script (isolated world, document_start, top frame).
+// Guard content script (isolated world, document_start, top frame; 0.3.7: also same-origin iframes, signing only).
 //  1. Asks the service worker whether this host is a sealed domain. If not: stops. No fetch, nothing else.
 //  2. Page check: every script, stylesheet and the HTML document are read from the browser's HTTP cache
 //     (fetch with cache: 'only-if-cached' never touches the network), hashed, and compared with the sealed
@@ -17,7 +17,13 @@ import { classifyInline, inlineHash, runs } from '@signet/cli/src/inline.ts';
 import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts';
 
 (() => {
-  if (window.top !== window || !/^https?:$/.test(location.protocol)) return;
+  if (!/^https?:$/.test(location.protocol)) return;
+  // 0.3.7: in an iframe whose every ancestor has this page's origin, Guard guards signing only. The wallet shows such a
+  // frame's requests under the sealed site's name, so they are decided like the top frame's (the tab's sealed site,
+  // its allowlist and the top frame's page check). The page check, its report and the tab state belong to the top
+  // frame alone. Any other iframe: nothing at all (it must not touch the tab's state).
+  const TOP = window.top === window;
+  if (!TOP && ![...location.ancestorOrigins].every((o) => o === location.origin)) return;
 
   // ---- every <script> the page ever has, from document_start (local only: nothing leaves this tab)
   // Each inline script element keeps every text it was seen with (strong refs: also scripts that removed themselves).
@@ -57,7 +63,7 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
       if (m.type === 'characterData' || m.type === 'childList') if (m.target instanceof HTMLScriptElement) record(m.target);
     }
   });
-  mo.observe(document, { childList: true, subtree: true, characterData: true });
+  if (TOP) mo.observe(document, { childList: true, subtree: true, characterData: true });
   /// Synchronously: the records not delivered yet, and every script in the DOM now.
   const scanNow = () => {
     for (const m of mo.takeRecords()) for (const n of m.addedNodes) record(n);
@@ -422,10 +428,12 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
   /// refusal notice; callers answer the page first, then call it.
   async function decideSign(req: unknown): Promise<{ refused: boolean; message: string; show: () => void }> {
     const none = () => {};
-    scanNow(); // synchronously, before anything else: a script that inserted itself and signed at once is now recorded
+    if (TOP) scanNow(); // synchronously, before anything else: a script that inserted itself and signed at once is now recorded
     if (!info) return { refused: false, message: '', show: none };
-    await Promise.race([first, new Promise((r) => setTimeout(r, 5000))]);
-    await Promise.race([checkFresh(), new Promise((r) => setTimeout(r, 8000))]); // the page as it is at signing time
+    if (TOP) {
+      await Promise.race([first, new Promise((r) => setTimeout(r, 5000))]);
+      await Promise.race([checkFresh(), new Promise((r) => setTimeout(r, 8000))]); // the page as it is at signing time
+    }
     const d = await ask<Decision>({ type: 'sign', req });
     if (!d) {
       // No answer: the extension is gone, or Guard itself is taking the tab to the warning page and the answer was
@@ -517,12 +525,14 @@ import type { Decision, FileResult, PageInfo, PageReport } from './lib/types.ts'
 
   // ---- start
   void (async () => {
-    info = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href });
+    // a subframe only reads (again: true): the tab's state and report stay the top frame's
+    info = await ask<PageInfo>({ type: 'site', host: location.hostname, url: location.href, ...(TOP ? {} : { again: true }) });
     infoKnown = true;
     infoReadyDone();
     // tell the page's wallet wrapper at once: on a sealed domain every signature waits for Guard's decision, which
     // waits for the first check below (so for the domain proof too). Never a fail-open window while the proof loads.
     down({ type: 'state', sealed: !!info });
+    if (!TOP) return firstDone(); // signing only: the top frame checks the page and confirms the domain
     if (info?.proof) {
       // this domain is sealed but hasn't confirmed its gate yet: read its own /.well-known/signet.json (same origin)
       let body: string | null = null;

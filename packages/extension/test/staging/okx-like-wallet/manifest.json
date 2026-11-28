@@ -3,7 +3,7 @@
   "name": "Mock wallet built like OKX Wallet 4.26.0 (test only)",
   "version": "0.0.1",
   "content_scripts": [
-    { "matches": ["http://*/*", "https://*/*"], "js": ["cs.js"], "run_at": "document_start" },
-    { "matches": ["http://*/*", "https://*/*"], "js": ["inpage.js"], "run_at": "document_start", "world": "MAIN" }
+    { "matches": ["http://*/*", "https://*/*"], "js": ["cs.js"], "run_at": "document_start", "all_frames": true },
+    { "matches": ["http://*/*", "https://*/*"], "js": ["inpage.js"], "run_at": "document_start", "world": "MAIN", "all_frames": true }
   ]
 }

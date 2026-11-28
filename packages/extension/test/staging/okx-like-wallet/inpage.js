@@ -2,7 +2,7 @@
 // is a non-configurable, read-only proxy whose set trap ignores assignments to functions; window.ethereum is a
 // non-configurable getter. Requests go to the content script (cs.js) with window.postMessage in the multiplex format.
 (() => {
-  if (window.top !== window) return;
+  // like OKX: every frame, iframes included (Guard 0.3.7 covers same-origin iframes)
   let next = 0;
   const waiting = new Map();
   window.addEventListener('message', (e) => {

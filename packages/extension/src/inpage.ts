@@ -7,7 +7,9 @@
 // patched in place (the page never holds an unwrapped reference), and the link to the content script uses
 // event names that contain a random secret handed over synchronously, before page scripts run.
 (() => {
-  if (window.top !== window) return;
+  // the top frame, or (0.3.7) an iframe whose every ancestor has this page's origin: a wallet that injects into
+  // iframes (OKX) would otherwise answer such a frame unguarded, under the sealed site's name. Other frames: nothing.
+  if (window.top !== window && ![...location.ancestorOrigins].every((o) => o === location.origin)) return;
   const doc = document;
   const listen = doc.addEventListener.bind(doc);
   const dispatch = doc.dispatchEvent.bind(doc);

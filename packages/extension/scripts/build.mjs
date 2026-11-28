@@ -79,8 +79,10 @@ const manifest = {
   permissions: ['storage', 'alarms'],
   host_permissions: rpcHosts, // only the RPCs (X Layer, and per chain for factory rules); pages are reached through content scripts
   content_scripts: [
-    { matches: ['http://*/*', 'https://*/*'], js: ['content.js'], run_at: 'document_start' },
-    { matches: ['http://*/*', 'https://*/*'], js: ['inpage.js'], run_at: 'document_start', world: 'MAIN' },
+    // all_frames (0.3.7): a same-origin iframe gets the signing guard too (wallets such as OKX inject into iframes);
+    // every other frame returns at once (content.ts, inpage.ts)
+    { matches: ['http://*/*', 'https://*/*'], js: ['content.js'], run_at: 'document_start', all_frames: true },
+    { matches: ['http://*/*', 'https://*/*'], js: ['inpage.js'], run_at: 'document_start', world: 'MAIN', all_frames: true },
   ],
   sandbox: { pages: ['sandbox.html'] },
   content_security_policy: {

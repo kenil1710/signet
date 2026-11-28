@@ -1,7 +1,7 @@
 // Test only. The mock wallet's content script: answers each request and records it on the page
 // (<html data-mock-okx-calls>) so the test can see exactly what reached the wallet.
 (() => {
-  if (window.top !== window) return;
+  // like OKX: every frame, iframes included (Guard 0.3.7 covers same-origin iframes)
   window.addEventListener('message', (e) => {
     const d = e.data;
     if (e.source !== window || !d || d.target !== 'mockokx-contentscript' || !d.data || !d.data.data) return;
