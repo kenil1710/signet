@@ -261,6 +261,13 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
 - CI key after #16's publish: 0.002858 OKB.
 
+## Release #17 published (2026-11-28, tier 00): Guard tested by hand with Rabby and OKX Wallet, Guard 0.3.6 links
+
+- Approved by approver A at 04:59:25 UTC, publishable from 05:59:25 UTC.
+- `scripts/release-site.sh 17` at 06:00 UTC: Cloudflare deployment `fc1d4534` (5 new files, 22 reused), then publish tx [`0x0e120f71…a127`](https://web3.okx.com/explorer/x-layer/tx/0x0e120f712016747f2f508390b9b59477720b86cf30cb40ba7169fb0ce51ba127) (block 77,076,575 at 06:00:11 UTC, 292,923 gas; decided by circuit #6), `signet/files.json` written (1,889,687 gas) and read back; allowlist.json and origins.json unchanged.
+- Checks: 27/27 live files equal `release/17`; `/api/check` and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 17 and `enforced()` = true on both RPCs; /start links to guard-v0.3.6 and llms.txt carries the Rabby and OKX Wallet wording. The released Guard 0.3.6 zip (build 5071a22): popup "Release #17 · this page matches" on `/`, `/app`, `/start` and a 404 page; a tampered `/start` red ("Doesn't match the sealed release"), then green again.
+- CI key after #17's publish: 0.002811 OKB.
+
 ## Release #17 proposed (2026-11-28, tier 00): Guard tested by hand with Rabby and OKX Wallet, Guard 0.3.6 links
 
 - Proposed by the CI key at 04:56:10 UTC: tx [`0x111c1abb…fdd0`](https://web3.okx.com/explorer/x-layer/tx/0x111c1abb8e376c85ba09a6132f0afdb45ad1e8c4e73a9c23cab39934331fdfd0) (block 77,072,734, 168,984 gas), manifest `0x7557ac04…87a1`. Tier 00 (allowlist and origins equal #16's): 1 approval + 1 h.
