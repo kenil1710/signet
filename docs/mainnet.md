@@ -205,6 +205,21 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Guard 0.3.8 hand tests (2026-11-28): OKX with Guard injected after OKX, MetaMask, Rabby, icons
+
+Guard 0.3.8 (build `4e211a7`, mainnet build), signetguard.xyz/app (release #19, enforce mode). Every wallet request
+was rejected by hand; nothing was signed or sent.
+
+| Check | Result |
+|---|---|
+| Icons and text | red seal in the toolbar and `chrome://extensions`; popup green, release #19, enforce, "Verified copy: coming soon" |
+| OKX Wallet, Guard **after** OKX (unpacked Guard id `mnfid…` sorts after OKX's `mcohilnc…`, so Chrome injects Guard's scripts second: the order that let requests through in 0.3.6–0.3.7) | unsealed through `okxwallet` and `ethereum`: both "4001 Signet Guard refused", red notice says "coming soon" (no "Pro"); a raw frame posted with `window.postMessage`: OKX never opened (watched 30 s, recorded); same-origin iframe: two 4001 "Signet Guard refused", OKX didn't open; sealed call to the gate: OKX opened, rejected |
+| MetaMask (test profile) | unsealed refused with the red page; sealed opened MetaMask, rejected |
+| Rabby (normal profile) | unsealed refused with the red page; sealed opened Rabby, rejected |
+
+- After the raw-frame test OKX's page script logs "StreamMiddleware - Unknown response id 990001": Guard answers the
+  page's own frame id with the wallet's 4001 reply, and OKX's provider never sent that id. Expected, harmless.
+
 ## Release #19 published (2026-11-28, tier 00): judge review 5 fixes, wallets line on the home page
 
 - Proposed by the CI key at 11:34:23 UTC (tx [`0xf01c2278…a920`](https://web3.okx.com/explorer/x-layer/tx/0xf01c22789f0f7d63e013847e3e15328002fb44a17920640df510d22fcd25a920), 168,984 gas); approved by approver A; published by `scripts/release-site.sh 19`: Cloudflare deployment `20d2721f` (8 new files, 19 reused), publish tx [`0x5742f0fa…07bb`](https://web3.okx.com/explorer/x-layer/tx/0x5742f0fa1320fde1e1dffac555c6553d4c8a8b7adb9cfe0d80ee3f2425a707bb) (block 77,100,405 at 12:37:21 UTC, 292,923 gas; circuit #6), `signet/files.json` written (1,889,943 gas) and read back.
