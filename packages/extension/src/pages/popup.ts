@@ -1,5 +1,6 @@
 import { esc, send, reportWrongBlock, headline, offerCopy, type TabInfo } from './shared.ts';
 import type { Net } from '../lib/types.ts';
+import { filesMatched } from '../lib/filecount.ts';
 
 declare const __NET__: Net;
 const host = (u: string | null | undefined) => { try { return u ? new URL(u).host : null; } catch { return u ?? null; } };
@@ -29,7 +30,8 @@ void (async () => {
   }
   const h = headline(i);
   const files = i.tab.report?.files ?? [];
-  const bad = files.filter((f) => !['ok', 'ok-sri', 'ok-gateway'].includes(f.status));
+  const matched = filesMatched(files);
+  const bad = matched.unchecked;
   root.className = `popup ${i.light}`;
   const mark = i.light === 'green' ? `<span class="mark"><img src="assets/seal-still.webp" alt="" width="56" height="56"></span>` : i.light === 'red' ? `<span class="mark">${BROKEN}</span>` : '<span class="dot"></span>';
   const nodes = [host(__NET__.rpcUrl), host(__NET__.rpcUrl2)].filter(Boolean);
@@ -39,7 +41,7 @@ void (async () => {
     <dl class="facts">
       <dt>Release</dt><dd>${i.site.release ? `#${i.site.release}` : '-'}</dd>
       <dt>Approvers on this gate</dt><dd>${i.site.approvers.length}</dd>
-      <dt>Files matched</dt><dd class="${bad.length ? 'bad' : 'good'}">${files.length - bad.length} / ${files.length} loaded · ${i.files} sealed</dd>
+      <dt>Files matched</dt><dd class="${matched.good ? 'good' : 'bad'}">${esc(matched.text)}</dd>
       <dt>Allowed contracts</dt><dd>${i.contracts ?? '-'}</dd>
       <dt>Decisions</dt><dd class="${i.decider?.by === 'conflict' ? 'bad' : ''}" id="decider">${decider(i)}</dd>
       <dt>Nodes</dt><dd>${nodes.length ? nodes.map(esc).join(' + ') : 'none'}${nodes.length === 2 ? ' (must agree)' : ''}</dd>

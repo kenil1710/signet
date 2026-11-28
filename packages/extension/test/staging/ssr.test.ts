@@ -186,6 +186,19 @@ test('clean server-rendered site in enforce mode: green on a prerendered and a s
     const { page, tab } = await visit(s, `${path}${q(vaults.mine)}`);
     if (path === '/stream') await page.waitForSelector('#slow');
     await light(s, tab, 'OK');
+    // Guard 0.3.7: the popup counts the server-rendered page and the inline scripts as checked, in green
+    const pp = await s.ctx.newPage();
+    await pp.goto(`chrome-extension://${s.extId}/popup.html?tab=${tab}`);
+    await pp.waitForSelector('h1');
+    const dd = pp.locator('dt:text-is("Files matched") + dd');
+    const text = (await dd.innerText()).trim();
+    const m = /^(\d+) \/ (\d+) loaded checked · (\d+) files? \+ (\d+) inline \+ 1 server-rendered page$/.exec(text);
+    assert.ok(m, `popup line: ${text}`);
+    assert.equal(m[1], m[2], `all loaded items checked: ${text}`);
+    assert.equal(Number(m[3]) + Number(m[4]) + 1, Number(m[2]), text);
+    assert.equal(await dd.getAttribute('class'), 'good', text);
+    assert.equal(await pp.locator('h2', { hasText: 'Page check' }).count(), 0, 'no "Page check" list of OK items');
+    await pp.close();
   }
   const { page } = await visit(s, `/stream${q(vaults.mine)}`);
   await page.waitForSelector('#slow');
