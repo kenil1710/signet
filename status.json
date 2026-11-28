@@ -1,12 +1,12 @@
 {
-  "updatedAt": "2026-11-28T15:31:52.428Z",
+  "updatedAt": "2026-11-28T15:37:07.046Z",
   "network": "mainnet",
   "domains": [
     {
       "domain": "signetguard.xyz",
       "status": "ok",
-      "checkedAt": "2026-11-28T15:31:52.428Z",
-      "release": 19
+      "checkedAt": "2026-11-28T15:37:07.045Z",
+      "release": 20
     }
   ],
   "operator": {
@@ -15,9 +15,9 @@
     "renewedThisRound": false
   },
   "prove": {
-    "checkedAt": "2026-11-28T15:32:00.087Z",
-    "block": "77110875",
-    "summary": "All checks passed (0 pending deployment). Checked in 7.4 s.",
+    "checkedAt": "2026-11-28T15:37:12.735Z",
+    "block": "77111190",
+    "summary": "All checks passed (0 pending deployment). Checked in 5.5 s.",
     "rows": [
       {
         "claim": "The release policy is circuit #6 on processor 0x73153e…, and it gives the published truth table on all 512 inputs",
@@ -46,7 +46,7 @@
       },
       {
         "claim": "signetguard.xyz: the release files stored on-chain hash to what its gate published",
-        "detail": "release #19: filesRoot, allowlistHash and originsHash recomputed here, 28 files listed, enforce mode",
+        "detail": "release #20: filesRoot, allowlistHash and originsHash recomputed here, 28 files listed, enforce mode",
         "status": "PASS"
       }
     ]
