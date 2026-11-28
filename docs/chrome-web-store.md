@@ -1,25 +1,31 @@
-# Chrome Web Store submission: Signet Guard 0.3.2
+# Chrome Web Store submission: Signet Guard 0.3.7
 
-Everything the Developer Dashboard asks for, in its order. Nothing here has been submitted; the team submits it
-(Chrome Web Store developer account, one-time USD 5 registration fee, paid by card to Google: **no OKB**).
+Everything the Developer Dashboard asks for. Nothing here has been submitted; the team submits it (Chrome Web Store
+developer account, one-time USD 5 registration fee, paid by card to Google: **no OKB**). Updated 2026-11-28 for 0.3.7.
 
 ## Package
 
-- File: `signet-guard-0.3.2.zip`, built exactly like the `guard-release` workflow (mainnet build, files sorted, fixed
-  timestamps). Upload the zip the workflow attaches to the `guard-v0.3.2` GitHub release (it carries the Sigstore
-  attestation), not a local build.
-- Manifest V3, version 0.3.2. No remote code: every script is in the package.
+Upload the zip attached to the GitHub pre-release `guard-v0.3.7`
+(https://github.com/kenil1710/signet/releases/tag/guard-v0.3.7), not a local build: `signet-guard-0.3.7.zip`, built
+by the `guard-release` workflow (mainnet build, files sorted, fixed timestamps), with a Sigstore attestation
+(`gh attestation verify signet-guard-0.3.7.zip -R kenil1710/signet`) and its SHA-256 in `signet-guard-0.3.7.zip.sha256`.
+Its `version_name` is "0.3.7 (build 5f28338 2026-11-28 09:02Z)", the build tested by hand. Store icon: the seal
+(`packages/extension/src/pages/assets/seal-still.webp`) as a 128×128 PNG, 96 px art centered.
+
+Manifest facts the review will see: Manifest V3, version 0.3.7, permissions `storage`, `alarms`; 6 host permissions
+(two X Layer RPC nodes, four Arc RPC nodes); two content scripts on `http://*/*` and `https://*/*` at
+`document_start` in all frames (one isolated, one in the page world); no remote code; no `icons` key in the manifest
+(Chrome shows a letter in the toolbar; the store icon is uploaded separately; adding manifest icons is a later
+release, not done in the code freeze).
 
 ## Store listing
 
 **Name:** Signet Guard
 
-**Summary (≤ 132 characters):**
+**Summary (≤ 132 characters, 124 used):**
 Checks dApp websites against the release their team sealed on X Layer, and refuses signatures to contracts they didn't seal.
 
-**Category:** Developer Tools (alternatives: Privacy & Security, if offered for the account's region)
-
-**Language:** English
+**Category:** Privacy & Security if offered for your account's region, otherwise Developer Tools. **Language:** English.
 
 **Description:**
 
@@ -32,12 +38,15 @@ Checks dApp websites against the release their team sealed on X Layer, and refus
 > outside origins it may use. A release goes live only after the team's approvers approve it and a timelock passes.
 >
 > On a sealed site, Guard:
-> • checks every script the page runs against the sealed hashes (from your browser's cache: nothing is downloaded twice),
+> • checks every script the page runs against the sealed hashes (read from your browser's cache: nothing is downloaded twice),
 > • checks every signature request before your wallet shows it, against the sealed contracts and spenders,
 > • shows a green seal, or a clear warning when the page doesn't match its release.
 >
 > Sites start in observe mode: Guard reports, it doesn't block. When a site's team turns on enforce mode, Guard refuses
-> signatures to contracts and spenders the team didn't seal, and offers a verified copy of the site.
+> signatures to contracts and spenders the team didn't seal (the page gets the standard "rejected" error, 4001).
+>
+> Wallets: tested by hand with Rabby, OKX Wallet and MetaMask; tested automatically with Coinbase Wallet, Bitget Wallet
+> and Phantom. Trust Wallet is not protected yet when a site uses window.ethereum.
 >
 > Private by design: on sites that aren't sealed Guard makes no network request at all. It has no account, no
 > analytics and no server: it reads public data from X Layer (and, for Arc dApps, Arc) through public RPC nodes, and
@@ -45,16 +54,18 @@ Checks dApp websites against the release their team sealed on X Layer, and refus
 >
 > Open source: https://github.com/kenil1710/signet · How it works and its limits: https://signetguard.xyz
 
-**Screenshots (1280×800):** `docs/demo/store/` (the staging suite's real Guard screenshots, padded to the store size;
-they show the staging test domain: retake them on signetguard.xyz during the real-wallet test below if possible):
-1. `1-sealed.png`: a sealed site, green: the popup shows the sealed release.
+(The wallet paragraph matches CLAIMS.md as of release #18; drop it if you prefer a shorter listing.)
+
+**Homepage URL:** https://signetguard.xyz · **Support URL:** https://github.com/kenil1710/signet/issues
+
+**Screenshots (1280×800; up to 5; upload in this order; in `docs/demo/store/`):**
+1. `1-sealed.png`: a sealed site, green; the popup shows the sealed release.
 2. `2-signature-refused.png`: enforce mode refuses a signature to an unsealed contract.
 3. `3-page-mismatch.png`: a tampered script: the page doesn't match its sealed release.
 4. `4-verified-copy.png`: the verified copy offered on a hijacked site.
 
-**Small promo tile (440×280):** optional; not made.
-
-**Homepage URL:** https://signetguard.xyz · **Support URL:** https://github.com/kenil1710/signet/issues
+They come from the staging test suite (real Guard pages on a staging test domain, Guard 0.3.x). Optional: retake 1–3
+at 1280×800 during the video demo on swap.localhost (same pages, newer build). No promo tile is required.
 
 ## Privacy practices tab
 
@@ -66,28 +77,24 @@ those sites send to the user's wallet against the contracts the site's team seal
 
 | Permission | Justification |
 |---|---|
-| `storage` | Keeps the public list of sealed domains, the sealed releases of sealed sites the user visits (so a check is instant), the user's settings, the per-tab result, and a local log of the last 200 warnings and refusals shown in the popup. Nothing leaves the device. |
+| `storage` | Keeps, on the device only: the public list of sealed domains, the sealed releases and domain proofs of sealed sites the user visits (so a check is instant), settings, the per-tab result, and a local log of the last 200 warnings and refusals shown in the popup. Nothing is synced or uploaded. |
 | `alarms` | Refreshes the public list of sealed domains every 5 minutes, so Guard knows which sites are sealed without asking anyone about the site the user is on. |
-| Host permission `https://xlayerrpc.okx.com/*`, `https://xlayer.drpc.org/*` | The two public X Layer RPC nodes Guard reads the sealed-domain list and sealed releases from. Every fact is read from both and must match; a difference is "could not check". |
-| Host permission `https://rpc.mainnet.arc.io/*`, `https://arc-mainnet.drpc.org/*`, `https://rpc.testnet.arc.io/*`, `https://arc-testnet.drpc.org/*` | Two public RPC nodes per Arc network, read only on a sealed site whose contracts are on Arc, to check that a contract the user is asked to sign for was created by the site's sealed factory for that user. |
-| Content scripts on `http://*/*`, `https://*/*` (an isolated script and a page-world script, at `document_start`) | Guard can't know in advance which site is sealed, and a hijacked page acts from its first script. The scripts ask the extension (locally) whether the current domain is sealed; on a domain that isn't sealed they do nothing and make no network request. On a sealed domain they compare the page's scripts with the sealed hashes and hold each wallet signature request until Guard has checked it. The page-world script is needed to see the page's wallet provider (`window.ethereum`, EIP-6963). |
+| Host permissions `https://xlayerrpc.okx.com/*`, `https://xlayer.drpc.org/*` | The two public X Layer RPC nodes Guard reads the sealed-domain list and sealed releases from. Every fact is read from both and must match; a difference means "could not check". |
+| Host permissions `https://rpc.mainnet.arc.io/*`, `https://arc-mainnet.drpc.org/*`, `https://rpc.testnet.arc.io/*`, `https://arc-testnet.drpc.org/*` | Two public RPC nodes per Arc network, read only on a sealed site whose contracts are on Arc, to check that a contract the user is asked to sign for was created by the site's sealed factory for that user. |
+| Content scripts on `http://*/*`, `https://*/*`, all frames, at `document_start` (one isolated script, one page-world script) | Guard can't know in advance which site is sealed, and a hijacked page acts from its first script. The scripts ask the extension (locally) whether the current domain is sealed; on a domain that isn't sealed they do nothing and make no network request. On a sealed domain they compare the page's scripts with the sealed hashes and hold each wallet signature request until Guard has checked it. The page-world script is needed to see the page's wallet providers (`window.ethereum`, EIP-6963). All frames: wallets also inject into iframes of the same site, which a hijacked page could use to reach the wallet; Guard checks signing requests in iframes whose every ancestor is the same site, and returns at once in any other frame. |
 
-**Remote code:** No, I am not using remote code. (All JavaScript is in the package; Guard only reads data: hashes,
-addresses and circuit answers.)
+**Remote code:** No, I am not using remote code. All JavaScript is in the package; Guard only reads data (hashes,
+addresses, circuit answers).
 
-**Data usage (what the form asks you to tick):** Guard collects **none** of the listed categories (personally
-identifiable information, health, financial and payment information, authentication information, personal
-communications, location, web history, user activity, website content). Pages and signature requests are checked in
-the browser and never transmitted. Certify all three statements: not sold to third parties; not used or transferred
-for purposes unrelated to the single purpose; not used or transferred to determine creditworthiness or for lending.
+**Data usage:** tick **none** of the categories. Guard transmits none of them: pages and signature requests are checked
+in the browser; the local event log never leaves the device (the store's categories are about data collected or
+transmitted). Certify all three statements (not sold; not used for unrelated purposes; not used for creditworthiness).
 
-**Privacy policy URL:** https://github.com/kenil1710/signet/blob/main/docs/PRIVACY.md (also served at
-https://signetguard.xyz/privacy from the next site release).
+**Privacy policy URL:** https://signetguard.xyz/privacy (live, HTTP 200; the same text as `docs/PRIVACY.md`).
 
-## Before submitting
+## Before you click Submit
 
-- Tag `guard-v0.3.2` so the workflow builds, attests and attaches the zip; download that zip and check its SHA-256
-  matches the release notes.
-- Test it once with a real wallet (MetaMask or OKX Wallet) on signetguard.xyz and on misthos.world (observe mode), and
-  say so in the listing only after that.
-- Review usually takes a few days; extensions with content scripts on all sites can take longer.
+- Upload `signet-guard-0.3.7.zip` from the GitHub release (not a local build) and check the dashboard shows version 0.3.7.
+- Review can take several days; extensions with content scripts on all sites often get a longer review.
+- After approval: put the store link in the site (`chromeWebStore` in `packages/dashboard/src/landing/config.ts`, now a
+  "coming soon" link) in a later site release, and say "in the Chrome Web Store" only after that.
