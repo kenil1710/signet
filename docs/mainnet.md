@@ -226,7 +226,7 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - **Sealed** call to the gate (`enforced()`, 0 OKB): OKX opened; rejected by hand.
 - The two earlier OKX failures the same day: with Guard 0.3.5/0.3.6 before the channel check, Guard can't wrap OKX's
   provider; the second ran a Guard build loaded before the check existed (`docs/decisions.md`).
-- **Both wallets now tested by hand with refusals:** Rabby (Guard 0.3.5, see below) and OKX Wallet (Guard 0.3.6).
+- **Both wallets now tested by hand with refusals:** Rabby (Guard 0.3.5, then 0.3.6 with the 4001 reply) and OKX Wallet (Guard 0.3.6).
 
 ## Release #17 sealed (2026-11-28, tier 00), not proposed: wallets tested, said plainly
 
@@ -248,8 +248,8 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
   action went through).
 - **Not clean yet:** the console printed nothing for the refused request (its promise should reject with 4001), and a
   sealed call sent afterwards didn't open Rabby either. Not reproduced headless with the same Rabby build (rejects with
-  4001 in ~1 s, also with OKX installed alongside); Guard 0.3.6 answers the page before drawing the notice. To check
-  again by hand.
+  4001 in ~1 s, also with OKX installed alongside); Guard 0.3.6 answers the page before drawing the notice. Checked
+  again by hand with Guard 0.3.6: fixed (rejects with 4001, see "Rabby with Guard 0.3.6" above).
 - **OKX Wallet 4.26.0, same day, first Guard 0.3.6 test build (before the channel check):** not intercepted. Unsealed requests through
   `window.okxwallet` and `window.ethereum` opened OKX; Guard was never asked. Root cause and fix: `docs/decisions.md`
   (2026-11-28).
@@ -260,6 +260,16 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - `scripts/release-site.sh 16` at 11:51 UTC: Cloudflare deployment `6cb3633c` (7 new files, 20 reused), then publish tx [`0xf353f3c1…e708`](https://web3.okx.com/explorer/x-layer/tx/0xf353f3c1ff8333b1853bf82ec69dad6000c515defea592ed74c247f525e2e708) (block 76,924,876 at 11:51:52 UTC, 292,923 gas; decided by circuit #6), `signet/files.json` written (1,889,686 gas) and read back.
 - Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
 - CI key after #16's publish: 0.002858 OKB.
+
+## Rabby with Guard 0.3.6 (2026-11-28): the refused request rejects with 4001
+
+- **Setup:** signetguard.xyz/app (release #17, enforce mode), Guard 0.3.6 (build 5071a22, the GitHub pre-release),
+  Rabby, by hand in the founder's normal profile.
+- **Unsealed request:** the console printed `4001 Signet Guard refused this signature: Contract not in the sealed
+  allowlist…`, Guard showed its refusal page, and **Rabby never opened**.
+- Closes the open point from the first Rabby refusal (Guard 0.3.5): the page's promise no longer hangs; it rejects with
+  4001. Both wallets are now tested by hand with Guard 0.3.6 refusals: Rabby and OKX Wallet.
+- From here on, code freeze until the submission: only real bugs are fixed.
 
 ## Release #17 published (2026-11-28, tier 00): Guard tested by hand with Rabby and OKX Wallet, Guard 0.3.6 links
 
