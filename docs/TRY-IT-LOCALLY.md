@@ -105,8 +105,12 @@ wrong block* copies a report to the clipboard (Guard sends nothing anywhere).
 ## What has and hasn't been tested
 
 The flow above was run headless with a **mock** wallet (green → red with nothing reaching the wallet → verified
-copy). It has **not** been run with real MetaMask yet: you are the first. If MetaMask behaves differently (for
-example, a request reaching the MetaMask popup on the red page, or the badge staying grey), note what you clicked
-and what you saw.
+copy), and on 2026-11-28 with the **real Rabby** extension (user1 imported, X Layer's RPC set to the fork in Rabby →
+More → Modify RPC URL): green; a sealed *Approve* opens Rabby; `try:hack` gives the red page and Rabby never opens;
+`?spender=0xBAD…` is refused (4001) and Rabby never opens. With Rabby, pick **X Layer** in its connect prompt (it
+offers Ethereum first). Since 2026-11-28 `try:setup` also writes the site's domain proof
+(`/.well-known/signet.json`); a setup made before that leaves the site grey: run `pnpm try:setup` again. If a wallet
+behaves differently (for example, a request reaching the wallet on the red page, or the badge staying grey), note
+what you clicked and what you saw.
 
 To stop: Ctrl+C in the `try:serve` terminal; `pnpm staging:down` stops the chain.
