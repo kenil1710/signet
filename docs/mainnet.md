@@ -205,6 +205,12 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
+## Release #20 published (2026-11-28, tier 00): Guard 0.3.8 links, OKX fixed in 0.3.8
+
+- Approved by approver A; timelock over at 15:35:26 UTC; published by `scripts/release-site.sh 20`: Cloudflare deployment `74c9a7f6` (5 new files, 22 reused), publish tx [`0xfe08d0fa…3453`](https://web3.okx.com/explorer/x-layer/tx/0xfe08d0faeb91d589061872c6a607ea14980495f53a1ac69418797e50789a3453) (block 77,111,137 at 15:36:13 UTC, 292,923 gas), `signet/files.json` written (1,889,931 gas) and read back.
+- Checks: 27/27 live files equal `release/20`; `/api/check` and `/api/watchtower` JSON; unknown path → sealed 404; release #20, enforce mode, manifest `0x1be635a3…f006`, no open proposals on both RPCs (rpc.xlayer.tech, xlayerrpc.okx.com); the live home page (×4) and /start (×1) link guard-v0.3.8 only; the released Guard 0.3.8 zip: green on `/`, `/app`, `/start`, a 404 page; a tampered `/start` red, then green.
+- CI key after #20: 0.002670 OKB. Full code freeze from here to the submission: real bugs only.
+
 ## Release #20 proposed (2026-11-28, tier 00): Guard 0.3.8 links, OKX fixed in 0.3.8
 
 - Proposed by the CI key at 14:32:43 UTC: tx [`0xb3e2dac9…6de4`](https://web3.okx.com/explorer/x-layer/tx/0xb3e2dac96f47882b7d500e26cd075705f2cd7ad024b2f81072cb61a3fe3a6de4) (block 77,107,327, 168,996 gas), manifest `0x1be635a3…f006`. Tier 00: 1 approval + 1 h. CI key after: 0.002713 OKB.
