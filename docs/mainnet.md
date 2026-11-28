@@ -205,7 +205,11 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Release #20 sealed (2026-11-28, tier 00), not proposed: Guard 0.3.8 links, OKX fixed in 0.3.8
+## Release #20 proposed (2026-11-28, tier 00): Guard 0.3.8 links, OKX fixed in 0.3.8
+
+- Proposed by the CI key at 14:32:43 UTC: tx [`0xb3e2dac9…6de4`](https://web3.okx.com/explorer/x-layer/tx/0xb3e2dac96f47882b7d500e26cd075705f2cd7ad024b2f81072cb61a3fe3a6de4) (block 77,107,327, 168,996 gas), manifest `0x1be635a3…f006`. Tier 00: 1 approval + 1 h. CI key after: 0.002713 OKB.
+
+## Release #20 sealed (2026-11-28, tier 00), not proposed at the time (proposed above): Guard 0.3.8 links, OKX fixed in 0.3.8
 
 - `release/20` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`: manifest
   `0x1be635a3…f006` (filesRoot `0xb6fb13a9…a59c`; the gate's `manifestHashOf` gives the same). Allowlist and origins
