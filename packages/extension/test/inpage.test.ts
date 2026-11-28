@@ -9,7 +9,9 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 
-const SOURCE = stripTypeScriptTypes(readFileSync(new URL('../src/inpage.ts', import.meta.url), 'utf8'));
+// inpage.ts imports lib/wire.ts (bundled by the build); here the two are joined into one classic script
+const WIRE = stripTypeScriptTypes(readFileSync(new URL('../src/lib/wire.ts', import.meta.url), 'utf8')).replace(/^export /gm, '');
+const SOURCE = WIRE + '\n' + stripTypeScriptTypes(readFileSync(new URL('../src/inpage.ts', import.meta.url), 'utf8')).replace(/^import .*$/m, '');
 const ME = '0x1111111111111111111111111111111111111111';
 const TOKEN = '0x1e4a5963abfd975d8c9021ce480b42188849d41d';
 const ROUTER = '5fbdb2315678afecb367f032d93f642f64180aa3';
@@ -218,4 +220,81 @@ test('reads still work: a non-signing request goes straight to the wallet with t
   assert.equal(await run(`window.okxwallet.request({ method: 'eth_getBalance', params: ['${ME}', 'latest'] })`), null);
   assert.deepEqual(calls.map((c) => [c.provider, c.method, c.params]), [['window.okxwallet.ethereum', 'eth_accounts', 'null'], ['window.okxwallet', 'eth_getBalance', `["${ME}","latest"]`]]);
   assert.equal(asks.length, 0);
+});
+
+// ---- 0.3.8: a wallet's own channel, held where it is posted (window.postMessage), before any listener sees it.
+// Chrome runs listeners on one target in registration order, so content.ts's listener can't be relied on to run
+// before the wallet's; the frame must not be dispatched at all until Guard has decided.
+const okxFrame = (id: number, req: { method: string; params: unknown }) => ({ target: 'okexwallet-contentscript', data: { name: 'okexwallet-provider', data: { jsonrpc: '2.0', id, ...req } } });
+/// A page whose window.postMessage records what is actually dispatched (what a wallet's listener would receive).
+function channelPage(mode: Mode) {
+  const posted: unknown[] = [];
+  const pg = page(mode, {
+    before: (w, calls) => {
+      w.postMessage = function (this: unknown, message: unknown) { posted.push(JSON.parse(JSON.stringify(message))); };
+      w.location = { origin: 'https://site.example' };
+      w.ethereum = mockProvider('window.ethereum', calls); // what walletInfo reads the chain and accounts from
+    },
+  });
+  return { ...pg, posted };
+}
+const sent = (posted: unknown[]) => posted.filter((m) => (m as { target?: string }).target === 'okexwallet-contentscript' && /sendTransaction/.test(JSON.stringify(m)));
+const replies = (posted: unknown[]) => posted.filter((m) => (m as { target?: string }).target === 'okexwallet-inpage') as { data: { data: { id: number; error?: { code: number; message: string } } } }[];
+
+test('0.3.8 enforce: a wallet frame for an unsealed spender posted with window.postMessage is never dispatched; the page gets the wallet\'s own 4001 reply', async () => {
+  const { run, posted, asks } = channelPage('enforce');
+  await settle();
+  run(`window.postMessage(${JSON.stringify(okxFrame(7, approve(DRAINER)))}, 'https://site.example')`);
+  await settle(60);
+  assert.equal(sent(posted).length, 0, 'the frame never reached a listener');
+  assert.equal(asks.length, 1);
+  const r = replies(posted);
+  assert.equal(r.length, 1);
+  assert.equal(r[0]!.data.data.id, 7);
+  assert.equal(r[0]!.data.data.error!.code, 4001);
+  assert.match(r[0]!.data.data.error!.message, /^Signet Guard refused this signature: Spender not in the sealed allowlist/);
+});
+
+test('0.3.8 enforce: a sealed request is held until Guard allows it, then the copy Guard checked is dispatched', async () => {
+  const { run, posted, asks } = channelPage('enforce');
+  await settle();
+  run(`(() => { const f = ${JSON.stringify(okxFrame(8, approve(ROUTER)))}; window.postMessage(f, 'https://site.example'); f.data.data.params[0].data = '0x095ea7b3${DRAINER.padStart(64, '0')}${'f'.repeat(64)}'; })()`);
+  assert.equal(sent(posted).length, 0, 'not dispatched before the decision');
+  await settle(60);
+  assert.equal(asks.length, 1);
+  const s = sent(posted);
+  assert.equal(s.length, 1);
+  assert.ok(JSON.stringify(s[0]).includes(ROUTER) && !JSON.stringify(s[0]).includes(DRAINER), 'the wallet got the checked copy, not the page object changed afterwards');
+});
+
+test('0.3.8: on a domain that is not sealed, frames are dispatched at once and Guard is never asked', async () => {
+  const { run, posted, asks } = channelPage('unsealed');
+  await settle();
+  run(`window.postMessage(${JSON.stringify(okxFrame(9, approve(DRAINER)))}, 'https://site.example')`);
+  assert.equal(sent(posted).length, 1, 'synchronous');
+  await settle(30);
+  assert.equal(asks.length, 0);
+});
+
+test('0.3.8: frames that are not signing requests pass at once; a request a wrapped provider already got allowed is not asked about twice', async () => {
+  const { run, posted, asks } = channelPage('enforce');
+  await settle();
+  run(`window.postMessage(${JSON.stringify(okxFrame(10, { method: 'eth_chainId', params: [] }))}, 'https://site.example'); window.postMessage('SYN', '*')`);
+  assert.equal(posted.length, 2, 'not held');
+  // a wrapped provider whose page script then posts the same request as a frame (MetaMask does)
+  await run(`window.ethereum.request(${JSON.stringify(approve(ROUTER))})`);
+  assert.equal(asks.length, 1);
+  run(`window.postMessage(${JSON.stringify(okxFrame(11, approve(ROUTER)))}, 'https://site.example')`);
+  await settle(30);
+  assert.equal(asks.length, 1, 'allowed a moment ago through the provider: not asked again');
+  assert.equal(sent(posted).length, 1);
+});
+
+test('0.3.8: postMessage called on another window (this is not ours) is passed through untouched', async () => {
+  const { run, posted, asks } = channelPage('enforce');
+  await settle();
+  run(`window.postMessage.call({}, ${JSON.stringify(okxFrame(12, approve(DRAINER)))}, '*')`);
+  await settle(30);
+  assert.equal(asks.length, 0);
+  assert.equal(posted.length, 1);
 });

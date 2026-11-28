@@ -6,6 +6,8 @@
 // The page shares this world, so: native functions are saved before page code can replace them, providers are
 // patched in place (the page never holds an unwrapped reference), and the link to the content script uses
 // event names that contain a random secret handed over synchronously, before page scripts run.
+import { requestKey, signRequestIn, type WireRequest } from './lib/wire.ts';
+
 (() => {
   // the top frame, or (0.3.7) an iframe whose every ancestor has this page's origin: a wallet that injects into
   // iframes (OKX) would otherwise answer such a frame unguarded, under the sealed site's name. Other frames: nothing.
@@ -88,22 +90,80 @@
     }
     const chainId = await request({ method: 'eth_chainId' }).catch(() => null);
     const accounts = await request({ method: 'eth_accounts' }).catch(() => []);
-    const id = nextId++;
-    const decision = await new Promise<{ refused: boolean; message: string }>((res) => {
-      asks.set(id, res);
-      later(() => res({ refused: false, message: '' }), 20000); // Guard not answering: fail-open
-      try {
-        up({ type: 'sign', id, req: { method, params: readable ? copy : [], chainId, accounts } });
-      } catch {
-        res({ refused: false, message: '' });
-      }
-    });
+    const decision = await askGuard(method, readable ? copy : [], chainId, accounts);
     if (decision.refused) {
       const err = new Error(`Signet Guard refused this signature: ${decision.message}`) as Error & { code: number };
       err.code = 4001; // EIP-1193: the request was rejected
       throw err;
     }
+    if (readable) remember(method, copy);
     return go(readable ? copy : params);
+  }
+
+  /// Guard's decision on one signing request (the content script asks the service worker).
+  function askGuard(method: string, params: unknown, chainId: unknown, accounts: unknown): Promise<{ refused: boolean; message: string }> {
+    const id = nextId++;
+    return new Promise<{ refused: boolean; message: string }>((res) => {
+      asks.set(id, res);
+      later(() => res({ refused: false, message: '' }), 20000); // Guard not answering: fail-open
+      try {
+        up({ type: 'sign', id, req: { method, params, chainId, accounts } });
+      } catch {
+        res({ refused: false, message: '' });
+      }
+    });
+  }
+
+  // ---- 0.3.8: a wallet's own channel, held where it is posted
+  // A wallet's page script hands each request to its content script with window.postMessage (OKX, whose provider
+  // can't be wrapped; also MetaMask, Rabby, ...), and page code can post such a frame itself. content.ts's listener can
+  // stop a frame only if Chrome runs it before the wallet's listener, and Chrome runs listeners on one target in the
+  // order they were registered (capture or not), which depends on the order the extensions were injected in. So the
+  // frame is held here, before any listener sees it: Guard decides, then the copy Guard checked is posted, or the page
+  // gets the wallet's own 4001 reply. A script that takes postMessage from another frame skips this (THREAT_MODEL);
+  // content.ts still stops that frame when its listener runs first.
+  const allowed = new Map<string, number>(); // requests Guard just allowed through a wrapped provider: key -> time
+  function remember(method: string, params: unknown): void {
+    const k = requestKey(method, params);
+    if (k) allowed.set(k, Date.now());
+  }
+  const nativePost = (window as unknown as { postMessage?: (...a: unknown[]) => void }).postMessage;
+  if (typeof nativePost === 'function') {
+    const post = (...a: unknown[]) => void Reflect.apply(nativePost, window, a);
+    // `copy` is taken when the page posts (as postMessage itself clones at once): a page changing its object later
+    // changes nothing; null when the frame isn't JSON (Guard is then asked with no params: refused in enforce mode)
+    const hold = async (req: WireRequest, a: unknown[], copy: unknown): Promise<void> => {
+      if (!(await isSealed())) return copy !== null && a.length <= 2 ? post(copy, ...a.slice(1)) : post(...a);
+      const checked = copy !== null && a.length <= 2 ? signRequestIn(copy) : null; // the wallet gets this copy
+      const k = checked ? requestKey(checked.method, checked.params) : null;
+      const at = k ? allowed.get(k) : undefined;
+      if (k && at !== undefined && Date.now() - at < 60_000) {
+        allowed.delete(k); // a wrapped provider already got exactly this request allowed
+        return post(copy, ...a.slice(1));
+      }
+      const w = await walletInfo(req.wallet);
+      const d = await askGuard(req.method, checked ? checked.params : [], w.chainId, w.accounts);
+      if (!d.refused) return checked ? post(copy, ...a.slice(1)) : post(...a);
+      const reply = (checked ?? req).reply;
+      if (reply) post(reply(4001, `Signet Guard refused this signature: ${d.message}`), typeof a[1] === 'string' ? a[1] : location.origin);
+    };
+    const guarded = function (this: unknown, ...a: unknown[]): void {
+      // another window's postMessage called with ours as this, or a domain known not to be sealed: untouched
+      if ((this !== undefined && this !== null && this !== window) || sealed === false) return void Reflect.apply(nativePost, this ?? window, a);
+      let req: WireRequest | null = null;
+      try {
+        req = signRequestIn(a[0]);
+      } catch { /* not a frame Guard reads */ }
+      if (!req) return post(...a);
+      let copy: unknown = null;
+      try {
+        copy = fromJson(toJson(a[0]));
+      } catch { /* not JSON */ }
+      void hold(req, a, copy);
+    };
+    try {
+      Object.defineProperty(window, 'postMessage', { value: guarded, writable: true, configurable: true, enumerable: true });
+    } catch { /* ignore: content.ts's listener still checks the channel */ }
   }
 
   // ---- wrapping providers

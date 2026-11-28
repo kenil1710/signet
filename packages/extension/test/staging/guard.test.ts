@@ -10,7 +10,7 @@ import type { Page } from 'playwright';
 import { encodeLabel } from '../../src/lib/label.ts';
 import {
   anvil, net, sealDemoDapp, switchToEnforce, serveSite, rpcProxy, buildExtension, startGateway, openBrowser, until, synced, tabIdOf, badge, events, siteState, signed,
-  DEMO_DIR, DRAINER, DRAIN_DATA, ROUTER, VENDOR_PATHS, OKX_LIKE_WALLET, type Project, type Site, type Proxy, type Session,
+  DEMO_DIR, DRAINER, DRAIN_DATA, ROUTER, VENDOR_PATHS, OKX_LIKE_WALLET, guardOrdered, unpackedId, type Project, type Site, type Proxy, type Session,
 } from './harness.ts';
 
 const domain = `guard-${Date.now().toString(36)}.signet.test`;
@@ -23,8 +23,8 @@ let gateway: Awaited<ReturnType<typeof startGateway>>;
 let origin: string;
 const open: Session[] = [];
 
-async function browser(o: { late?: boolean; vendors?: boolean; extensions?: string[] } = {}): Promise<Session> {
-  const s = await openBrowser(ext, { origin, late: o.late, vendors: o.vendors, extensions: o.extensions });
+async function browser(o: { late?: boolean; vendors?: boolean; extensions?: string[]; ext?: string } = {}): Promise<Session> {
+  const s = await openBrowser(o.ext ?? ext, { origin, late: o.late, vendors: o.vendors, extensions: o.extensions });
   open.push(s);
   await synced(s, domain);
   return s;
@@ -295,8 +295,13 @@ test('enforce mode (Guard 0.3.6): a direct request through any wallet global (wi
   }
 });
 
-test("enforce mode (Guard 0.3.6): a wallet Guard can't wrap (built like OKX 4.26.0) is checked on its own channel: unsealed refused [4001] before the wallet sees it, sealed reaches it", async () => {
-  const s = await browser({ extensions: [OKX_LIKE_WALLET] });
+// Chrome injects content scripts in extension-id order and runs listeners on one target in registration order, so
+// these run Guard both before and after the wallet on purpose (0.3.8: the frame is held in the page, before any
+// listener; 0.3.6-0.3.7 passed or failed this by the luck of the build folder's id).
+for (const guardFirst of [true, false]) test(`enforce mode (Guard 0.3.8), Guard's scripts ${guardFirst ? 'before' : 'after'} the wallet's: a wallet Guard can't wrap (built like OKX 4.26.0) is checked on its own channel: unsealed refused [4001] before the wallet sees it (also a frame page code posts itself), sealed reaches it`, async () => {
+  const ordered = guardOrdered(ext, OKX_LIKE_WALLET, guardFirst);
+  assert.equal(unpackedId(ordered) < unpackedId(OKX_LIKE_WALLET), guardFirst, 'the extension order this run is meant to test');
+  const s = await browser({ extensions: [OKX_LIKE_WALLET], ext: ordered });
   const { page, tab } = await visit(s);
   await light(s, tab, 'OK');
   const r = await page.evaluate(async ({ drainer, router }) => {
@@ -310,11 +315,19 @@ test("enforce mode (Guard 0.3.6): a wallet Guard can't wrap (built like OKX 4.26
       ethUnsealed: await go(w.ethereum, tx(drainer)),
       okxSealed: await go(w.okxwallet, tx(router)),
       chainId: await go(w.okxwallet, { method: 'eth_chainId' }),
+      // hostile page code posting the wallet's own frame itself, skipping the provider: held in the page too
+      raw: await new Promise<string>((res) => {
+        const id = 4242;
+        addEventListener('message', (e) => { const d = (e.data as { target?: string; data?: { data?: { id?: number; error?: { code: number }; result?: unknown } } })?.data?.data; if ((e.data as { target?: string })?.target === 'mockokx-inpage' && d?.id === id) res(d.error ? `${d.error.code}` : 'SENT'); });
+        window.postMessage({ target: 'mockokx-contentscript', data: { name: 'mockokx-provider', data: { jsonrpc: '2.0', id, ...tx(drainer) } } }, location.origin);
+        setTimeout(() => res('(no answer)'), 15000);
+      }),
       calls: JSON.parse(document.documentElement.dataset.mockOkxCalls || '[]') as { method: string; params: string }[],
     };
   }, { drainer: DRAINER, router: ROUTER });
   await dismiss(page);
   assert.equal(r.wrapped, false);
+  assert.equal(r.raw, '4001', 'a frame the page posts itself is refused too');
   assert.match(r.okxUnsealed, /^4001 Signet Guard refused this signature: Spender not in the sealed allowlist/);
   assert.match(r.ethUnsealed, /^4001 Signet Guard refused this signature: Spender not in the sealed allowlist/);
   assert.equal(r.okxSealed, 'SENT 0xabab');
@@ -323,13 +336,15 @@ test("enforce mode (Guard 0.3.6): a wallet Guard can't wrap (built like OKX 4.26
   assert.equal(sent.length, 1, JSON.stringify(r.calls));
   assert.ok(sent[0]!.params.includes(ROUTER.toLowerCase().slice(2)) && !r.calls.some((c) => c.params.includes(DRAINER.toLowerCase().slice(2))), 'only the sealed approve reached the wallet');
   const refused = (await events(s)).filter((e) => e.refused);
-  assert.ok(refused.length >= 2);
+  assert.ok(refused.length >= 3);
   assert.ok(refused.every((e) => e.details.some((d) => /^decided by the Guard circuit, row 0x[0-9a-f]{3}/.test(d))), JSON.stringify(refused.map((e) => e.details.at(-1))));
   await s.close();
 });
 
-test('enforce mode (Guard 0.3.7): a same-origin iframe reaches a wallet that injects into iframes (like OKX) only through Guard; the tab stays the top page\'s', async () => {
-  const s = await browser({ extensions: [OKX_LIKE_WALLET] });
+for (const guardFirst of [true, false]) test(`enforce mode (Guard 0.3.8), Guard's scripts ${guardFirst ? 'before' : 'after'} the wallet's: a same-origin iframe reaches a wallet that injects into iframes (like OKX) only through Guard; the tab stays the top page's`, async () => {
+  const ordered = guardOrdered(ext, OKX_LIKE_WALLET, guardFirst);
+  assert.equal(unpackedId(ordered) < unpackedId(OKX_LIKE_WALLET), guardFirst, 'the extension order this run is meant to test');
+  const s = await browser({ extensions: [OKX_LIKE_WALLET], ext: ordered });
   const { page, tab } = await visit(s);
   await light(s, tab, 'OK');
   const r = await page.evaluate(async ({ drainer, router }) => {

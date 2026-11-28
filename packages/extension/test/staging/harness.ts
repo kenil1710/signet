@@ -4,7 +4,8 @@
 // built extension loaded. Not product code.
 import http from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, existsSync, rmSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 // Every temp folder the harness makes (projects, builds, browser profiles) is removed when the test process exits,
 // so repeated runs don't fill the disk (a benchmark run made ~200). KEEP_TMP=1 keeps them for debugging.
@@ -261,6 +262,25 @@ export async function installMockWallet(ctx: BrowserContext, late = false, vendo
 /// A test wallet extension built like OKX Wallet 4.26.0 (non-configurable globals, a provider that ignores
 /// assignments, requests over window.postMessage): Guard can't wrap it and must check its channel instead.
 export const OKX_LIKE_WALLET = fileURLToPath(new URL('./okx-like-wallet', import.meta.url));
+/// Chrome's id for an unpacked extension: the first 32 hex digits of the sha256 of its absolute (real) path, 0-f as a-p.
+export function unpackedId(dir: string): string {
+  return [...createHash('sha256').update(realpathSync(dir)).digest('hex').slice(0, 32)].map((c) => String.fromCharCode(97 + parseInt(c, 16))).join('');
+}
+/// A copy of the Guard build whose extension id sorts before (`first`) or after another extension's. Chrome injects
+/// content scripts of different extensions in id order (measured: not in --load-extension order), and listeners on one
+/// target run in registration order: so this decides whether Guard's content-script listener runs before the wallet's.
+export function guardOrdered(ext: string, other: string, first: boolean): string {
+  const otherId = unpackedId(other);
+  for (let i = 0; i < 200; i++) {
+    const dir = tmp('guard-ext-ordered-');
+    if ((unpackedId(dir) < otherId) === first) {
+      cpSync(ext, dir, { recursive: true });
+      return dir;
+    }
+  }
+  throw new Error('no folder name gave the wanted id order');
+}
+
 export async function openBrowser(ext: string, o: { origin: string; late?: boolean; vendors?: boolean; extensions?: string[] }): Promise<Session> {
   const profile = tmp('guard-profile-');
   const ctx = await chromium.launchPersistentContext(profile, {

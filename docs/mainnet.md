@@ -205,7 +205,14 @@ After (xlayerrpc.okx.com and rpc.xlayer.tech): signet-dev balance **0**, nonce 2
 **The signet-dev rotation is complete:** signet-dev holds no OKB, no circuit NFT (#5, #6, #7 are in the site gate), and
 no role on the gate (not an approver, proposer, recovery or guardian). The guardian is signet-ops.
 
-## Release #19 sealed (2026-11-28, tier 00), not proposed: judge review 5 fixes, wallets line on the home page
+## Release #19 published (2026-11-28, tier 00): judge review 5 fixes, wallets line on the home page
+
+- Proposed by the CI key at 11:34:23 UTC (tx [`0xf01c2278…a920`](https://web3.okx.com/explorer/x-layer/tx/0xf01c22789f0f7d63e013847e3e15328002fb44a17920640df510d22fcd25a920), 168,984 gas); approved by approver A; published by `scripts/release-site.sh 19`: Cloudflare deployment `20d2721f` (8 new files, 19 reused), publish tx [`0x5742f0fa…07bb`](https://web3.okx.com/explorer/x-layer/tx/0x5742f0fa1320fde1e1dffac555c6553d4c8a8b7adb9cfe0d80ee3f2425a707bb) (block 77,100,405 at 12:37:21 UTC, 292,923 gas; circuit #6), `signet/files.json` written (1,889,943 gas) and read back.
+- Checks: 27/27 live files equal `release/19`; `/api/check` and `/api/watchtower` JSON; unknown path → sealed 404; `currentRelease()` 19, `enforced()` true, manifest `0xb3ed364f…` on both RPCs; the home page has the "Tested by hand …" line and the "Example" label; the released Guard 0.3.7: green on `/`, `/app`, `/start`, a 404 page; a tampered `/start` red, then green.
+- #19 was sealed before the OKX ordering finding (below in `docs/decisions.md`): its CLAIMS and /start still say OKX refusals work without the "not guaranteed in 0.3.6–0.3.7" note; the repo docs have it, the site gets it with the next release.
+- CI key after #19: 0.002717 OKB.
+
+## Release #19 sealed (2026-11-28, tier 00), not proposed at the time (published above): judge review 5 fixes, wallets line on the home page
 
 - `release/19` = the site built with `SIGNET_NETWORK=mainnet SIGNET_REPO_PUBLIC=1`, then `signet seal`: manifest
   `0xb3ed364f…5f1f` (filesRoot `0xaae4ec2f…f887`; the gate's `manifestHashOf` gives the same). Allowlist and origins

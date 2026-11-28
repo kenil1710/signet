@@ -34,7 +34,7 @@ These are cases Guard can't act on by design. They are not failures of the defen
 
 | Case | Threat | Result | What happens instead |
 |---|---|---|---|
-| the DNS hijack against a user WITHOUT Guard | 1 | **not protected** (reached the wallet: eth_sendTransaction) | Not blockable without Guard or a wallet that does the same check. The watchtower confirmed the mismatch on two loads and alerted the team 1.8 s into its round (it runs once a minute, so within about a minute of the hijack); the team can then freeze and warn users. |
+| the DNS hijack against a user WITHOUT Guard | 1 | **not protected** (reached the wallet: eth_sendTransaction) | Not blockable without Guard or a wallet that does the same check. The watchtower confirmed the mismatch on two loads and alerted the team 1.9 s into its round (it runs once a minute, so within about a minute of the hijack); the team can then freeze and warn users. |
 | A compromised Guard extension, build or Chrome Web Store account | 17 | **not run** (can't be tested from outside) | Defeats Guard entirely: it can feed the circuit any facts. Documented in `THREAT_MODEL.md`. |
 
 ## Clean sessions
