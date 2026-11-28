@@ -261,6 +261,12 @@ no role on the gate (not an approver, proposer, recovery or guardian). The guard
 - Checks: 27/27 live files equal `release/16`; `/api/check` (both sites sealed) and `/api/watchtower` answer JSON; an unknown path is a 404 with the sealed 404.html; `currentRelease()` = 16 and `enforced()` = true on both RPCs. Guard 0.3.5 (mainnet build): popup "Release #16 · this page matches", "Mode: enforce (Guard blocks)"; `/`, `/app`, `/start` and a 404 page green; a tampered `/start` red, then green again. The live home page, /start and llms.txt carry the new key-holder wording.
 - CI key after #16's publish: 0.002858 OKB.
 
+## Release #18 proposed (2026-11-28, tier 00): MetaMask tested by hand, Guard 0.3.7 links
+
+- Proposed by the CI key at 09:38:22 UTC: tx [`0xa0be5389…9aa3`](https://web3.okx.com/explorer/x-layer/tx/0xa0be5389b614e07444ddbaea3afb8c3e8ca774cdb63a2d8d718da00279149aa3) (block 77,089,666, 168,996 gas), manifest `0x7ebbd1af…20ca`. Tier 00 (allowlist and origins equal #17's): 1 approval + 1 h.
+- No link in the site, README, docs or llms.txt uses `/releases/latest` (all name the exact tag), so guard-v0.3.7 stays a pre-release.
+- CI key after the proposal: 0.002807 OKB.
+
 ## Guard 0.3.7 published; release #18 sealed (2026-11-28, tier 00), not proposed
 
 - **Guard 0.3.7** pre-release: https://github.com/kenil1710/signet/releases/tag/guard-v0.3.7 (tag on `5f28338`, the
